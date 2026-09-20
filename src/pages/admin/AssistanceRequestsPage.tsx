@@ -1,13 +1,13 @@
 import { useEffect, useMemo, useState } from 'react'
-import { Eye, RotateCcw } from 'lucide-react'
 import { AdminHeader } from '../../components/admin/AdminHeader'
 import { ApprovalDecisionModal } from '../../components/approval/ApprovalDecisionModal'
+import { AssistanceRequestRowActions } from '../../components/approval/AssistanceRequestRowActions'
 import { RequestDetailsModal } from '../../components/approval/RequestDetailsModal'
 import { VulnerabilityBadge, StatusBadge } from '../../components/admin/StatusBadge'
 import { Pagination } from '../../components/admin/Pagination'
 import { ResponsiveToolbar } from '../../components/layout/ResponsiveToolbar'
 import { ResponsiveTable } from '../../components/ui/ResponsiveTable'
-import { Button } from '../../components/ui/Button'
+import { PAGE_SIZE_DEFAULT, usePagination } from '../../hooks/usePagination'
 import { useReviewActor } from '../../hooks/useReviewActor'
 import { buildChanges, logAuditEvent } from '../../services/auditStorage'
 import {
@@ -40,6 +40,8 @@ export default function AssistanceRequestsPage() {
     if (statusFilter === 'All') return items
     return items.filter((item) => item.status === statusFilter)
   }, [items, statusFilter])
+
+  const pagination = usePagination(filtered, PAGE_SIZE_DEFAULT, statusFilter)
 
   function refreshItems() {
     setItems(getAssistanceItems())
@@ -106,9 +108,10 @@ export default function AssistanceRequestsPage() {
           </ResponsiveToolbar>
 
           <ResponsiveTable
-            data={filtered}
+            data={pagination.paginatedItems}
             keyExtractor={(row) => row.id}
             emptyMessage="No assistance requests match your filter."
+            stableRowCount={PAGE_SIZE_DEFAULT}
             columns={[
               {
                 key: 'association',
@@ -133,57 +136,25 @@ export default function AssistanceRequestsPage() {
               {
                 key: 'actions',
                 header: 'Actions',
+                colWidth: '26%',
                 render: (row) => (
-                  <div className="flex flex-wrap gap-2">
-                    <button
-                      type="button"
-                      onClick={() => setViewItem(row)}
-                      className="rounded px-2 py-1 text-xs font-medium text-primary hover:bg-green-50"
-                    >
-                      Full Details
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setViewItem(row)}
-                      className="rounded p-1 text-gray-400 hover:bg-gray-100 hover:text-primary"
-                      aria-label="View details"
-                    >
-                      <Eye className="h-4 w-4" />
-                    </button>
-                    {(row.status === 'PENDING' || row.status === 'UNDER REVIEW') && (
-                      <>
-                        <Button size="sm" onClick={() => setDecisionModal({ type: 'approve', item: row })}>
-                          Approve
-                        </Button>
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          onClick={() => setDecisionModal({ type: 'reject', item: row })}
-                        >
-                          Reject
-                        </Button>
-                      </>
-                    )}
-                    {row.decisions.length > 0 && (
-                      <button
-                        type="button"
-                        onClick={() => setDecisionModal({ type: 'override', item: row })}
-                        className="rounded p-1 text-gray-400 hover:bg-gray-100 hover:text-orange-600"
-                        aria-label="Override decision"
-                        title="Override"
-                      >
-                        <RotateCcw className="h-4 w-4" />
-                      </button>
-                    )}
-                  </div>
+                  <AssistanceRequestRowActions
+                    item={row}
+                    onView={setViewItem}
+                    onApprove={(item) => setDecisionModal({ type: 'approve', item })}
+                    onReject={(item) => setDecisionModal({ type: 'reject', item })}
+                    onOverride={(item) => setDecisionModal({ type: 'override', item })}
+                  />
                 ),
               },
             ]}
           />
 
           <Pagination
-            showing={`Showing 1 to ${filtered.length} of ${filtered.length} entries`}
-            totalPages={Math.max(1, Math.ceil(filtered.length / 6))}
+            showing={pagination.showing}
+            currentPage={pagination.currentPage}
+            totalPages={pagination.totalPages}
+            onPageChange={pagination.setCurrentPage}
           />
         </div>
       </main>

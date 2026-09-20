@@ -14,6 +14,8 @@ import {
   subscribeMemberStorage,
 } from '../../services/memberStorage'
 import { useAuth } from '../../context/AuthContext'
+import { PAGE_SIZE_DEFAULT, usePagination } from '../../hooks/usePagination'
+import { TableActionsCell } from '../../components/ui/TableActionsCell'
 import { getInitials } from '../../utils/userDisplay'
 
 function vulnerabilityVariant(level: VulnerabilityLevel) {
@@ -49,6 +51,13 @@ export default function MembersPage() {
       return membershipMatch && vulnerabilityMatch
     })
   }, [items, membershipFilter, vulnerabilityFilter])
+
+  const pagination = usePagination(
+    filtered,
+    PAGE_SIZE_DEFAULT,
+    `${membershipFilter}-${vulnerabilityFilter}`,
+    'members',
+  )
 
   function handleAdd() {
     setEditingMember(null)
@@ -121,11 +130,11 @@ export default function MembersPage() {
       key: 'actions',
       header: 'Actions',
       render: (r) => (
-        <div className="flex gap-2">
+        <TableActionsCell>
           <button
             type="button"
             onClick={() => handleEdit(r)}
-            className="rounded p-1 text-gray-400 hover:bg-gray-100 hover:text-primary"
+            className="shrink-0 rounded p-1 text-gray-400 hover:bg-gray-100 hover:text-primary"
             aria-label={`Edit ${r.name}`}
           >
             <Pencil className="h-4 w-4" />
@@ -133,12 +142,12 @@ export default function MembersPage() {
           <button
             type="button"
             onClick={() => handleView(r)}
-            className="rounded p-1 text-gray-400 hover:bg-gray-100 hover:text-primary"
+            className="shrink-0 rounded p-1 text-gray-400 hover:bg-gray-100 hover:text-primary"
             aria-label={`View ${r.name}`}
           >
             <Eye className="h-4 w-4" />
           </button>
-        </div>
+        </TableActionsCell>
       ),
     },
   ]
@@ -186,9 +195,17 @@ export default function MembersPage() {
             </Button>
           </div>
 
-          <DataTable columns={columns} data={filtered} keyExtractor={(r) => r.id} />
+          <DataTable
+            columns={columns}
+            data={pagination.paginatedItems}
+            keyExtractor={(r) => r.id}
+            stableRowCount={PAGE_SIZE_DEFAULT}
+          />
           <Pagination
-            showing={`Showing 1 to ${filtered.length} of ${items.length} members`}
+            showing={pagination.showing}
+            currentPage={pagination.currentPage}
+            totalPages={pagination.totalPages}
+            onPageChange={pagination.setCurrentPage}
           />
         </div>
       </main>

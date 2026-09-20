@@ -1,13 +1,15 @@
 import { useEffect, useMemo, useState } from 'react'
-import { Download, Eye } from 'lucide-react'
+import { Download } from 'lucide-react'
 import { DashboardNavbar } from '../../components/layout/DashboardNavbar'
 import { ApprovalDecisionModal } from '../../components/approval/ApprovalDecisionModal'
+import { AssistanceRequestRowActions } from '../../components/approval/AssistanceRequestRowActions'
 import { RequestDetailsModal } from '../../components/approval/RequestDetailsModal'
 import { DataTable, type Column } from '../../components/ui/DataTable'
 import { Badge } from '../../components/ui/Badge'
 import { Button } from '../../components/ui/Button'
 import { SearchBar } from '../../components/ui/SearchBar'
 import { Pagination } from '../../components/ui/Pagination'
+import { PAGE_SIZE_DEFAULT, usePagination } from '../../hooks/usePagination'
 import { useReviewActor } from '../../hooks/useReviewActor'
 import { buildChanges, logAuditEvent } from '../../services/auditStorage'
 import {
@@ -55,6 +57,8 @@ export default function StaffAssistanceRequestsPage() {
     if (activeTab === 'All') return items
     return items.filter((item) => item.status === activeTab)
   }, [items, activeTab])
+
+  const pagination = usePagination(filtered, PAGE_SIZE_DEFAULT, activeTab)
 
   function refreshItems() {
     setItems(getAssistanceItems())
@@ -126,23 +130,14 @@ export default function StaffAssistanceRequestsPage() {
     {
       key: 'actions',
       header: 'Actions',
+      colWidth: '26%',
       render: (r) => (
-        <div className="flex flex-wrap gap-2">
-          <Button size="sm" variant="outline" onClick={() => setViewItem(r)}>
-            <Eye className="h-4 w-4" />
-            Full Details
-          </Button>
-          {(r.status === 'PENDING' || r.status === 'UNDER REVIEW') && (
-            <>
-              <Button size="sm" onClick={() => setDecisionModal({ type: 'approve', item: r })}>
-                Approve
-              </Button>
-              <Button size="sm" variant="outline" onClick={() => setDecisionModal({ type: 'reject', item: r })}>
-                Reject
-              </Button>
-            </>
-          )}
-        </div>
+        <AssistanceRequestRowActions
+          item={r}
+          onView={setViewItem}
+          onApprove={(item) => setDecisionModal({ type: 'approve', item })}
+          onReject={(item) => setDecisionModal({ type: 'reject', item })}
+        />
       ),
     },
   ]
@@ -182,8 +177,18 @@ export default function StaffAssistanceRequestsPage() {
             </Button>
           </div>
 
-          <DataTable columns={columns} data={filtered} keyExtractor={(r) => r.id} />
-          <Pagination showing={`Showing 1 to ${filtered.length} of ${filtered.length} entries`} totalPages={1} />
+          <DataTable
+            columns={columns}
+            data={pagination.paginatedItems}
+            keyExtractor={(r) => r.id}
+            stableRowCount={PAGE_SIZE_DEFAULT}
+          />
+          <Pagination
+            showing={pagination.showing}
+            currentPage={pagination.currentPage}
+            totalPages={pagination.totalPages}
+            onPageChange={pagination.setCurrentPage}
+          />
         </div>
       </main>
 

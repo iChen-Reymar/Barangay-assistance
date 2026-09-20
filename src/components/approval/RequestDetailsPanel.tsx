@@ -12,8 +12,14 @@ import { Badge } from '../ui/Badge'
 import { Button } from '../ui/Button'
 import { DecisionTimeline } from './DecisionTimeline'
 import { VulnerabilityBadge, StatusBadge } from '../admin/StatusBadge'
+import { SupportingDocumentViewModal } from './SupportingDocumentViewModal'
 import { formatDecisionDate } from '../../services/decisionStorage'
 import { formatDate } from '../../services/authStorage'
+import {
+  buildDocumentPreview,
+  downloadSupportingDocument,
+  type DocumentPreview,
+} from '../../services/supportingDocumentService'
 import type {
   DocumentStatus,
   QualificationStatus,
@@ -59,13 +65,31 @@ export function RequestDetailsPanel({
   showDecisionHistory = true,
 }: RequestDetailsPanelProps) {
   const [activeTab, setActiveTab] = useState<Tab>('Details')
+  const [documentPreview, setDocumentPreview] = useState<DocumentPreview | null>(null)
   const details = item.details
+  const documentContext = {
+    association: item.association,
+    requestId: item.id,
+    requestType: item.requestType,
+  }
   const documents = item.documents ?? []
   const qualifications = item.qualifications ?? []
 
   const verifiedDocs = documents.filter((d) => d.status === 'verified').length
   const passedChecks = qualifications.filter((q) => q.status === 'passed').length
   const pendingChecks = qualifications.filter((q) => q.status === 'pending').length
+
+  function handleViewDocument(docId: string) {
+    const doc = documents.find((row) => row.id === docId)
+    if (!doc) return
+    setDocumentPreview(buildDocumentPreview(doc, documentContext))
+  }
+
+  function handleDownloadDocument(docId: string) {
+    const doc = documents.find((row) => row.id === docId)
+    if (!doc) return
+    downloadSupportingDocument(doc, documentContext)
+  }
 
   return (
     <div className="space-y-4">
@@ -220,11 +244,11 @@ export function RequestDetailsPanel({
                     )}
                   </div>
                   <div className="flex flex-wrap gap-2">
-                    <Button size="sm" variant="outline">
+                    <Button size="sm" variant="outline" onClick={() => handleViewDocument(doc.id)}>
                       <Eye className="h-3.5 w-3.5" />
                       View
                     </Button>
-                    <Button size="sm" variant="ghost">
+                    <Button size="sm" variant="ghost" onClick={() => handleDownloadDocument(doc.id)}>
                       <Download className="h-3.5 w-3.5" />
                       Download
                     </Button>
@@ -327,6 +351,16 @@ export function RequestDetailsPanel({
           <DecisionTimeline decisions={item.decisions} />
         </section>
       )}
+
+      <SupportingDocumentViewModal
+        open={documentPreview !== null}
+        onClose={() => setDocumentPreview(null)}
+        preview={documentPreview}
+        onDownload={() => {
+          if (!documentPreview) return
+          downloadSupportingDocument(documentPreview.document, documentContext)
+        }}
+      />
     </div>
   )
 }

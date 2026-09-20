@@ -1,10 +1,18 @@
 import type { ReactNode } from 'react'
+import {
+  TABLE_DESKTOP_CLASS,
+  TABLE_ROW_CLASS,
+  cellTruncateClass,
+  resolveColumnWidth,
+  tableBodyMinHeight,
+} from './tableLayout'
 
 export interface ResponsiveColumn<T> {
   key: string
   header: string
   render?: (row: T) => ReactNode
   className?: string
+  colWidth?: string
   mobileLabel?: string
   hideOnMobile?: boolean
   primary?: boolean
@@ -15,6 +23,7 @@ interface ResponsiveTableProps<T> {
   data: T[]
   keyExtractor: (row: T) => string
   emptyMessage?: string
+  stableRowCount?: number
 }
 
 export function ResponsiveTable<T>({
@@ -22,6 +31,7 @@ export function ResponsiveTable<T>({
   data,
   keyExtractor,
   emptyMessage = 'No records found.',
+  stableRowCount,
 }: ResponsiveTableProps<T>) {
   const mobileColumns = columns.filter((col) => !col.hideOnMobile)
   const primaryColumn = columns.find((col) => col.primary) ?? columns[0]
@@ -31,6 +41,11 @@ export function ResponsiveTable<T>({
     if (col.render) return col.render(row)
     return String((row as Record<string, unknown>)[col.key] ?? '')
   }
+
+  const desktopRows =
+    stableRowCount && data.length > 0
+      ? Array.from({ length: stableRowCount }, (_, index) => data[index] ?? null)
+      : data.map((row) => row)
 
   if (data.length === 0) {
     return (
@@ -69,8 +84,19 @@ export function ResponsiveTable<T>({
         ))}
       </div>
 
-      <div className="hidden overflow-x-auto md:block">
-        <table className="w-full text-sm">
+      <div
+        className="hidden overflow-x-auto md:block"
+        style={stableRowCount ? { minHeight: tableBodyMinHeight(stableRowCount) } : undefined}
+      >
+        <table className={TABLE_DESKTOP_CLASS}>
+          <colgroup>
+            {columns.map((col) => (
+              <col
+                key={col.key}
+                style={{ width: resolveColumnWidth(col.key, col.colWidth) }}
+              />
+            ))}
+          </colgroup>
           <thead>
             <tr className="border-b border-gray-100 bg-gray-50 text-left text-xs font-semibold uppercase text-gray-500">
               {columns.map((col) => (
@@ -81,15 +107,30 @@ export function ResponsiveTable<T>({
             </tr>
           </thead>
           <tbody>
-            {data.map((row) => (
-              <tr key={keyExtractor(row)} className="border-b border-gray-50 hover:bg-gray-50">
-                {columns.map((col) => (
-                  <td key={col.key} className={`px-4 py-3 ${col.className ?? ''}`}>
-                    {renderCell(row, col)}
-                  </td>
-                ))}
-              </tr>
-            ))}
+            {desktopRows.map((row, index) =>
+              row ? (
+                <tr key={keyExtractor(row)} className={`${TABLE_ROW_CLASS} border-b border-gray-50 hover:bg-gray-50`}>
+                  {columns.map((col) => (
+                    <td
+                      key={col.key}
+                      className={`px-4 py-3 align-middle ${cellTruncateClass(col.key)} ${col.className ?? ''} ${
+                        col.key === 'actions' ? 'whitespace-nowrap' : ''
+                      }`}
+                    >
+                      {renderCell(row, col)}
+                    </td>
+                  ))}
+                </tr>
+              ) : (
+                <tr key={`placeholder-${index}`} className={`${TABLE_ROW_CLASS} border-b border-gray-50`} aria-hidden>
+                  {columns.map((col) => (
+                    <td key={col.key} className="px-4 py-3">
+                      &nbsp;
+                    </td>
+                  ))}
+                </tr>
+              ),
+            )}
           </tbody>
         </table>
       </div>

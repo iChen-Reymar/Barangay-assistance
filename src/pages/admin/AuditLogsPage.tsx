@@ -6,6 +6,8 @@ import { Pagination } from '../../components/admin/Pagination'
 import { ResponsiveToolbar } from '../../components/layout/ResponsiveToolbar'
 import { ResponsiveTable } from '../../components/ui/ResponsiveTable'
 import { getAuditLogs, subscribeAuditLogs } from '../../services/auditStorage'
+import { applyAuditLogsPrivacy, getPrivacySettings, subscribePrivacySettings } from '../../services/privacyStorage'
+import { PAGE_SIZE_AUDIT, usePagination } from '../../hooks/usePagination'
 import type { AuditLogEntry } from '../../types/audit'
 
 const actionColors: Record<string, string> = {
@@ -31,19 +33,37 @@ export default function AuditLogsPage() {
 
   useEffect(() => {
     setLogs(getAuditLogs())
-    return subscribeAuditLogs(() => setLogs(getAuditLogs()))
+    const refresh = () => setLogs(getAuditLogs())
+    const unsubAudit = subscribeAuditLogs(refresh)
+    const unsubPrivacy = subscribePrivacySettings(refresh)
+    return () => {
+      unsubAudit()
+      unsubPrivacy()
+    }
   }, [])
 
+  const displayLogs = useMemo(
+    () => applyAuditLogsPrivacy(logs, getPrivacySettings()),
+    [logs],
+  )
+
   const filtered = useMemo(() => {
-    return logs.filter((row) => {
+    return displayLogs.filter((row) => {
       const userMatch = userFilter === 'All' || row.user === userFilter
       const actionMatch = actionFilter === 'All' || row.action === actionFilter
       return userMatch && actionMatch
     })
-  }, [logs, userFilter, actionFilter])
+  }, [displayLogs, userFilter, actionFilter])
 
-  const users = useMemo(() => uniqueUsers(logs), [logs])
-  const actions = useMemo(() => uniqueActions(logs), [logs])
+  const users = useMemo(() => uniqueUsers(displayLogs), [displayLogs])
+  const actions = useMemo(() => uniqueActions(displayLogs), [displayLogs])
+
+  const pagination = usePagination(
+    filtered,
+    PAGE_SIZE_AUDIT,
+    `${userFilter}-${actionFilter}`,
+    'events',
+  )
 
   return (
     <>
@@ -83,7 +103,8 @@ export default function AuditLogsPage() {
           </ResponsiveToolbar>
 
           <ResponsiveTable
-            data={filtered}
+            stableRowCount={PAGE_SIZE_AUDIT}
+            data={pagination.paginatedItems}
             keyExtractor={(row) => row.id}
             emptyMessage="No audit logs match your filters."
             columns={[
@@ -133,12 +154,10 @@ export default function AuditLogsPage() {
           />
 
           <Pagination
-            showing={
-              filtered.length === 0
-                ? 'Showing 0 events'
-                : `Showing 1 to ${filtered.length} of ${filtered.length} events`
-            }
-            totalPages={Math.max(1, Math.ceil(filtered.length / 10))}
+            showing={pagination.showing}
+            currentPage={pagination.currentPage}
+            totalPages={pagination.totalPages}
+            onPageChange={pagination.setCurrentPage}
           />
         </div>
       </main>

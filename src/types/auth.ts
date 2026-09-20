@@ -26,6 +26,8 @@ export interface StoredUser {
   associationType?: string
   associationAddress?: string
   registrationNumber?: string
+  isAnonymized?: boolean
+  anonymizedAt?: string
 }
 
 export interface SessionUser {

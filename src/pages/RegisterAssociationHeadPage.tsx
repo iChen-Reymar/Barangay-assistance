@@ -97,6 +97,13 @@ function RegisterAssociationHeadForm() {
 
       <div className="relative flex flex-col justify-center bg-white px-8 py-16 lg:px-12 xl:px-20">
         <div className="mx-auto w-full max-w-2xl">
+          <Link
+            to="/request-access"
+            className="mb-6 inline-block text-sm text-gray-500 transition hover:text-primary"
+          >
+            &larr; Choose account type
+          </Link>
+
           <h2 className="mb-2 text-3xl font-bold text-gray-900">Association Head Registration</h2>
           <p className="mb-8 text-sm text-gray-500">
             Register your barangay association and request portal access as the authorized head or
@@ -260,12 +267,6 @@ function RegisterAssociationHeadForm() {
           </form>
 
           <p className="mt-6 text-center text-sm text-gray-600">
-            Barangay staff member?{' '}
-            <Link to="/request-access" className="font-semibold text-primary hover:underline">
-              Request Staff Access
-            </Link>
-          </p>
-          <p className="mt-2 text-center text-sm text-gray-600">
             Already have an account?{' '}
             <Link to="/login" className="font-semibold text-primary hover:underline">
               Sign In

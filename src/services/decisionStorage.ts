@@ -210,6 +210,53 @@ export function verifyQualification(
   return enrichReviewableItem(items[index])
 }
 
+function isOlderThan(isoDate: string, days: number) {
+  const cutoff = Date.now() - days * 24 * 60 * 60 * 1000
+  return new Date(isoDate).getTime() < cutoff
+}
+
+export function anonymizeRejectedAssistanceRecords(retentionDays: number): number {
+  const items = readItems()
+  let count = 0
+  const updated = items.map((item) => {
+    if (item.status !== 'REJECTED') return item
+    const latestDecision = item.decisions[0]
+    if (!latestDecision || !isOlderThan(latestDecision.decidedAt, retentionDays)) return item
+    if (item.association.startsWith('Anonymized')) return item
+    count += 1
+    return {
+      ...item,
+      association: `Anonymized Request ${item.id.slice(0, 6).toUpperCase()}`,
+      details: item.details
+        ? {
+            ...item.details,
+            submittedBy: 'Anonymized',
+            contactNumber: '***-***-****',
+            email: undefined,
+            address: 'Redacted',
+            supportingInfo: 'Redacted per data retention policy.',
+          }
+        : item.details,
+      documents: [],
+    }
+  })
+  if (count > 0) writeItems(updated)
+  return count
+}
+
+export function purgeRejectedAssistanceOlderThan(days: number): number {
+  const items = readItems()
+  const kept = items.filter((item) => {
+    if (item.status !== 'REJECTED') return true
+    const latestDecision = item.decisions[0]
+    if (!latestDecision) return true
+    return !isOlderThan(latestDecision.decidedAt, days)
+  })
+  const removed = items.length - kept.length
+  if (removed > 0) writeItems(kept)
+  return removed
+}
+
 export function subscribeDecisionStorage(callback: () => void) {
   window.addEventListener(UPDATED_EVENT, callback)
   return () => window.removeEventListener(UPDATED_EVENT, callback)

@@ -21,9 +21,3 @@ export const staffNavItems = [
   { to: '/staff/reports', label: 'Reports', icon: BarChart3 },
   { to: '/staff/settings', label: 'Settings', icon: Settings },
 ]
-
-export const staffUser = {
-  initials: 'MS',
-  name: 'Maria Santos',
-  role: 'Barangay Staff',
-}

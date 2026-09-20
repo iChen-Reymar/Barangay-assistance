@@ -1,5 +1,6 @@
 import { Modal } from '../ui/Modal'
 import { Button } from '../ui/Button'
+import { applyAuditLogPrivacy } from '../../services/privacyStorage'
 import type { AuditLogEntry } from '../../types/audit'
 
 interface AuditLogDetailModalProps {
@@ -20,7 +21,7 @@ const actionColors: Record<string, string> = {
 export function AuditLogDetailModal({ open, onClose, entry }: AuditLogDetailModalProps) {
   if (!entry) return null
 
-  const selected = entry
+  const selected = applyAuditLogPrivacy(entry)
 
   return (
     <Modal open={open} onClose={onClose} title="Audit Log Details" size="lg">

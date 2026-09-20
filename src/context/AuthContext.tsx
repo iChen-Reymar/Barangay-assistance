@@ -9,6 +9,10 @@ import {
 } from 'react'
 import { initializeAuditStorage, buildChanges, logAuditEvent } from '../services/auditStorage'
 import { initializeDecisionStorage } from '../services/decisionStorage'
+import { initializePrivacyStorage } from '../services/privacyStorage'
+import { initializePriorityStorage } from '../services/priorityStorage'
+import { initializeStaffBeneficiaryStorage } from '../services/staffBeneficiaryStorage'
+import { initializeReportHistoryStorage } from '../services/reportHistoryService'
 import {
   approveUser,
   changeUserPassword,
@@ -64,6 +68,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     initializeAuthStorage()
     initializeAuditStorage()
     initializeDecisionStorage()
+    initializePrivacyStorage()
+    initializePriorityStorage()
+    initializeStaffBeneficiaryStorage()
+    initializeReportHistoryStorage()
     setPendingRequests(getPendingUsers())
     setAllUsers(getAllUsers())
     setUser(getSession())

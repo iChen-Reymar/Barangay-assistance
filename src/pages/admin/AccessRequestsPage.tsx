@@ -4,6 +4,7 @@ import { ApprovalDecisionModal } from '../../components/approval/ApprovalDecisio
 import { DecisionTimeline } from '../../components/approval/DecisionTimeline'
 import { Badge } from '../../components/ui/Badge'
 import { Button } from '../../components/ui/Button'
+import { TableActionsCell } from '../../components/ui/TableActionsCell'
 import { Modal } from '../../components/ui/Modal'
 import { DataTable, type Column } from '../../components/ui/DataTable'
 import { useAuth } from '../../context/AuthContext'
@@ -57,14 +58,23 @@ export default function AccessRequestsPage() {
       key: 'actions',
       header: 'Actions',
       render: (r) => (
-        <div className="flex flex-wrap gap-2">
-          <Button size="sm" onClick={() => setDecisionModal({ type: 'approve', user: r })}>
+        <TableActionsCell>
+          <Button
+            size="sm"
+            className="shrink-0 !px-2 !py-1 text-xs"
+            onClick={() => setDecisionModal({ type: 'approve', user: r })}
+          >
             Approve
           </Button>
-          <Button size="sm" variant="outline" onClick={() => setDecisionModal({ type: 'reject', user: r })}>
+          <Button
+            size="sm"
+            variant="outline"
+            className="shrink-0 !px-2 !py-1 text-xs"
+            onClick={() => setDecisionModal({ type: 'reject', user: r })}
+          >
             Reject
           </Button>
-        </div>
+        </TableActionsCell>
       ),
     },
   ]
@@ -73,13 +83,6 @@ export default function AccessRequestsPage() {
     <>
       <AdminHeader title="Access Requests" searchPlaceholder="Search pending access requests..." />
       <main className="flex-1 overflow-y-auto p-4 sm:p-5 md:p-6">
-        <div className="mb-6 rounded-lg border border-amber-200 bg-amber-50 p-4">
-          <p className="text-sm text-amber-800">
-            <span className="font-semibold">{pendingRequests.length} pending request(s)</span> waiting
-            for review. Rejections require notes; all decisions are timestamped.
-          </p>
-        </div>
-
         <div className="mb-6 rounded-lg border border-gray-200 bg-white shadow-sm">
           <div className="border-b border-gray-200 px-4 py-4 md:px-5">
             <h2 className="text-base font-bold text-gray-900">Pending Access Requests</h2>

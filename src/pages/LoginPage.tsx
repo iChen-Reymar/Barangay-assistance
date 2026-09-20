@@ -94,23 +94,12 @@ function LoginForm() {
             </button>
           </form>
 
-          <div className="mt-6 space-y-2 text-center text-sm text-gray-600">
-            <p>
-              Barangay staff?{' '}
-              <Link to="/request-access" className="font-semibold text-primary hover:underline">
-                Request Staff Access
-              </Link>
-            </p>
-            <p>
-              Association head?{' '}
-              <Link
-                to="/register/association-head"
-                className="font-semibold text-primary hover:underline"
-              >
-                Register Your Association
-              </Link>
-            </p>
-          </div>
+          <p className="mt-6 text-center text-sm text-gray-600">
+            Don&apos;t have an account?{' '}
+            <Link to="/request-access" className="font-semibold text-primary hover:underline">
+              Request Access
+            </Link>
+          </p>
         </div>
 
         <p className="mt-8 text-center text-xs text-gray-400 sm:absolute sm:bottom-6 sm:right-8 sm:mt-0">

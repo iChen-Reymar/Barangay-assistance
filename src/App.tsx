@@ -6,6 +6,7 @@ import StaffLayout from './layouts/StaffLayout'
 import LandingPage from './pages/LandingPage'
 import LoginPage from './pages/LoginPage'
 import RequestAccessPage from './pages/RequestAccessPage'
+import StaffRequestAccessPage from './pages/StaffRequestAccessPage'
 import RegisterAssociationHeadPage from './pages/RegisterAssociationHeadPage'
 import DashboardPage from './pages/admin/DashboardPage'
 import AssociationsPage from './pages/admin/AssociationsPage'
@@ -47,6 +48,7 @@ export default function App() {
         <Route path="/" element={<LandingPage />} />
         <Route path="/login" element={<LoginPage />} />
         <Route path="/request-access" element={<RequestAccessPage />} />
+        <Route path="/request-access/staff" element={<StaffRequestAccessPage />} />
         <Route path="/register/association-head" element={<RegisterAssociationHeadPage />} />
 
         <Route

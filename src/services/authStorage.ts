@@ -239,6 +239,46 @@ export function getReviewedAccessRequests(): StoredUser[] {
     .sort((a, b) => new Date(b.reviewedAt!).getTime() - new Date(a.reviewedAt!).getTime())
 }
 
+export function anonymizeRejectedUsers(): number {
+  const users = readUsers()
+  let count = 0
+  const updated = users.map((user) => {
+    if (user.status !== 'rejected' || user.isAnonymized) return user
+    count += 1
+    return {
+      ...user,
+      firstName: 'Anonymized',
+      lastName: 'User',
+      fullName: `Anonymized User ${user.id.slice(0, 6).toUpperCase()}`,
+      email: `anon-${user.id.slice(0, 8)}@redacted.local`,
+      contactNumber: '***-***-****',
+      password: crypto.randomUUID(),
+      associationAddress: undefined,
+      associationName: user.associationName
+        ? `Association ${user.id.slice(0, 6).toUpperCase()}`
+        : undefined,
+      registrationNumber: undefined,
+      isAnonymized: true,
+      anonymizedAt: new Date().toISOString(),
+    }
+  })
+  if (count > 0) writeUsers(updated)
+  return count
+}
+
+export function purgeAnonymizedRejectedUsersOlderThan(days: number): number {
+  const cutoff = Date.now() - days * 24 * 60 * 60 * 1000
+  const users = readUsers()
+  const kept = users.filter((user) => {
+    if (user.status !== 'rejected' || !user.isAnonymized) return true
+    const reference = user.anonymizedAt ?? user.rejectedAt ?? user.createdAt
+    return new Date(reference).getTime() >= cutoff
+  })
+  const removed = users.length - kept.length
+  if (removed > 0) writeUsers(kept)
+  return removed
+}
+
 function syncSession(user: StoredUser) {
   const session: SessionUser = {
     id: user.id,

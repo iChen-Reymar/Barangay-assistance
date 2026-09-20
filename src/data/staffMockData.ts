@@ -2,6 +2,16 @@ export type VulnerabilityLevel = 'HIGH' | 'MEDIUM' | 'LOW'
 export type VerificationStatus = 'VERIFIED' | 'PENDING' | 'UNVERIFIED'
 export type RequestStatus = 'PENDING' | 'UNDER REVIEW' | 'APPROVED' | 'REJECTED'
 
+export interface StaffBeneficiary {
+  id: string
+  name: string
+  association: string
+  familySize: number
+  monthlyIncome: number
+  vulnerability: VulnerabilityLevel
+  verification: VerificationStatus
+}
+
 export const staffStats = {
   totalBeneficiaries: 248,
   assessedBeneficiaries: 195,
@@ -39,13 +49,15 @@ export const recentActivities = [
   { text: 'Generated Beneficiary Summary Report', time: 'Yesterday' },
 ]
 
-export const staffBeneficiaries = [
+export const staffBeneficiaries: StaffBeneficiary[] = [
   { id: '1', name: 'Juan dela Cruz', association: 'Farmers Association', familySize: 5, monthlyIncome: 8500, vulnerability: 'LOW' as VulnerabilityLevel, verification: 'VERIFIED' as VerificationStatus },
   { id: '2', name: 'Maria Clara', association: "Sitoy Farmer's Group", familySize: 4, monthlyIncome: 5200, vulnerability: 'MEDIUM' as VulnerabilityLevel, verification: 'VERIFIED' as VerificationStatus },
   { id: '3', name: 'Pedro Penduko', association: "Sitoy Farmer's Group", familySize: 7, monthlyIncome: 4200, vulnerability: 'HIGH' as VulnerabilityLevel, verification: 'VERIFIED' as VerificationStatus },
   { id: '4', name: 'Emilio Aguinaldo', association: 'PWD Group', familySize: 3, monthlyIncome: 3800, vulnerability: 'HIGH' as VulnerabilityLevel, verification: 'PENDING' as VerificationStatus },
   { id: '5', name: 'Ana Garcia', association: 'Youth Organization', familySize: 4, monthlyIncome: 7200, vulnerability: 'LOW' as VulnerabilityLevel, verification: 'VERIFIED' as VerificationStatus },
   { id: '6', name: 'Rosa Mendoza', association: 'Senior Citizens Club', familySize: 2, monthlyIncome: 3500, vulnerability: 'HIGH' as VulnerabilityLevel, verification: 'UNVERIFIED' as VerificationStatus },
+  { id: '7', name: 'Carlos Rivera', association: 'Buru-un Fishermen Assoc.', familySize: 5, monthlyIncome: 4800, vulnerability: 'MEDIUM' as VulnerabilityLevel, verification: 'PENDING' as VerificationStatus },
+  { id: '8', name: 'Elena Torres', association: "Purok 3 Women's Guild", familySize: 3, monthlyIncome: 4100, vulnerability: 'HIGH' as VulnerabilityLevel, verification: 'UNVERIFIED' as VerificationStatus },
 ]
 
 export const assessmentBeneficiaries = [

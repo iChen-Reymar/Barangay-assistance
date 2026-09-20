@@ -1,15 +1,28 @@
+import { useEffect, useState } from 'react'
 import { Plus, Eye, Pencil } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import { DashboardNavbar } from '../../components/layout/DashboardNavbar'
+import {
+  StaffBeneficiaryFormModal,
+  type StaffBeneficiaryFormInput,
+} from '../../components/staff/StaffBeneficiaryFormModal'
+import { StaffBeneficiaryViewModal } from '../../components/staff/StaffBeneficiaryViewModal'
 import { DataTable, type Column } from '../../components/ui/DataTable'
 import { Badge } from '../../components/ui/Badge'
 import { Button } from '../../components/ui/Button'
 import { Filter } from '../../components/ui/Filter'
 import { Pagination } from '../../components/ui/Pagination'
-import { staffBeneficiaries, type VulnerabilityLevel, type VerificationStatus } from '../../data/staffMockData'
-import { staffUser } from '../../components/staff/navConfig'
-
-type Beneficiary = (typeof staffBeneficiaries)[number]
+import { PAGE_SIZE_DEFAULT, usePagination } from '../../hooks/usePagination'
+import { TableActionsCell } from '../../components/ui/TableActionsCell'
+import { useStaffDisplayUser } from '../../hooks/useStaffDisplayUser'
+import { useAuth } from '../../context/AuthContext'
+import { buildChanges, logAuditEvent } from '../../services/auditStorage'
+import type { StaffBeneficiary, VulnerabilityLevel, VerificationStatus } from '../../data/staffMockData'
+import {
+  getStaffBeneficiaries,
+  subscribeStaffBeneficiaryStorage,
+  updateStaffBeneficiary,
+} from '../../services/staffBeneficiaryStorage'
 
 function vulnerabilityVariant(level: VulnerabilityLevel) {
   if (level === 'HIGH') return 'danger'
@@ -27,8 +40,101 @@ function formatCurrency(amount: number) {
   return `₱ ${amount.toLocaleString('en-PH', { minimumFractionDigits: 2 })}`
 }
 
+function formToBeneficiary(input: StaffBeneficiaryFormInput, existing: StaffBeneficiary): StaffBeneficiary {
+  return {
+    id: existing.id,
+    name: input.name.trim(),
+    association: input.association,
+    familySize: input.familySize,
+    monthlyIncome: input.monthlyIncome,
+    vulnerability: input.vulnerability,
+    verification: input.verification,
+  }
+}
+
 export default function StaffBeneficiariesPage() {
-  const columns: Column<Beneficiary>[] = [
+  const displayUser = useStaffDisplayUser()
+  const { user, profile } = useAuth()
+  const actorName = profile?.fullName ?? user?.fullName ?? displayUser.name
+  const actorEmail = profile?.email ?? user?.email
+
+  const [items, setItems] = useState<StaffBeneficiary[]>(() => getStaffBeneficiaries())
+  const [viewOpen, setViewOpen] = useState(false)
+  const [formOpen, setFormOpen] = useState(false)
+  const [viewingBeneficiary, setViewingBeneficiary] = useState<StaffBeneficiary | null>(null)
+  const [editingBeneficiary, setEditingBeneficiary] = useState<StaffBeneficiary | null>(null)
+
+  const pagination = usePagination(items, PAGE_SIZE_DEFAULT, 'staff-beneficiaries')
+
+  useEffect(() => {
+    return subscribeStaffBeneficiaryStorage(() => {
+      setItems(getStaffBeneficiaries())
+    })
+  }, [])
+
+  function handleView(beneficiary: StaffBeneficiary) {
+    setViewingBeneficiary(beneficiary)
+    setViewOpen(true)
+  }
+
+  function handleEdit(beneficiary: StaffBeneficiary) {
+    setEditingBeneficiary(beneficiary)
+    setFormOpen(true)
+  }
+
+  function handleSaveForm(input: StaffBeneficiaryFormInput) {
+    if (!editingBeneficiary) return
+
+    const updated = formToBeneficiary(input, editingBeneficiary)
+    updateStaffBeneficiary(updated)
+
+    logAuditEvent({
+      user: actorName,
+      userEmail: actorEmail,
+      action: 'Beneficiary Update',
+      actionColor: 'orange',
+      description: `Updated beneficiary record for ${editingBeneficiary.name}.`,
+      entityType: 'beneficiary',
+      entityId: editingBeneficiary.id,
+      changes: buildChanges([
+        { key: 'name', label: 'Name', oldValue: editingBeneficiary.name, newValue: updated.name },
+        {
+          key: 'association',
+          label: 'Association',
+          oldValue: editingBeneficiary.association,
+          newValue: updated.association,
+        },
+        {
+          key: 'familySize',
+          label: 'Family Size',
+          oldValue: editingBeneficiary.familySize,
+          newValue: updated.familySize,
+        },
+        {
+          key: 'monthlyIncome',
+          label: 'Monthly Income',
+          oldValue: formatCurrency(editingBeneficiary.monthlyIncome),
+          newValue: formatCurrency(updated.monthlyIncome),
+        },
+        {
+          key: 'vulnerability',
+          label: 'Vulnerability',
+          oldValue: editingBeneficiary.vulnerability,
+          newValue: updated.vulnerability,
+        },
+        {
+          key: 'verification',
+          label: 'Verification',
+          oldValue: editingBeneficiary.verification,
+          newValue: updated.verification,
+        },
+      ]),
+    })
+
+    setEditingBeneficiary(null)
+  }
+
+  const columns: Column<StaffBeneficiary>[] = [
     { key: 'name', header: 'Name', primary: true, render: (r) => <span className="font-medium text-gray-900">{r.name}</span> },
     { key: 'association', header: 'Association' },
     { key: 'familySize', header: 'Family Size' },
@@ -46,15 +152,25 @@ export default function StaffBeneficiariesPage() {
     {
       key: 'actions',
       header: 'Actions',
-      render: () => (
-        <div className="flex gap-2">
-          <button type="button" className="rounded p-1 text-gray-400 hover:bg-gray-100 hover:text-primary" aria-label="View">
+      render: (r) => (
+        <TableActionsCell>
+          <button
+            type="button"
+            onClick={() => handleView(r)}
+            className="shrink-0 rounded p-1 text-gray-400 hover:bg-gray-100 hover:text-primary"
+            aria-label={`View ${r.name}`}
+          >
             <Eye className="h-4 w-4" />
           </button>
-          <button type="button" className="rounded p-1 text-gray-400 hover:bg-gray-100 hover:text-primary" aria-label="Edit">
+          <button
+            type="button"
+            onClick={() => handleEdit(r)}
+            className="shrink-0 rounded p-1 text-gray-400 hover:bg-gray-100 hover:text-primary"
+            aria-label={`Edit ${r.name}`}
+          >
             <Pencil className="h-4 w-4" />
           </button>
-        </div>
+        </TableActionsCell>
       ),
     },
   ]
@@ -64,8 +180,8 @@ export default function StaffBeneficiariesPage() {
       <DashboardNavbar
         title="Beneficiary Management"
         searchPlaceholder="Search records, requests, files..."
-        userName={staffUser.name}
-        userInitials={staffUser.initials}
+        userName={displayUser.name}
+        userInitials={displayUser.initials}
       />
       <main className="flex-1 overflow-y-auto p-4 sm:p-5 md:p-6">
         <div className="rounded-lg border border-gray-200 bg-white shadow-sm">
@@ -83,10 +199,41 @@ export default function StaffBeneficiariesPage() {
             </Link>
           </div>
 
-          <DataTable columns={columns} data={staffBeneficiaries} keyExtractor={(r) => r.id} />
-          <Pagination showing="Showing 1 to 6 of 248 entries" totalPages={5} />
+          <DataTable
+            columns={columns}
+            data={pagination.paginatedItems}
+            keyExtractor={(r) => r.id}
+            stableRowCount={PAGE_SIZE_DEFAULT}
+          />
+          <Pagination
+            showing={pagination.showing}
+            currentPage={pagination.currentPage}
+            totalPages={pagination.totalPages}
+            onPageChange={pagination.setCurrentPage}
+          />
         </div>
       </main>
+
+      <StaffBeneficiaryViewModal
+        open={viewOpen}
+        onClose={() => setViewOpen(false)}
+        beneficiary={viewingBeneficiary}
+        onEdit={(beneficiary) => {
+          setViewOpen(false)
+          handleEdit(beneficiary)
+        }}
+      />
+
+      <StaffBeneficiaryFormModal
+        open={formOpen}
+        onClose={() => {
+          setFormOpen(false)
+          setEditingBeneficiary(null)
+        }}
+        title="Edit Beneficiary"
+        initialValues={editingBeneficiary ?? undefined}
+        onSave={handleSaveForm}
+      />
     </>
   )
 }

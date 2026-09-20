@@ -1,5 +1,4 @@
 import { useEffect, useState } from 'react'
-import { AlertTriangle } from 'lucide-react'
 import { DashboardNavbar } from '../../components/layout/DashboardNavbar'
 import { ApprovalDecisionModal } from '../../components/approval/ApprovalDecisionModal'
 import { DecisionTimeline } from '../../components/approval/DecisionTimeline'
@@ -97,15 +96,6 @@ export default function StaffRecommendationsPage() {
         userInitials={initials}
       />
       <main className="flex-1 overflow-y-auto p-4 sm:p-5 md:p-6">
-        <div className="mb-6 flex items-start gap-3 rounded-lg border border-amber-200 bg-amber-50 p-4">
-          <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0 text-amber-600" />
-          <p className="text-sm text-amber-800">
-            <span className="font-semibold">System Policy:</span> AI matching agents provide risk scores
-            and assistance matching recommendations. Final authorization is strictly reserved for authorized
-            barangay executive officials.
-          </p>
-        </div>
-
         <h2 className="mb-4 text-base font-bold text-gray-900">
           Pending AI-Matched Recommendations ({pending.length} items require review)
         </h2>

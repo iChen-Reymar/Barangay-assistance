@@ -6,8 +6,9 @@ import { Button } from '../../components/ui/Button'
 import { Filter } from '../../components/ui/Filter'
 import { SearchBar } from '../../components/ui/SearchBar'
 import { Pagination } from '../../components/ui/Pagination'
+import { PAGE_SIZE_DEFAULT, usePagination } from '../../hooks/usePagination'
 import { staffPriorityList, type VulnerabilityLevel, type VerificationStatus } from '../../data/staffMockData'
-import { staffUser } from '../../components/staff/navConfig'
+import { useStaffDisplayUser } from '../../hooks/useStaffDisplayUser'
 
 type PriorityItem = (typeof staffPriorityList)[number]
 
@@ -24,6 +25,9 @@ function verificationVariant(status: VerificationStatus) {
 }
 
 export default function StaffPriorityListPage() {
+  const displayUser = useStaffDisplayUser()
+  const pagination = usePagination(staffPriorityList, PAGE_SIZE_DEFAULT, 'staff-priority', 'records')
+
   const columns: Column<PriorityItem>[] = [
     { key: 'rank', header: 'Rank', render: (r) => <span className="font-bold text-gray-900">{r.rank}</span> },
     { key: 'name', header: 'Name', render: (r) => <span className="font-medium text-gray-900">{r.name}</span> },
@@ -55,8 +59,8 @@ export default function StaffPriorityListPage() {
       <DashboardNavbar
         title="Priority List"
         searchPlaceholder="Search records, requests, files..."
-        userName={staffUser.name}
-        userInitials={staffUser.initials}
+        userName={displayUser.name}
+        userInitials={displayUser.initials}
       />
       <main className="flex-1 overflow-y-auto p-4 sm:p-5 md:p-6">
         <div className="rounded-lg border border-gray-200 bg-white shadow-sm">
@@ -72,8 +76,18 @@ export default function StaffPriorityListPage() {
             </Button>
           </div>
 
-          <DataTable columns={columns} data={staffPriorityList} keyExtractor={(r) => String(r.rank)} />
-          <Pagination showing="Showing 1 to 6 of 42 records" />
+          <DataTable
+            columns={columns}
+            data={pagination.paginatedItems}
+            keyExtractor={(r) => String(r.rank)}
+            stableRowCount={PAGE_SIZE_DEFAULT}
+          />
+          <Pagination
+            showing={pagination.showing}
+            currentPage={pagination.currentPage}
+            totalPages={pagination.totalPages}
+            onPageChange={pagination.setCurrentPage}
+          />
         </div>
       </main>
     </>

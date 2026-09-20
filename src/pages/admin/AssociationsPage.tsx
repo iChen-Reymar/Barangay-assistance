@@ -16,6 +16,9 @@ import {
   type AssociationStatus,
   type AssociationType,
 } from '../../data/mockData'
+import { TABLE_DESKTOP_CLASS, TABLE_ROW_CLASS, tableBodyMinHeight } from '../../components/ui/tableLayout'
+import { TableActionsCell } from '../../components/ui/TableActionsCell'
+import { PAGE_SIZE_DEFAULT, usePagination } from '../../hooks/usePagination'
 
 function formatDate(date: Date) {
   return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
@@ -43,6 +46,8 @@ export default function AssociationsPage() {
       return typeMatch && statusMatch
     })
   }, [items, typeFilter, statusFilter])
+
+  const pagination = usePagination(filtered, PAGE_SIZE_DEFAULT, `${typeFilter}-${statusFilter}`)
 
   const stats = useMemo(() => {
     const active = items.filter((row) => row.status === 'ACTIVE').length
@@ -76,6 +81,11 @@ export default function AssociationsPage() {
     setViewingAssociation(association)
     setViewOpen(true)
   }
+
+  const associationColWidths = ['18%', '10%', '9%', '14%', '12%', '11%', '10%', '16%']
+  const associationTableRows = Array.from({ length: PAGE_SIZE_DEFAULT }, (_, index) => {
+    return pagination.paginatedItems[index] ?? null
+  })
 
   function handleSaveForm(input: AssociationFormInput) {
     if (editingAssociation) {
@@ -192,8 +202,16 @@ export default function AssociationsPage() {
             </button>
           </div>
 
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
+          <div
+            className="overflow-x-auto"
+            style={{ minHeight: tableBodyMinHeight(PAGE_SIZE_DEFAULT) }}
+          >
+            <table className={TABLE_DESKTOP_CLASS}>
+              <colgroup>
+                {associationColWidths.map((width, index) => (
+                  <col key={index} style={{ width }} />
+                ))}
+              </colgroup>
               <thead>
                 <tr className="border-b border-gray-100 bg-gray-50 text-left text-xs font-semibold uppercase text-gray-500">
                   <th className="px-4 py-3">Association Name</th>
@@ -207,26 +225,27 @@ export default function AssociationsPage() {
                 </tr>
               </thead>
               <tbody>
-                {filtered.length === 0 ? (
+                {pagination.paginatedItems.length === 0 ? (
                   <tr>
                     <td colSpan={8} className="px-4 py-8 text-center text-gray-500">
                       No associations match your filters.
                     </td>
                   </tr>
                 ) : (
-                  filtered.map((row) => (
-                    <tr key={row.id} className="border-b border-gray-50 hover:bg-gray-50">
-                      <td className="px-4 py-3 font-medium text-gray-900">{row.name}</td>
-                      <td className="px-4 py-3 text-gray-600">{row.type}</td>
-                      <td className="px-4 py-3 text-gray-600">{row.members}</td>
-                      <td className="px-4 py-3 text-gray-600">{row.contactPerson}</td>
-                      <td className="px-4 py-3 text-gray-600">{row.contactNumber}</td>
-                      <td className="px-4 py-3 text-gray-500">{row.dateRegistered}</td>
-                      <td className="px-4 py-3">
+                  associationTableRows.map((row, index) =>
+                    row ? (
+                    <tr key={row.id} className={`${TABLE_ROW_CLASS} border-b border-gray-50 hover:bg-gray-50`}>
+                      <td className="max-w-0 truncate px-4 py-3 align-middle font-medium text-gray-900">{row.name}</td>
+                      <td className="px-4 py-3 align-middle text-gray-600">{row.type}</td>
+                      <td className="px-4 py-3 align-middle text-gray-600">{row.members}</td>
+                      <td className="max-w-0 truncate px-4 py-3 align-middle text-gray-600">{row.contactPerson}</td>
+                      <td className="px-4 py-3 align-middle text-gray-600">{row.contactNumber}</td>
+                      <td className="px-4 py-3 align-middle text-gray-500">{row.dateRegistered}</td>
+                      <td className="px-4 py-3 align-middle">
                         <ActiveBadge status={row.status} />
                       </td>
-                      <td className="px-4 py-3">
-                        <div className="flex gap-2">
+                      <td className="px-4 py-3 align-middle">
+                        <TableActionsCell>
                           <button
                             type="button"
                             onClick={() => handleView(row)}
@@ -251,21 +270,27 @@ export default function AssociationsPage() {
                           >
                             <Settings className="h-4 w-4" />
                           </button>
-                        </div>
+                        </TableActionsCell>
                       </td>
                     </tr>
-                  ))
+                    ) : (
+                      <tr key={`association-placeholder-${index}`} className={`${TABLE_ROW_CLASS} border-b border-gray-50`} aria-hidden>
+                        <td colSpan={8} className="px-4 py-3">
+                          &nbsp;
+                        </td>
+                      </tr>
+                    ),
+                  )
                 )}
               </tbody>
             </table>
           </div>
 
           <Pagination
-            showing={
-              filtered.length === 0
-                ? 'Showing 0 entries'
-                : `Showing 1 to ${filtered.length} of ${filtered.length} entries`
-            }
+            showing={pagination.showing}
+            currentPage={pagination.currentPage}
+            totalPages={pagination.totalPages}
+            onPageChange={pagination.setCurrentPage}
           />
         </div>
       </main>

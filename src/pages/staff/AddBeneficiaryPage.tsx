@@ -2,7 +2,7 @@ import { Link } from 'react-router-dom'
 import { DashboardNavbar } from '../../components/layout/DashboardNavbar'
 import { Button } from '../../components/ui/Button'
 import { associations } from '../../data/staffMockData'
-import { staffUser } from '../../components/staff/navConfig'
+import { useStaffDisplayUser } from '../../hooks/useStaffDisplayUser'
 
 const vulnerabilityIndicators = [
   'Elderly Member (60+)',
@@ -13,13 +13,15 @@ const vulnerabilityIndicators = [
 ]
 
 export default function AddBeneficiaryPage() {
+  const displayUser = useStaffDisplayUser()
+
   return (
     <>
       <DashboardNavbar
         title="Add New Beneficiary"
         searchPlaceholder="Search records, requests, files..."
-        userName={staffUser.name}
-        userInitials={staffUser.initials}
+        userName={displayUser.name}
+        userInitials={displayUser.initials}
       />
       <main className="flex-1 overflow-y-auto p-4 sm:p-5 md:p-6">
         <form className="mx-auto max-w-4xl space-y-6">

@@ -99,6 +99,24 @@ export interface Beneficiary {
 
 export const housingTypes: HousingType[] = ['Concrete', 'Light Materials', 'Temporary/Salvaged']
 
+export interface PriorityListEntry {
+  id: string
+  rank: number
+  association: string
+  score: number
+  classification: VulnerabilityLevel
+  recommended: string
+  previousAid: 'None' | 'Yes'
+  status: RequestStatus
+  notes?: string
+}
+
+export function classificationFromScore(score: number): VulnerabilityLevel {
+  if (score >= 80) return 'HIGH'
+  if (score >= 60) return 'MEDIUM'
+  return 'LOW'
+}
+
 export function computeVulnerability(input: {
   monthlyIncome: number
   elderlyCount: number
@@ -171,30 +189,121 @@ export const pendingRecommendations = [
   },
 ]
 
-export const priorityList = [
-  { rank: 1, association: 'Farmers Association', score: 92, classification: 'HIGH' as VulnerabilityLevel, recommended: 'Food Assistance', previousAid: 'None', status: 'PENDING' as RequestStatus },
-  { rank: 2, association: 'PWD Group', score: 88, classification: 'HIGH' as VulnerabilityLevel, recommended: 'Medical Assistance', previousAid: 'Yes', status: 'APPROVED' as RequestStatus },
-  { rank: 3, association: "Sitoy Farmer's Group", score: 85, classification: 'HIGH' as VulnerabilityLevel, recommended: 'Livelihood Training', previousAid: 'None', status: 'UNDER REVIEW' as RequestStatus },
-  { rank: 4, association: 'Buru-un Fishermen Assoc.', score: 78, classification: 'MEDIUM' as VulnerabilityLevel, recommended: 'Livelihood Training', previousAid: 'Yes', status: 'PENDING' as RequestStatus },
-  { rank: 5, association: "Purok 3 Women's Guild", score: 72, classification: 'MEDIUM' as VulnerabilityLevel, recommended: 'Food Assistance', previousAid: 'None', status: 'PENDING' as RequestStatus },
-  { rank: 6, association: 'Senior Citizens Club', score: 65, classification: 'MEDIUM' as VulnerabilityLevel, recommended: 'Medical Assistance', previousAid: 'Yes', status: 'APPROVED' as RequestStatus },
-  { rank: 7, association: 'Youth Organization', score: 42, classification: 'LOW' as VulnerabilityLevel, recommended: 'Livelihood Training', previousAid: 'None', status: 'PENDING' as RequestStatus },
+export const priorityList: PriorityListEntry[] = [
+  { id: 'pl-1', rank: 1, association: 'Farmers Association', score: 92, classification: 'HIGH', recommended: 'Food Assistance', previousAid: 'None', status: 'PENDING' },
+  { id: 'pl-2', rank: 2, association: 'PWD Group', score: 88, classification: 'HIGH', recommended: 'Medical Assistance', previousAid: 'Yes', status: 'APPROVED' },
+  { id: 'pl-3', rank: 3, association: "Sitoy Farmer's Group", score: 85, classification: 'HIGH', recommended: 'Livelihood Training', previousAid: 'None', status: 'UNDER REVIEW' },
+  { id: 'pl-4', rank: 4, association: 'Buru-un Fishermen Assoc.', score: 78, classification: 'MEDIUM', recommended: 'Livelihood Training', previousAid: 'Yes', status: 'PENDING' },
+  { id: 'pl-5', rank: 5, association: "Purok 3 Women's Guild", score: 72, classification: 'MEDIUM', recommended: 'Food Assistance', previousAid: 'None', status: 'PENDING' },
+  { id: 'pl-6', rank: 6, association: 'Senior Citizens Club', score: 65, classification: 'MEDIUM', recommended: 'Medical Assistance', previousAid: 'Yes', status: 'APPROVED' },
+  { id: 'pl-7', rank: 7, association: 'Youth Organization', score: 42, classification: 'LOW', recommended: 'Livelihood Training', previousAid: 'None', status: 'PENDING' },
 ]
 
-export const reportTemplates = [
-  { title: 'Beneficiary Report', description: 'Summary of registered beneficiaries, household size, and location metrics.', icon: 'users' },
-  { title: 'Vulnerability Report', description: 'Results outlining risk allocations and at-risk priorities.', icon: 'shield' },
-  { title: 'Assistance Report', description: 'Tracking of assistance programs and distribution channels.', icon: 'hand' },
-  { title: 'AI Assessment Report', description: 'AI-driven scoring logs, classification thresholds, and matching histories.', icon: 'cpu' },
-  { title: 'Approved Assistance Report', description: 'Registry of approved grants with payout timelines and status updates.', icon: 'check' },
-  { title: 'Audit Log Report', description: 'System logs, user alterations, and database queries.', icon: 'file' },
+export type ReportHistoryType =
+  | 'beneficiary'
+  | 'vulnerability'
+  | 'assistance'
+  | 'approved'
+  | 'ai_scoring'
+  | 'audit'
+
+export interface ReportTemplate {
+  title: string
+  description: string
+  icon: string
+  slug: string
+  reportType: ReportHistoryType
+}
+
+export const reportTemplates: ReportTemplate[] = [
+  {
+    title: 'Beneficiary Report',
+    description: 'Summary of registered beneficiaries, household size, and location metrics.',
+    icon: 'users',
+    slug: 'beneficiary',
+    reportType: 'beneficiary',
+  },
+  {
+    title: 'Vulnerability Report',
+    description: 'Results outlining risk allocations and at-risk priorities.',
+    icon: 'shield',
+    slug: 'vulnerability',
+    reportType: 'vulnerability',
+  },
+  {
+    title: 'Assistance Report',
+    description: 'Tracking of assistance programs and distribution channels.',
+    icon: 'hand',
+    slug: 'assistance',
+    reportType: 'assistance',
+  },
+  {
+    title: 'AI Assessment Report',
+    description: 'AI-driven scoring logs, classification thresholds, and matching histories.',
+    icon: 'cpu',
+    slug: 'ai_assessment',
+    reportType: 'ai_scoring',
+  },
+  {
+    title: 'Approved Assistance Report',
+    description: 'Registry of approved grants with payout timelines and status updates.',
+    icon: 'check',
+    slug: 'approved_assistance',
+    reportType: 'approved',
+  },
+  {
+    title: 'Audit Log Report',
+    description: 'System logs, user alterations, and database queries.',
+    icon: 'file',
+    slug: 'audit_log',
+    reportType: 'audit',
+  },
 ]
 
-export const reportHistory = [
-  { name: 'Beneficiary_Summary_August2026.pdf', generatedBy: 'Barangay Staff', date: 'Aug 10, 2026 10:15 AM', format: 'PDF' },
-  { name: 'Vulnerability_Assessment_Q3_2026.xlsx', generatedBy: 'Administrator', date: 'Aug 8, 2026 2:30 PM', format: 'EXCEL' },
-  { name: 'Assistance_Distribution_July2026.pdf', generatedBy: 'Barangay Staff', date: 'Aug 5, 2026 9:00 AM', format: 'PDF' },
-  { name: 'AI_Scoring_Log_August2026.pdf', generatedBy: 'Administrator', date: 'Aug 3, 2026 4:45 PM', format: 'PDF' },
+export type ReportFormat = 'PDF' | 'EXCEL' | 'CSV'
+
+export interface ReportHistoryEntry {
+  id: string
+  name: string
+  generatedBy: string
+  date: string
+  format: ReportFormat
+  reportType: ReportHistoryType
+}
+
+export const reportHistory: ReportHistoryEntry[] = [
+  {
+    id: 'rh-1',
+    name: 'Beneficiary_Summary_August2026.pdf',
+    generatedBy: 'Barangay Staff',
+    date: 'Aug 10, 2026 10:15 AM',
+    format: 'PDF',
+    reportType: 'beneficiary',
+  },
+  {
+    id: 'rh-2',
+    name: 'Vulnerability_Assessment_Q3_2026.xlsx',
+    generatedBy: 'Administrator',
+    date: 'Aug 8, 2026 2:30 PM',
+    format: 'EXCEL',
+    reportType: 'vulnerability',
+  },
+  {
+    id: 'rh-3',
+    name: 'Assistance_Distribution_July2026.pdf',
+    generatedBy: 'Barangay Staff',
+    date: 'Aug 5, 2026 9:00 AM',
+    format: 'PDF',
+    reportType: 'assistance',
+  },
+  {
+    id: 'rh-4',
+    name: 'AI_Scoring_Log_August2026.pdf',
+    generatedBy: 'Administrator',
+    date: 'Aug 3, 2026 4:45 PM',
+    format: 'PDF',
+    reportType: 'ai_scoring',
+  },
 ]
 
 export const systemUsers = [

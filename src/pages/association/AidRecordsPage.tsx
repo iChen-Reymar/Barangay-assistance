@@ -7,12 +7,14 @@ import { Button } from '../../components/ui/Button'
 import { Pagination } from '../../components/ui/Pagination'
 import { Modal } from '../../components/ui/Modal'
 import { aidRecords } from '../../data/associationMockData'
+import { PAGE_SIZE_DEFAULT, usePagination } from '../../hooks/usePagination'
 import { associationUser } from '../../components/association/navConfig'
 
 type AidRecord = (typeof aidRecords)[number]
 
 export default function AidRecordsPage() {
   const [showModal, setShowModal] = useState(false)
+  const pagination = usePagination(aidRecords, PAGE_SIZE_DEFAULT, 'aid-records', 'records')
 
   const columns: Column<AidRecord>[] = [
     { key: 'member', header: 'Member', render: (r) => <span className="font-medium text-gray-900">{r.member}</span> },
@@ -46,8 +48,18 @@ export default function AidRecordsPage() {
             </Button>
           </div>
 
-          <DataTable columns={columns} data={aidRecords} keyExtractor={(r) => r.id} />
-          <Pagination showing="Showing 1 to 4 of 12 records" />
+          <DataTable
+            columns={columns}
+            data={pagination.paginatedItems}
+            keyExtractor={(r) => r.id}
+            stableRowCount={PAGE_SIZE_DEFAULT}
+          />
+          <Pagination
+            showing={pagination.showing}
+            currentPage={pagination.currentPage}
+            totalPages={pagination.totalPages}
+            onPageChange={pagination.setCurrentPage}
+          />
         </div>
       </main>
 

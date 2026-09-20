@@ -1,5 +1,4 @@
 import { useEffect, useState } from 'react'
-import { AlertTriangle } from 'lucide-react'
 import { AdminHeader } from '../../components/admin/AdminHeader'
 import { ApprovalDecisionModal } from '../../components/approval/ApprovalDecisionModal'
 import { DecisionTimeline } from '../../components/approval/DecisionTimeline'
@@ -86,14 +85,6 @@ export default function RecommendationsPage() {
     <>
       <AdminHeader title="Assistance Decision & Approvals Console" />
       <main className="flex-1 overflow-y-auto p-4 sm:p-5 md:p-6">
-        <div className="mb-6 flex items-start gap-3 rounded-lg border border-amber-200 bg-amber-50 p-4">
-          <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0 text-amber-600" />
-          <p className="text-sm text-amber-800">
-            Approve, reject, or override AI recommendations with required notes. Every action is
-            timestamped and logged.
-          </p>
-        </div>
-
         <h2 className="mb-4 text-base font-bold text-gray-900">
           Pending AI Recommendations ({pending.length} require review)
         </h2>

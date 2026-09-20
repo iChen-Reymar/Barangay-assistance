@@ -1,4 +1,6 @@
 import { useMemo, useState } from 'react'
+import { PAGE_SIZE_DEFAULT, usePagination } from '../../hooks/usePagination'
+import { TableActionsCell } from '../../components/ui/TableActionsCell'
 import { Plus, Pencil, Eye } from 'lucide-react'
 import { AdminHeader } from '../../components/admin/AdminHeader'
 import { VulnerabilityBadge, ActiveBadge } from '../../components/admin/StatusBadge'
@@ -70,6 +72,12 @@ export default function BeneficiariesPage() {
       return associationMatch && vulnerabilityMatch
     })
   }, [items, associationFilter, vulnerabilityFilter])
+
+  const pagination = usePagination(
+    filtered,
+    PAGE_SIZE_DEFAULT,
+    `${associationFilter}-${vulnerabilityFilter}`,
+  )
 
   function handleAdd() {
     setEditingBeneficiary(null)
@@ -178,7 +186,8 @@ export default function BeneficiariesPage() {
           </ResponsiveToolbar>
 
           <ResponsiveTable
-            data={filtered}
+            stableRowCount={PAGE_SIZE_DEFAULT}
+            data={pagination.paginatedItems}
             keyExtractor={(row) => row.id}
             emptyMessage="No beneficiaries match your filters."
             columns={[
@@ -213,11 +222,11 @@ export default function BeneficiariesPage() {
                 key: 'actions',
                 header: 'Actions',
                 render: (row) => (
-                  <div className="flex gap-2">
+                  <TableActionsCell>
                     <button
                       type="button"
                       onClick={() => handleEdit(row)}
-                      className="rounded p-1 text-gray-400 hover:bg-gray-100 hover:text-primary"
+                      className="shrink-0 rounded p-1 text-gray-400 hover:bg-gray-100 hover:text-primary"
                       aria-label={`Edit ${row.name}`}
                     >
                       <Pencil className="h-4 w-4" />
@@ -225,24 +234,22 @@ export default function BeneficiariesPage() {
                     <button
                       type="button"
                       onClick={() => handleView(row)}
-                      className="rounded p-1 text-gray-400 hover:bg-gray-100 hover:text-primary"
+                      className="shrink-0 rounded p-1 text-gray-400 hover:bg-gray-100 hover:text-primary"
                       aria-label={`View ${row.name}`}
                     >
                       <Eye className="h-4 w-4" />
                     </button>
-                  </div>
+                  </TableActionsCell>
                 ),
               },
             ]}
           />
 
           <Pagination
-            showing={
-              filtered.length === 0
-                ? 'Showing 0 entries'
-                : `Showing 1 to ${filtered.length} of ${filtered.length} entries`
-            }
-            totalPages={Math.max(1, Math.ceil(filtered.length / 6))}
+            showing={pagination.showing}
+            currentPage={pagination.currentPage}
+            totalPages={pagination.totalPages}
+            onPageChange={pagination.setCurrentPage}
           />
         </div>
       </main>
