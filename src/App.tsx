@@ -10,14 +10,11 @@ import StaffRequestAccessPage from './pages/StaffRequestAccessPage'
 import RegisterAssociationHeadPage from './pages/RegisterAssociationHeadPage'
 import DashboardPage from './pages/admin/DashboardPage'
 import AssociationsPage from './pages/admin/AssociationsPage'
-import BeneficiariesPage from './pages/admin/BeneficiariesPage'
 import ProgramsPage from './pages/admin/ProgramsPage'
-import VulnerabilityAssessmentPage from './pages/admin/VulnerabilityAssessmentPage'
-import AssistanceRequestsPage from './pages/admin/AssistanceRequestsPage'
 import RecommendationsPage from './pages/admin/RecommendationsPage'
-import PriorityListPage from './pages/admin/PriorityListPage'
 import ReportsPage from './pages/admin/ReportsPage'
 import AuditLogsPage from './pages/admin/AuditLogsPage'
+import UsersPage from './pages/admin/UsersPage'
 import AccessRequestsPage from './pages/admin/AccessRequestsPage'
 import SettingsPage from './pages/admin/SettingsPage'
 import AssociationDashboardPage from './pages/association/DashboardPage'
@@ -61,14 +58,11 @@ export default function App() {
         >
           <Route index element={<DashboardPage />} />
           <Route path="associations" element={<AssociationsPage />} />
-          <Route path="beneficiaries" element={<BeneficiariesPage />} />
           <Route path="programs" element={<ProgramsPage />} />
-          <Route path="vulnerability-assessment" element={<VulnerabilityAssessmentPage />} />
-          <Route path="assistance-requests" element={<AssistanceRequestsPage />} />
           <Route path="recommendations" element={<RecommendationsPage />} />
-          <Route path="priority-list" element={<PriorityListPage />} />
           <Route path="reports" element={<ReportsPage />} />
           <Route path="audit-logs" element={<AuditLogsPage />} />
+          <Route path="users" element={<UsersPage />} />
           <Route path="access-requests" element={<AccessRequestsPage />} />
           <Route path="settings" element={<SettingsPage />} />
         </Route>

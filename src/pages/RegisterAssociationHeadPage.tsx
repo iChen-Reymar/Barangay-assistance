@@ -260,7 +260,7 @@ function RegisterAssociationHeadForm() {
 
             <button
               type="submit"
-              className="w-full rounded-lg bg-[#1a472a] py-3 text-sm font-bold text-white transition hover:bg-[#143520]"
+              className="w-full rounded-lg bg-primary py-3 text-sm font-bold text-white transition hover:bg-primary-dark"
             >
               Submit Registration
             </button>

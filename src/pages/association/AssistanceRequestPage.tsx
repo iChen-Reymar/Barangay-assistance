@@ -2,7 +2,6 @@ import { useEffect, useState } from 'react'
 import { CheckCircle } from 'lucide-react'
 import { DashboardNavbar } from '../../components/layout/DashboardNavbar'
 import { Button } from '../../components/ui/Button'
-import { ProcessFlowBanner } from '../../components/ui/ProcessFlowBanner'
 import { getActivePrograms, subscribeProgramStorage } from '../../services/programStorage'
 import type { AssistanceProgram } from '../../data/programsMockData'
 import { associationUser } from '../../components/association/navConfig'
@@ -36,8 +35,6 @@ export default function AssistanceRequestPage() {
         notificationsPath="/association/notifications"
       />
       <main className="flex-1 overflow-y-auto p-4 sm:p-5 md:p-6">
-        <ProcessFlowBanner />
-
         <div className="mx-auto max-w-2xl rounded-lg border border-gray-200 bg-white p-6 shadow-sm">
           {submitted ? (
             <div className="py-8 text-center">

@@ -10,7 +10,7 @@ export function OfficialSeal() {
 
 export function AuthBrandingPanel() {
   return (
-    <div className="relative flex flex-col items-center justify-center bg-[#1a472a] px-8 py-16 text-center text-white lg:px-12">
+    <div className="relative flex flex-col items-center justify-center bg-primary px-8 py-16 text-center text-white lg:px-12">
       <OfficialSeal />
 
       <h1 className="mb-6 max-w-sm text-2xl font-bold leading-snug lg:text-3xl">

@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { Shield, Trash2, UserX } from 'lucide-react'
+import { Trash2, UserX } from 'lucide-react'
 import { Button } from '../ui/Button'
 import { useAuth } from '../../context/AuthContext'
 import { buildChanges, logAuditEvent } from '../../services/auditStorage'
@@ -98,16 +98,6 @@ export function PrivacyControlsPanel() {
           {error}
         </div>
       )}
-
-      <div className="rounded-lg border border-blue-200 bg-blue-50 p-4">
-        <div className="flex items-start gap-3">
-          <Shield className="mt-0.5 h-5 w-5 shrink-0 text-blue-600" />
-          <p className="text-sm text-blue-800">
-            Configure privacy masking, anonymization, and retention policies for beneficiary,
-            association, and audit data stored in this barangay system.
-          </p>
-        </div>
-      </div>
 
       <div className="grid gap-6 lg:grid-cols-2">
         <div className="rounded-lg border border-gray-200 bg-white p-5 shadow-sm">

@@ -71,7 +71,7 @@ export function ResponsiveTable<T>({
                     <dt className="text-[10px] font-semibold uppercase text-gray-400">
                       {col.mobileLabel ?? col.header}
                     </dt>
-                    <dd className="mt-0.5 text-gray-700">{renderCell(row, col)}</dd>
+                    <dd className="mt-0.5 break-words text-gray-700">{renderCell(row, col)}</dd>
                   </div>
                 ))}
             </dl>

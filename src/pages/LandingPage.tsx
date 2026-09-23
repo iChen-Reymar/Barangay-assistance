@@ -193,12 +193,6 @@ export default function LandingPage() {
               >
                 Get Started
               </Link>
-              <Link
-                to="/register/association-head"
-                className="rounded-md border-2 border-primary px-6 py-2.5 text-sm font-semibold text-gray-700 transition hover:bg-primary/5"
-              >
-                Register as Association Head
-              </Link>
               <a
                 href="#about"
                 className="rounded-md border-2 border-gray-200 px-6 py-2.5 text-sm font-semibold text-gray-700 transition hover:bg-gray-50"

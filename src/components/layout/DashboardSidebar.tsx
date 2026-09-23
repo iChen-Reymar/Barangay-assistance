@@ -46,7 +46,7 @@ export function DashboardSidebar({
       )}
 
       <aside
-        className={`fixed inset-y-0 left-0 z-50 flex h-screen w-64 flex-col bg-[#1a472a] text-white transition-transform duration-200 lg:translate-x-0 ${
+        className={`fixed inset-y-0 left-0 z-50 flex h-screen w-64 flex-col bg-primary text-white transition-transform duration-200 lg:translate-x-0 ${
           sidebarOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'
         }`}
       >
@@ -96,21 +96,21 @@ export function DashboardSidebar({
               onClick={closeSidebar}
               className="mb-3 flex items-center gap-3 rounded-lg px-1 py-1 transition hover:bg-white/10"
             >
-              <div className="flex h-9 w-9 items-center justify-center rounded-full bg-white/20 text-sm font-bold">
+              <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-white/20 text-sm font-bold">
                 {user.initials}
               </div>
-              <div>
-                <p className="text-sm font-semibold">{user.name}</p>
+              <div className="min-w-0 flex-1">
+                <p className="text-sm font-semibold leading-snug break-words">{user.name}</p>
                 <p className="text-[10px] text-white/60">{user.role}</p>
               </div>
             </NavLink>
           ) : (
             <div className="mb-3 flex items-center gap-3">
-              <div className="flex h-9 w-9 items-center justify-center rounded-full bg-white/20 text-sm font-bold">
+              <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-white/20 text-sm font-bold">
                 {user.initials}
               </div>
-              <div>
-                <p className="text-sm font-semibold">{user.name}</p>
+              <div className="min-w-0 flex-1">
+                <p className="text-sm font-semibold leading-snug break-words">{user.name}</p>
                 <p className="text-[10px] text-white/60">{user.role}</p>
               </div>
             </div>

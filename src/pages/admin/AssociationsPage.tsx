@@ -235,10 +235,10 @@ export default function AssociationsPage() {
                   associationTableRows.map((row, index) =>
                     row ? (
                     <tr key={row.id} className={`${TABLE_ROW_CLASS} border-b border-gray-50 hover:bg-gray-50`}>
-                      <td className="max-w-0 truncate px-4 py-3 align-middle font-medium text-gray-900">{row.name}</td>
+                      <td className="whitespace-normal break-words px-4 py-3 align-middle font-medium text-gray-900">{row.name}</td>
                       <td className="px-4 py-3 align-middle text-gray-600">{row.type}</td>
                       <td className="px-4 py-3 align-middle text-gray-600">{row.members}</td>
-                      <td className="max-w-0 truncate px-4 py-3 align-middle text-gray-600">{row.contactPerson}</td>
+                      <td className="whitespace-normal break-words px-4 py-3 align-middle text-gray-600">{row.contactPerson}</td>
                       <td className="px-4 py-3 align-middle text-gray-600">{row.contactNumber}</td>
                       <td className="px-4 py-3 align-middle text-gray-500">{row.dateRegistered}</td>
                       <td className="px-4 py-3 align-middle">

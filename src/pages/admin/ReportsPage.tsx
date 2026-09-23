@@ -109,18 +109,18 @@ export default function ReportsPage() {
 
   function handleDownload(entry: ReportHistoryEntry) {
     downloadHistoryReport(entry)
-    setStatusMessage(`Downloaded ${entry.name.replace(/\.(pdf|xlsx)$/i, '.csv')}.`)
+    setStatusMessage(`Downloaded ${entry.format === 'PDF' ? entry.name : entry.name.replace(/\.(pdf|xlsx)$/i, '.csv')}.`)
   }
 
   function handleDownloadFromModal() {
     if (!viewPreview) return
     downloadHistoryReport(viewPreview.entry)
-    setStatusMessage(`Downloaded ${viewPreview.entry.name.replace(/\.(pdf|xlsx)$/i, '.csv')}.`)
+    setStatusMessage(`Downloaded ${viewPreview.entry.format === 'PDF' ? viewPreview.entry.name : viewPreview.entry.name.replace(/\.(pdf|xlsx)$/i, '.csv')}.`)
   }
 
   return (
     <>
-      <AdminHeader title="System Reports Panel" />
+      <AdminHeader title="Export Reports" />
       <main className="flex-1 overflow-y-auto p-4 sm:p-5 md:p-6">
         {statusMessage ? (
           <div className="mb-4 rounded-lg border border-green-200 bg-green-50 px-4 py-3 text-sm text-green-800">
@@ -201,13 +201,13 @@ export default function ReportsPage() {
                   historyTableRows.map((row, index) =>
                     row ? (
                       <tr key={row.id} className={`${TABLE_ROW_CLASS} border-b border-gray-50 hover:bg-gray-50`}>
-                        <td className="max-w-0 truncate px-4 py-3 align-middle font-medium text-gray-900">
+                        <td className="whitespace-normal break-words px-4 py-3 align-middle font-medium text-gray-900">
                           {row.name}
                         </td>
-                        <td className="max-w-0 truncate px-4 py-3 align-middle text-gray-600">
+                        <td className="whitespace-normal break-words px-4 py-3 align-middle text-gray-600">
                           {row.generatedBy}
                         </td>
-                        <td className="max-w-0 truncate px-4 py-3 align-middle text-gray-500">
+                        <td className="whitespace-normal break-words px-4 py-3 align-middle text-gray-500">
                           {row.date}
                         </td>
                         <td className="px-4 py-3 align-middle">

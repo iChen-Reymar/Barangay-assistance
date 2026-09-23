@@ -10,10 +10,12 @@ import {
   type ProfileUpdateInput,
   type SessionUser,
   type StoredUser,
+  type UserRole,
 } from '../types/auth'
 
 const USERS_KEY = 'barangay_users'
 const SESSION_KEY = 'barangay_session'
+const DEMO_USERS_KEY = 'barangay_managed_users_seeded'
 
 function readUsers(): StoredUser[] {
   const raw = localStorage.getItem(USERS_KEY)
@@ -29,12 +31,74 @@ function writeUsers(users: StoredUser[]) {
   localStorage.setItem(USERS_KEY, JSON.stringify(users))
 }
 
+function roleToLabel(role: UserRole): string {
+  if (role === 'admin') return 'Administrator'
+  if (role === 'association') return 'Association Head'
+  return 'Barangay Staff'
+}
+
+function demoUsers(now: string): StoredUser[] {
+  return [
+    {
+      id: 'user-bryan-martinez',
+      email: 'bryan.martinez@barangayburuun.gov.ph',
+      password: 'Staff@2026',
+      firstName: 'Bryan',
+      lastName: 'Martinez',
+      fullName: 'Bryan S. Martinez',
+      contactNumber: '+63 917 111 2201',
+      position: 'Barangay Staff',
+      department: 'social-services',
+      role: 'staff',
+      roleLabel: 'Barangay Staff',
+      status: 'approved',
+      createdAt: now,
+      approvedAt: now,
+    },
+    {
+      id: 'user-maria-santos',
+      email: 'maria.santos@barangayburuun.gov.ph',
+      password: 'Staff@2026',
+      firstName: 'Maria',
+      lastName: 'Santos',
+      fullName: 'Maria L. Santos',
+      contactNumber: '+63 917 111 2202',
+      position: 'Barangay Staff',
+      department: 'health',
+      role: 'staff',
+      roleLabel: 'Barangay Staff',
+      status: 'approved',
+      createdAt: now,
+      approvedAt: now,
+    },
+    {
+      id: 'user-ricardo-lopez',
+      email: 'ricardo.lopez@sitoyfarmers.org',
+      password: 'Assoc@2026',
+      firstName: 'Ricardo',
+      lastName: 'Lopez',
+      fullName: 'Ricardo Lopez',
+      contactNumber: '+63 921 567 8901',
+      position: 'Association Head',
+      department: 'registered-associations',
+      role: 'association',
+      roleLabel: 'Association Head',
+      status: 'approved',
+      createdAt: now,
+      approvedAt: now,
+      associationName: "Sitoy Farmer's Group",
+      associationType: 'Agricultural',
+    },
+  ]
+}
+
 export function initializeAuthStorage() {
-  const users = readUsers()
+  let users = readUsers()
   const hasAdmin = users.some(
     (u) => u.email.toLowerCase() === DEFAULT_ADMIN.email.toLowerCase(),
   )
   if (!hasAdmin) {
+    const now = new Date().toISOString()
     const adminUser: StoredUser = {
       id: crypto.randomUUID(),
       email: DEFAULT_ADMIN.email,
@@ -48,11 +112,117 @@ export function initializeAuthStorage() {
       role: 'admin',
       roleLabel: 'Administrator',
       status: 'approved',
-      createdAt: new Date().toISOString(),
-      approvedAt: new Date().toISOString(),
+      createdAt: now,
+      approvedAt: now,
     }
-    writeUsers([adminUser, ...users])
+    users = [adminUser, ...users]
   }
+
+  if (!localStorage.getItem(DEMO_USERS_KEY)) {
+    const now = new Date().toISOString()
+    for (const demo of demoUsers(now)) {
+      if (!users.some((user) => user.email.toLowerCase() === demo.email.toLowerCase())) {
+        users.push(demo)
+      }
+    }
+    localStorage.setItem(DEMO_USERS_KEY, '1')
+  }
+
+  writeUsers(users)
+}
+
+function approvedAdminCount(users: StoredUser[], exceptId?: string) {
+  return users.filter(
+    (user) => user.id !== exceptId && user.role === 'admin' && user.status === 'approved',
+  ).length
+}
+
+export function createManagedUser(input: {
+  firstName: string
+  lastName: string
+  email: string
+  password: string
+  contactNumber: string
+  role: UserRole
+  associationName?: string
+}): { success: boolean; error?: string } {
+  if (input.password.length < 6) {
+    return { success: false, error: 'Password must be at least 6 characters.' }
+  }
+
+  const users = readUsers()
+  const email = input.email.trim().toLowerCase()
+  if (users.some((user) => user.email.toLowerCase() === email)) {
+    return { success: false, error: 'An account with this email already exists.' }
+  }
+
+  const now = new Date().toISOString()
+  const roleLabel = roleToLabel(input.role)
+  const user: StoredUser = {
+    id: crypto.randomUUID(),
+    email: input.email.trim(),
+    password: input.password,
+    firstName: input.firstName.trim(),
+    lastName: input.lastName.trim(),
+    fullName: `${input.firstName.trim()} ${input.lastName.trim()}`,
+    contactNumber: input.contactNumber.trim(),
+    position: roleLabel,
+    department: input.role === 'association' ? 'registered-associations' : 'barangay-hall',
+    role: input.role,
+    roleLabel,
+    status: 'approved',
+    createdAt: now,
+    approvedAt: now,
+    associationName: input.role === 'association' ? input.associationName?.trim() || undefined : undefined,
+  }
+  writeUsers([...users, user])
+  return { success: true }
+}
+
+export function updateUserRole(
+  userId: string,
+  role: UserRole,
+): { success: boolean; error?: string } {
+  const users = readUsers()
+  const index = users.findIndex((user) => user.id === userId)
+  if (index === -1) return { success: false, error: 'User not found.' }
+
+  const current = users[index]
+  if (current.role === 'admin' && current.status === 'approved' && role !== 'admin' && approvedAdminCount(users, userId) === 0) {
+    return { success: false, error: 'At least one administrator must remain.' }
+  }
+
+  const roleLabel = roleToLabel(role)
+  const updated: StoredUser = {
+    ...current,
+    role,
+    roleLabel,
+    position: roleLabel,
+    department: role === 'association' ? 'registered-associations' : current.department === 'registered-associations' ? 'barangay-hall' : current.department,
+  }
+  users[index] = updated
+  writeUsers(users)
+  if (getSession()?.id === userId) syncSession(updated)
+  return { success: true }
+}
+
+export function removeUser(
+  userId: string,
+  actorId: string,
+): { success: boolean; error?: string } {
+  if (userId === actorId) {
+    return { success: false, error: 'You cannot remove the account you are signed in with.' }
+  }
+
+  const users = readUsers()
+  const target = users.find((user) => user.id === userId)
+  if (!target) return { success: false, error: 'User not found.' }
+  if (target.role === 'admin' && target.status === 'approved' && approvedAdminCount(users, userId) === 0) {
+    return { success: false, error: 'At least one administrator must remain.' }
+  }
+
+  writeUsers(users.filter((user) => user.id !== userId))
+  return { success: true }
 }
 
 export function getAllUsers(): StoredUser[] {

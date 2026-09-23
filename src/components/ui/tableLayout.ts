@@ -10,7 +10,7 @@ const COLUMN_WIDTHS: Record<string, string> = {
   vulnerability: '11%',
   classification: '11%',
   score: '11%',
-  date: '11%',
+  date: '20%',
   approvedDate: '11%',
   dateReceived: '11%',
   distributionDate: '11%',
@@ -40,8 +40,8 @@ export function resolveColumnWidth(key: string, override?: string): string {
 
 export const TABLE_DESKTOP_CLASS = 'w-full min-w-[960px] table-fixed text-sm'
 
-/** Fixed row height for paginated tables (fits one row of compact action buttons). */
-export const TABLE_ROW_CLASS = 'h-20 max-h-20 min-h-20'
+/** Rows grow with their content so wrapped text stays visible. */
+export const TABLE_ROW_CLASS = 'align-top'
 
 export const TABLE_HEADER_HEIGHT_PX = 44
 export const TABLE_ROW_HEIGHT_PX = 80
@@ -51,6 +51,6 @@ export function tableBodyMinHeight(stableRowCount: number): number {
 }
 
 export function cellTruncateClass(key: string): string {
-  if (key === 'actions' || key === 'status' || key === 'rank') return ''
-  return 'max-w-0 truncate'
+  if (key === 'actions' || key === 'status' || key === 'rank') return 'whitespace-nowrap'
+  return 'whitespace-normal break-words'
 }

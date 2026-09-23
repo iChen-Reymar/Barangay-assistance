@@ -60,7 +60,18 @@ export const staffBeneficiaries: StaffBeneficiary[] = [
   { id: '8', name: 'Elena Torres', association: "Purok 3 Women's Guild", familySize: 3, monthlyIncome: 4100, vulnerability: 'HIGH' as VulnerabilityLevel, verification: 'UNVERIFIED' as VerificationStatus },
 ]
 
-export const assessmentBeneficiaries = [
+export interface AssessmentBeneficiary {
+  id: string
+  label: string
+  name: string
+  association: string
+  familySize: number
+  monthlyIncome: number
+  score: number
+  classification: VulnerabilityLevel
+}
+
+export const assessmentBeneficiaries: AssessmentBeneficiary[] = [
   {
     id: '1',
     label: "Pedro Penduko (Sitoy Farmer's Group)",
@@ -68,14 +79,18 @@ export const assessmentBeneficiaries = [
     association: "Sitoy Farmer's Group",
     familySize: 7,
     monthlyIncome: 4200,
+    score: 91,
+    classification: 'HIGH',
   },
   {
     id: '2',
-    label: 'Maria Santos (Sitoy Farmer\'s Group)',
+    label: "Maria Santos (Sitoy Farmer's Group)",
     name: 'Maria Santos',
     association: "Sitoy Farmer's Group",
     familySize: 6,
     monthlyIncome: 4500,
+    score: 88,
+    classification: 'HIGH',
   },
   {
     id: '3',
@@ -84,8 +99,74 @@ export const assessmentBeneficiaries = [
     association: 'PWD Group',
     familySize: 3,
     monthlyIncome: 3800,
+    score: 85,
+    classification: 'HIGH',
+  },
+  {
+    id: '4',
+    label: "Elena Torres (Purok 3 Women's Guild)",
+    name: 'Elena Torres',
+    association: "Purok 3 Women's Guild",
+    familySize: 3,
+    monthlyIncome: 4100,
+    score: 82,
+    classification: 'HIGH',
+  },
+  {
+    id: '5',
+    label: 'Rosa Mendoza (Senior Citizens Club)',
+    name: 'Rosa Mendoza',
+    association: 'Senior Citizens Club',
+    familySize: 2,
+    monthlyIncome: 3500,
+    score: 80,
+    classification: 'HIGH',
+  },
+  {
+    id: '6',
+    label: "Maria Clara (Sitoy Farmer's Group)",
+    name: 'Maria Clara',
+    association: "Sitoy Farmer's Group",
+    familySize: 4,
+    monthlyIncome: 5200,
+    score: 72,
+    classification: 'MEDIUM',
+  },
+  {
+    id: '7',
+    label: 'Carlos Rivera (Buru-un Fishermen Assoc.)',
+    name: 'Carlos Rivera',
+    association: 'Buru-un Fishermen Assoc.',
+    familySize: 5,
+    monthlyIncome: 4800,
+    score: 64,
+    classification: 'MEDIUM',
+  },
+  {
+    id: '8',
+    label: 'Ana Garcia (Youth Organization)',
+    name: 'Ana Garcia',
+    association: 'Youth Organization',
+    familySize: 4,
+    monthlyIncome: 7200,
+    score: 42,
+    classification: 'LOW',
+  },
+  {
+    id: '9',
+    label: 'Juan dela Cruz (Farmers Association)',
+    name: 'Juan dela Cruz',
+    association: 'Farmers Association',
+    familySize: 5,
+    monthlyIncome: 8500,
+    score: 35,
+    classification: 'LOW',
   },
 ]
+
+export function rankedAssessmentBeneficiaries() {
+  return [...assessmentBeneficiaries].sort((a, b) => b.score - a.score || a.name.localeCompare(b.name))
+}
 
 export const assessmentFactors = [
   { text: 'Low household income (₱4,200/mo)', type: 'danger' as const },

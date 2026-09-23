@@ -180,7 +180,7 @@ export default function ProgramsPage() {
 
   return (
     <>
-      <AdminHeader title="Assistance Program Management" />
+      <AdminHeader title="Manage Assistance Lists" />
       <main className="flex-1 overflow-y-auto p-4 sm:p-5 md:p-6">
         <div className="mb-6 grid grid-cols-2 gap-4 lg:grid-cols-4">
           <StatCard label="Total Programs" value={stats.total} icon={Package} />

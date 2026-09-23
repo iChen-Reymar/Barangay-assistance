@@ -15,7 +15,6 @@ export function AdminHeader({
 
   const displayName = profile?.fullName ?? user?.fullName ?? 'Admin'
   const initials = getInitials(displayName)
-  const hasAccessRequests = pendingRequests.length > 0
 
   return (
     <DashboardNavbar
@@ -23,7 +22,7 @@ export function AdminHeader({
       searchPlaceholder={searchPlaceholder}
       userName={displayName}
       userInitials={initials}
-      notificationsPath={hasAccessRequests ? '/admin/access-requests' : undefined}
+      notificationsPath="/admin/access-requests"
       notificationCount={pendingRequests.length}
     />
   )

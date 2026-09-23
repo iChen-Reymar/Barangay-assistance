@@ -2,7 +2,6 @@ import { Users, Clock, CheckCircle, XCircle } from 'lucide-react'
 import { DashboardNavbar } from '../../components/layout/DashboardNavbar'
 import { StatCard } from '../../components/ui/StatCard'
 import { Badge } from '../../components/ui/Badge'
-import { ProcessFlowBanner } from '../../components/ui/ProcessFlowBanner'
 import { NotificationPanel } from '../../components/ui/NotificationPanel'
 import {
   associationStats,
@@ -23,8 +22,6 @@ export default function AssociationDashboardPage() {
         notificationsPath="/association/notifications"
       />
       <main className="flex-1 overflow-y-auto p-4 sm:p-5 md:p-6">
-        <ProcessFlowBanner />
-
         <div className="mb-6 grid grid-cols-2 gap-4 lg:grid-cols-4">
           <StatCard label="Total Members" value={associationStats.totalMembers} icon={Users} />
           <StatCard label="Pending Requests" value={associationStats.pendingRequests} icon={Clock} />

@@ -7,7 +7,7 @@ export function Sidebar() {
   const navigate = useNavigate()
 
   return (
-    <aside className="flex w-64 shrink-0 flex-col bg-[#1a472a] text-white">
+    <aside className="flex w-64 shrink-0 flex-col bg-primary text-white">
       <div className="border-b border-white/10 px-4 py-5 text-center">
         <div className="mx-auto mb-3 flex h-16 w-16 items-center justify-center">
           <BarangayLogo className="h-16 w-16" alt="" />

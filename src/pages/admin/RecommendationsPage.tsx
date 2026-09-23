@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import { AdminHeader } from '../../components/admin/AdminHeader'
 import { ApprovalDecisionModal } from '../../components/approval/ApprovalDecisionModal'
 import { DecisionTimeline } from '../../components/approval/DecisionTimeline'
@@ -11,6 +12,7 @@ import { buildChanges, logAuditEvent } from '../../services/auditStorage'
 import {
   formatDecisionDate,
   getRecommendationItems,
+  getReviewableItems,
   getItemById,
   submitAssistanceDecision,
   subscribeDecisionStorage,
@@ -19,9 +21,18 @@ import {
 } from '../../services/decisionStorage'
 import type { DecisionType, DocumentStatus, QualificationStatus, ReviewableAssistanceItem } from '../../types/approval'
 
+function loadRecommendationItems(approvedOnly: boolean) {
+  if (approvedOnly) {
+    return getReviewableItems().filter((item) => item.status === 'APPROVED')
+  }
+  return getRecommendationItems()
+}
+
 export default function RecommendationsPage() {
   const actor = useReviewActor()
-  const [items, setItems] = useState<ReviewableAssistanceItem[]>(() => getRecommendationItems())
+  const [searchParams, setSearchParams] = useSearchParams()
+  const approvedOnly = searchParams.get('status') === 'approved'
+  const [items, setItems] = useState<ReviewableAssistanceItem[]>(() => loadRecommendationItems(approvedOnly))
   const [expandedId, setExpandedId] = useState<string | null>(null)
   const [detailsItem, setDetailsItem] = useState<ReviewableAssistanceItem | null>(null)
   const [decisionModal, setDecisionModal] = useState<{
@@ -30,14 +41,14 @@ export default function RecommendationsPage() {
   } | null>(null)
 
   useEffect(() => {
-    setItems(getRecommendationItems())
-    return subscribeDecisionStorage(() => setItems(getRecommendationItems()))
-  }, [])
+    setItems(loadRecommendationItems(approvedOnly))
+    return subscribeDecisionStorage(() => setItems(loadRecommendationItems(approvedOnly)))
+  }, [approvedOnly])
 
   const pending = items.filter((item) => item.status === 'PENDING' || item.status === 'UNDER REVIEW')
 
   function refreshItems() {
-    setItems(getRecommendationItems())
+    setItems(loadRecommendationItems(approvedOnly))
   }
 
   function handleVerifyDocument(documentId: string, status: DocumentStatus) {
@@ -83,11 +94,40 @@ export default function RecommendationsPage() {
 
   return (
     <>
-      <AdminHeader title="Assistance Decision & Approvals Console" />
+      <AdminHeader
+        title={approvedOnly ? 'Approved Recommendations' : 'Assistance Decision & Approvals Console'}
+      />
       <main className="flex-1 overflow-y-auto p-4 sm:p-5 md:p-6">
-        <h2 className="mb-4 text-base font-bold text-gray-900">
-          Pending AI Recommendations ({pending.length} require review)
-        </h2>
+        <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+          <h2 className="text-base font-bold text-gray-900">
+            {approvedOnly
+              ? `Approved AI Recommendations (${items.length})`
+              : `Pending AI Recommendations (${pending.length} require review)`}
+          </h2>
+          <div className="flex rounded-lg border border-gray-200 bg-white p-1 text-sm">
+            <button
+              type="button"
+              onClick={() => setSearchParams({})}
+              className={`rounded-md px-3 py-1.5 font-medium ${approvedOnly ? 'text-gray-600' : 'bg-primary text-white'}`}
+            >
+              All
+            </button>
+            <button
+              type="button"
+              onClick={() => setSearchParams({ status: 'approved' })}
+              className={`rounded-md px-3 py-1.5 font-medium ${approvedOnly ? 'bg-primary text-white' : 'text-gray-600'}`}
+            >
+              Approved
+            </button>
+          </div>
+        </div>
+        {items.length === 0 ? (
+          <div className="rounded-lg border border-gray-200 bg-white px-5 py-8 text-sm text-gray-500">
+            {approvedOnly
+              ? 'No approved AI recommendations yet. Approve a pending recommendation to list it here.'
+              : 'No recommendations to review.'}
+          </div>
+        ) : null}
 
         <div className="space-y-4">
           {items.map((rec) => (
