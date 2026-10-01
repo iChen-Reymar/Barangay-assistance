@@ -1,12 +1,22 @@
 import { useEffect, useState } from 'react'
+import { Link } from 'react-router-dom'
 import { CheckCircle } from 'lucide-react'
 import { DashboardNavbar } from '../../components/layout/DashboardNavbar'
 import { Button } from '../../components/ui/Button'
 import { getActivePrograms, subscribeProgramStorage } from '../../services/programStorage'
+import { submitAssociationAssistanceRequest } from '../../services/decisionStorage'
+import { getAssociationDetails } from '../../services/memberStorage'
 import type { AssistanceProgram } from '../../data/programsMockData'
-import { associationUser } from '../../components/association/navConfig'
+import { useAuth } from '../../context/AuthContext'
+import { getInitials } from '../../utils/userDisplay'
+import { buildChanges, logAuditEvent } from '../../services/auditStorage'
 
 export default function AssistanceRequestPage() {
+  const { user, profile } = useAuth()
+  const displayName = profile?.fullName ?? user?.fullName ?? 'Association Head'
+  const initials = getInitials(displayName)
+  const associationName = profile?.associationName ?? getAssociationDetails().name
+
   const [programs, setPrograms] = useState<AssistanceProgram[]>(() => getActivePrograms())
   const [submitted, setSubmitted] = useState(false)
   const [program, setProgram] = useState('')
@@ -22,7 +32,36 @@ export default function AssistanceRequestPage() {
 
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
+    const submittedRequest = submitAssociationAssistanceRequest({
+      association: associationName,
+      program,
+      memberCount: Number(memberCount),
+      purpose,
+      requestedAssistance,
+      supportingInfo,
+      submittedBy: displayName,
+      contactNumber: profile?.contactNumber,
+      email: profile?.email ?? user?.email,
+    })
+    logAuditEvent({
+      user: displayName,
+      userEmail: profile?.email ?? user?.email,
+      action: 'Assistance Request',
+      actionColor: 'blue',
+      description: `${associationName} submitted ${program} for barangay staff review.`,
+      entityType: 'assistance_request',
+      entityId: submittedRequest.id,
+      changes: buildChanges([
+        { key: 'status', label: 'Status', oldValue: '—', newValue: 'PENDING' },
+        { key: 'program', label: 'Program', oldValue: '—', newValue: program },
+      ]),
+    })
     setSubmitted(true)
+    setProgram('')
+    setMemberCount('')
+    setPurpose('')
+    setRequestedAssistance('')
+    setSupportingInfo('')
   }
 
   return (
@@ -30,8 +69,8 @@ export default function AssistanceRequestPage() {
       <DashboardNavbar
         title="Submit Assistance Request"
         searchPlaceholder="Search programs..."
-        userName={associationUser.name}
-        userInitials={associationUser.initials}
+        userName={displayName}
+        userInitials={initials}
         notificationsPath="/association/notifications"
       />
       <main className="flex-1 overflow-y-auto p-4 sm:p-5 md:p-6">
@@ -41,11 +80,19 @@ export default function AssistanceRequestPage() {
               <CheckCircle className="mx-auto mb-4 h-12 w-12 text-green-600" />
               <h2 className="text-lg font-bold text-gray-900">Your request has been submitted successfully.</h2>
               <p className="mt-2 text-sm text-gray-500">
-                Your request will proceed through vulnerability assessment, AI recommendation, and official review before approval.
+                Barangay staff can now review this request. Track it under Request Status.
               </p>
-              <Button className="mt-6" variant="outline" onClick={() => setSubmitted(false)}>
-                Submit Another Request
-              </Button>
+              <div className="mt-6 flex flex-wrap items-center justify-center gap-3">
+                <Link
+                  to="/association/request-status"
+                  className="inline-flex items-center justify-center rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-white hover:bg-primary-dark"
+                >
+                  View Request Status
+                </Link>
+                <Button variant="outline" onClick={() => setSubmitted(false)}>
+                  Submit Another Request
+                </Button>
+              </div>
             </div>
           ) : (
             <form onSubmit={handleSubmit} className="space-y-5">

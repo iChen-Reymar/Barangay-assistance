@@ -152,18 +152,9 @@ export default function StaffRecommendationsPage() {
                   View Full Details
                 </Button>
                 {(rec.status === 'PENDING' || rec.status === 'UNDER REVIEW') && (
-                  <>
-                    <Button size="sm" onClick={() => setDecisionModal({ type: 'approve', item: rec })}>
-                      Approve
-                    </Button>
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      onClick={() => setDecisionModal({ type: 'reject', item: rec })}
-                    >
-                      Reject
-                    </Button>
-                  </>
+                  <Button size="sm" onClick={() => setDecisionModal({ type: 'approve', item: rec })}>
+                    Approve
+                  </Button>
                 )}
                 {rec.decisions.length > 0 && (
                   <Button

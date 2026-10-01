@@ -13,7 +13,7 @@ import type { DecisionType } from '../../types/approval'
 import type { StoredUser } from '../../types/auth'
 
 export default function AccessRequestsPage() {
-  const { pendingRequests, approveRequest, rejectRequest, allUsers, refreshUsers } = useAuth()
+  const { pendingRequests, approveRequest, allUsers, refreshUsers } = useAuth()
   const [decisionModal, setDecisionModal] = useState<{
     type: DecisionType
     user: StoredUser
@@ -65,14 +65,6 @@ export default function AccessRequestsPage() {
             onClick={() => setDecisionModal({ type: 'approve', user: r })}
           >
             Approve
-          </Button>
-          <Button
-            size="sm"
-            variant="outline"
-            className="shrink-0 !px-2 !py-1 text-xs"
-            onClick={() => setDecisionModal({ type: 'reject', user: r })}
-          >
-            Reject
           </Button>
         </TableActionsCell>
       ),
@@ -154,11 +146,7 @@ export default function AccessRequestsPage() {
         currentStatus="PENDING"
         onSubmit={(notes) => {
           if (!decisionModal) return
-          if (decisionModal.type === 'approve') {
-            approveRequest(decisionModal.user.id, notes)
-          } else {
-            rejectRequest(decisionModal.user.id, notes)
-          }
+          approveRequest(decisionModal.user.id, notes)
           refreshUsers()
         }}
       />

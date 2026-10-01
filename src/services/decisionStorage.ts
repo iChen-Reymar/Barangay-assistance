@@ -105,6 +105,59 @@ export function getAssistanceItems(): ReviewableAssistanceItem[] {
   return getReviewableItems().filter((item) => item.source === 'assistance')
 }
 
+export function getAssociationAssistanceItems(associationName: string): ReviewableAssistanceItem[] {
+  const name = associationName.trim().toLowerCase()
+  return getAssistanceItems().filter((item) => item.association.trim().toLowerCase() === name)
+}
+
+export function submitAssociationAssistanceRequest(input: {
+  association: string
+  program: string
+  memberCount: number
+  purpose: string
+  requestedAssistance: string
+  supportingInfo: string
+  submittedBy: string
+  contactNumber?: string
+  email?: string
+}): ReviewableAssistanceItem {
+  const now = new Date()
+  initializeDecisionStorage()
+  const existing = readItems()
+  const usedNumbers = existing
+    .map((entry) => /^asst-(\d+)$/.exec(entry.id)?.[1])
+    .filter((value): value is string => Boolean(value))
+    .map(Number)
+  const nextNumber = (usedNumbers.length > 0 ? Math.max(...usedNumbers) : 0) + 1
+
+  const item: ReviewableAssistanceItem = {
+    id: `asst-${nextNumber}`,
+    source: 'assistance',
+    association: input.association.trim(),
+    requestType: input.program.trim(),
+    program: input.program.trim(),
+    vulnerability: 'MEDIUM',
+    date: now.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }),
+    status: 'PENDING',
+    description: input.purpose.trim(),
+    decisions: [],
+    details: {
+      submittedBy: input.submittedBy.trim(),
+      contactNumber: input.contactNumber?.trim() || '—',
+      email: input.email,
+      address: 'Barangay Buru-un, Iligan City',
+      memberCount: input.memberCount,
+      purpose: input.purpose.trim(),
+      requestedItems: input.requestedAssistance.trim(),
+      supportingInfo: input.supportingInfo.trim() || '—',
+      submittedAt: now.toISOString(),
+    },
+  }
+
+  writeItems([item, ...existing])
+  return enrichReviewableItem(item)
+}
+
 export function getRecommendationItems(): ReviewableAssistanceItem[] {
   return getReviewableItems().filter((item) => item.source === 'recommendation')
 }
@@ -258,8 +311,15 @@ export function purgeRejectedAssistanceOlderThan(days: number): number {
 }
 
 export function subscribeDecisionStorage(callback: () => void) {
+  const onStorage = (event: StorageEvent) => {
+    if (event.key === ITEMS_KEY) callback()
+  }
   window.addEventListener(UPDATED_EVENT, callback)
-  return () => window.removeEventListener(UPDATED_EVENT, callback)
+  window.addEventListener('storage', onStorage)
+  return () => {
+    window.removeEventListener(UPDATED_EVENT, callback)
+    window.removeEventListener('storage', onStorage)
+  }
 }
 
 export function getRecentAssistanceDecisions(limit = 10): DecisionRecord[] {

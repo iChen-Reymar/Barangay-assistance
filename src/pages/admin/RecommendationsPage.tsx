@@ -185,13 +185,6 @@ export default function RecommendationsPage() {
                     <Button size="sm" onClick={() => setDecisionModal({ type: 'approve', item: rec })}>
                       Approve
                     </Button>
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      onClick={() => setDecisionModal({ type: 'reject', item: rec })}
-                    >
-                      Reject
-                    </Button>
                   </>
                 )}
                 {rec.decisions.length > 0 && (

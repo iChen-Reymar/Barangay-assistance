@@ -223,7 +223,8 @@ export function enrichReviewableItem<
     ...item,
     details: {
       ...extras.details,
-      vulnerabilityScore: item.score ?? extras.details.vulnerabilityScore,
+      ...item.details,
+      vulnerabilityScore: item.score ?? item.details?.vulnerabilityScore ?? extras.details.vulnerabilityScore,
     },
     documents: item.documents ?? extras.documents,
     qualifications: item.qualifications ?? extras.qualifications,

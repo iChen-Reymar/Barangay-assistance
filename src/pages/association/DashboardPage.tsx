@@ -1,32 +1,75 @@
+import { useEffect, useState } from 'react'
 import { Users, Clock, CheckCircle, XCircle } from 'lucide-react'
 import { DashboardNavbar } from '../../components/layout/DashboardNavbar'
 import { StatCard } from '../../components/ui/StatCard'
 import { Badge } from '../../components/ui/Badge'
 import { NotificationPanel } from '../../components/ui/NotificationPanel'
+import { associationStats, associationNotifications } from '../../data/associationMockData'
+import { useAuth } from '../../context/AuthContext'
+import { getInitials } from '../../utils/userDisplay'
+import { getAssociationDetails } from '../../services/memberStorage'
 import {
-  associationStats,
-  recentRequests,
-  associationNotifications,
-  approvedAssistance,
-} from '../../data/associationMockData'
-import { associationUser } from '../../components/association/navConfig'
+  getAssociationAssistanceItems,
+  subscribeDecisionStorage,
+} from '../../services/decisionStorage'
+import type { ReviewableAssistanceItem } from '../../types/approval'
+import type { RequestStatus } from '../../data/mockData'
+
+function statusVariant(status: RequestStatus) {
+  if (status === 'APPROVED') return 'success' as const
+  if (status === 'REJECTED') return 'danger' as const
+  if (status === 'UNDER REVIEW') return 'info' as const
+  if (status === 'PENDING') return 'warning' as const
+  return 'neutral' as const
+}
+
+function approvedOn(item: ReviewableAssistanceItem) {
+  const decision = [...item.decisions].reverse().find((entry) => entry.newStatus === 'APPROVED')
+  if (!decision) return item.date
+  return new Date(decision.decidedAt).toLocaleDateString('en-US', {
+    month: 'short',
+    day: 'numeric',
+    year: 'numeric',
+  })
+}
 
 export default function AssociationDashboardPage() {
+  const { user, profile } = useAuth()
+  const displayName = profile?.fullName ?? user?.fullName ?? 'Association Head'
+  const initials = getInitials(displayName)
+  const associationName = profile?.associationName ?? getAssociationDetails().name
+  const [requests, setRequests] = useState<ReviewableAssistanceItem[]>(() =>
+    getAssociationAssistanceItems(associationName),
+  )
+
+  useEffect(() => {
+    const refresh = () => setRequests(getAssociationAssistanceItems(associationName))
+    refresh()
+    return subscribeDecisionStorage(refresh)
+  }, [associationName])
+
+  const pendingCount = requests.filter(
+    (item) => item.status === 'PENDING' || item.status === 'UNDER REVIEW',
+  ).length
+  const approvedItems = requests.filter((item) => item.status === 'APPROVED')
+  const rejectedCount = requests.filter((item) => item.status === 'REJECTED').length
+  const recent = requests.slice(0, 4)
+
   return (
     <>
       <DashboardNavbar
         title="Association Dashboard"
         searchPlaceholder="Search members, requests, records..."
-        userName={associationUser.name}
-        userInitials={associationUser.initials}
+        userName={displayName}
+        userInitials={initials}
         notificationsPath="/association/notifications"
       />
       <main className="flex-1 overflow-y-auto p-4 sm:p-5 md:p-6">
         <div className="mb-6 grid grid-cols-2 gap-4 lg:grid-cols-4">
           <StatCard label="Total Members" value={associationStats.totalMembers} icon={Users} />
-          <StatCard label="Pending Requests" value={associationStats.pendingRequests} icon={Clock} />
-          <StatCard label="Approved Requests" value={associationStats.approvedRequests} icon={CheckCircle} />
-          <StatCard label="Rejected Requests" value={associationStats.rejectedRequests} icon={XCircle} />
+          <StatCard label="Pending Requests" value={pendingCount} icon={Clock} />
+          <StatCard label="Approved Requests" value={approvedItems.length} icon={CheckCircle} />
+          <StatCard label="Rejected Requests" value={rejectedCount} icon={XCircle} />
         </div>
 
         <div className="grid gap-6 lg:grid-cols-2">
@@ -34,27 +77,24 @@ export default function AssociationDashboardPage() {
             <div className="border-b border-gray-200 px-5 py-4">
               <h2 className="text-sm font-bold text-gray-900">Recent Requests</h2>
             </div>
-            <div className="divide-y divide-gray-100">
-              {recentRequests.map((req) => (
-                <div key={req.id} className="flex items-center justify-between px-5 py-4">
-                  <div>
-                    <p className="font-medium text-gray-900">{req.program}</p>
-                    <p className="text-xs text-gray-500">{req.date} · {req.members} members</p>
+            {recent.length === 0 ? (
+              <p className="px-5 py-6 text-sm text-gray-500">No assistance requests yet.</p>
+            ) : (
+              <div className="divide-y divide-gray-100">
+                {recent.map((req) => (
+                  <div key={req.id} className="flex items-center justify-between gap-3 px-5 py-4">
+                    <div>
+                      <p className="font-medium text-gray-900">{req.requestType}</p>
+                      <p className="text-xs text-gray-500">
+                        {req.date}
+                        {req.details?.memberCount ? ` · ${req.details.memberCount} members` : ''}
+                      </p>
+                    </div>
+                    <Badge variant={statusVariant(req.status)}>{req.status}</Badge>
                   </div>
-                  <Badge
-                    variant={
-                      req.status === 'APPROVED'
-                        ? 'success'
-                        : req.status === 'UNDER REVIEW'
-                          ? 'info'
-                          : 'neutral'
-                    }
-                  >
-                    {req.status}
-                  </Badge>
-                </div>
-              ))}
-            </div>
+                ))}
+              </div>
+            )}
           </div>
 
           <div className="rounded-lg border border-gray-200 bg-white p-5 shadow-sm">
@@ -67,19 +107,26 @@ export default function AssociationDashboardPage() {
           <div className="border-b border-gray-200 px-5 py-4">
             <h2 className="text-sm font-bold text-gray-900">Approved Assistance</h2>
           </div>
-          <div className="grid gap-4 p-5 sm:grid-cols-2 lg:grid-cols-3">
-            {approvedAssistance.map((item) => (
-              <div key={item.id} className="rounded-lg border border-gray-200 p-4">
-                <p className="font-bold text-green-800">{item.program}</p>
-                <p className="mt-1 text-xs text-gray-500">Approved: {item.approvedDate}</p>
-                <p className="text-sm text-gray-600">{item.beneficiaries} beneficiaries</p>
-                <div className="mt-2 flex items-center justify-between">
-                  <Badge variant="success">{item.status}</Badge>
-                  <span className="text-xs text-gray-400">{item.distributionDate}</span>
+          {approvedItems.length === 0 ? (
+            <p className="px-5 py-6 text-sm text-gray-500">
+              Approved requests from barangay staff will appear here.
+            </p>
+          ) : (
+            <div className="grid gap-4 p-5 sm:grid-cols-2 lg:grid-cols-3">
+              {approvedItems.map((item) => (
+                <div key={item.id} className="rounded-lg border border-gray-200 p-4">
+                  <p className="font-bold text-green-800">{item.requestType}</p>
+                  <p className="mt-1 text-xs text-gray-500">Approved: {approvedOn(item)}</p>
+                  <p className="text-sm text-gray-600">
+                    {item.details?.memberCount ?? '—'} members
+                  </p>
+                  <div className="mt-2">
+                    <Badge variant="success">APPROVED</Badge>
+                  </div>
                 </div>
-              </div>
-            ))}
-          </div>
+              ))}
+            </div>
+          )}
         </div>
       </main>
     </>
