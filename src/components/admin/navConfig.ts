@@ -5,7 +5,6 @@ import {
   ClipboardCheck,
   FileDown,
   ScrollText,
-  UserCog,
   Settings,
 } from 'lucide-react'
 
@@ -13,7 +12,6 @@ export const navItems = [
   { to: '/admin', label: 'Dashboard', icon: LayoutDashboard, end: true },
   { to: '/admin/audit-logs', label: 'Audit Logs', icon: ScrollText },
   { to: '/admin/reports', label: 'Export Reports', icon: FileDown },
-  { to: '/admin/users', label: 'Manage Users', icon: UserCog },
   { to: '/admin/associations', label: 'Manage Association', icon: Building2 },
   { to: '/admin/recommendations?status=approved', label: 'Approved Recommendations', icon: ClipboardCheck },
   { to: '/admin/programs', label: 'Assistance Lists', icon: ClipboardList },
