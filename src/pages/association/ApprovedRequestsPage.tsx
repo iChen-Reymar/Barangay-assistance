@@ -7,7 +7,7 @@ export default function ApprovedRequestsPage() {
   return (
     <>
       <DashboardNavbar
-        title="Approved Assistance"
+        title="View AI-Generated Recommendation"
         searchPlaceholder="Search approved requests..."
         userName={associationUser.name}
         userInitials={associationUser.initials}

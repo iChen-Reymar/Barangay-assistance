@@ -4,6 +4,7 @@ import {
   type AssociationDetails,
   type AssociationMember,
 } from '../data/associationMockData'
+import { ensureAssociationFromUser } from './associationStorage'
 
 const MEMBERS_KEY = 'barangay_association_members'
 const DETAILS_KEY = 'barangay_association_details'
@@ -57,6 +58,10 @@ export function getAssociationMemberById(id: string): AssociationMember | null {
   return getAssociationMembers().find((member) => member.id === id) ?? null
 }
 
+export function removeAssociationMember(id: string) {
+  writeMembers(readMembers().filter((member) => member.id !== id))
+}
+
 export function upsertAssociationMember(member: AssociationMember) {
   const members = readMembers()
   const index = members.findIndex((row) => row.id === member.id)
@@ -98,7 +103,13 @@ export function syncAssociationFromApprovedUser(user: {
 }) {
   if (!user.associationName) return
 
+  ensureAssociationFromUser(user)
+
   const existing = readDetails()
+  if (existing && existing.name.trim().toLowerCase() !== user.associationName.trim().toLowerCase()) {
+    return
+  }
+
   saveAssociationDetails({
     id: existing?.id ?? user.id,
     name: user.associationName,

@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { Plus, Pencil, Eye } from 'lucide-react'
+import { Plus, Pencil, Eye, Trash2 } from 'lucide-react'
 import { DashboardNavbar } from '../../components/layout/DashboardNavbar'
 import { MemberFormModal, type MemberFormInput } from '../../components/association/MemberFormModal'
 import { MemberViewModal } from '../../components/association/MemberViewModal'
@@ -11,6 +11,7 @@ import type { AssociationMember, VulnerabilityLevel } from '../../data/associati
 import {
   getAssociationMembers,
   upsertAssociationMember,
+  removeAssociationMember,
   subscribeMemberStorage,
 } from '../../services/memberStorage'
 import { useAuth } from '../../context/AuthContext'
@@ -147,6 +148,14 @@ export default function MembersPage() {
           >
             <Eye className="h-4 w-4" />
           </button>
+          <button
+            type="button"
+            onClick={() => removeAssociationMember(r.id)}
+            className="shrink-0 rounded p-1 text-gray-400 hover:bg-gray-100 hover:text-red-600"
+            aria-label={`Remove ${r.name}`}
+          >
+            <Trash2 className="h-4 w-4" />
+          </button>
         </TableActionsCell>
       ),
     },
@@ -155,7 +164,7 @@ export default function MembersPage() {
   return (
     <>
       <DashboardNavbar
-        title="Association Members"
+        title="Manage Association Members"
         searchPlaceholder="Search members..."
         userName={displayName}
         userInitials={initials}

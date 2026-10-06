@@ -2,13 +2,13 @@ import { useEffect, useState, type FormEvent } from 'react'
 import { Modal } from '../ui/Modal'
 import { Button } from '../ui/Button'
 import {
-  associations,
   computeVulnerability,
   formatElderlyPwd,
   housingTypes,
   type Beneficiary,
   type HousingType,
 } from '../../data/mockData'
+import { getActiveAssociations } from '../../services/associationStorage'
 
 export type BeneficiaryFormInput = {
   name: string
@@ -52,9 +52,12 @@ export function BeneficiaryFormModal({
 }: BeneficiaryFormModalProps) {
   const [form, setForm] = useState<BeneficiaryFormInput>(emptyForm)
   const [error, setError] = useState('')
+  const [associationOptions, setAssociationOptions] = useState(() => getActiveAssociations())
 
   useEffect(() => {
     if (!open) return
+    const options = getActiveAssociations()
+    setAssociationOptions(options)
     if (initialValues) {
       setForm({
         name: initialValues.name,
@@ -68,7 +71,7 @@ export function BeneficiaryFormModal({
     } else {
       setForm({
         ...emptyForm,
-        association: associations[0]?.name ?? '',
+        association: options[0]?.name ?? '',
       })
     }
     setError('')
@@ -132,7 +135,7 @@ export function BeneficiaryFormModal({
             className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
           >
             <option value="">Select association</option>
-            {associations.map((assoc) => (
+            {associationOptions.map((assoc) => (
               <option key={assoc.id} value={assoc.name}>
                 {assoc.name}
               </option>

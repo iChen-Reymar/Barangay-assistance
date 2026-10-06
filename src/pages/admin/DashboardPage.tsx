@@ -1,4 +1,5 @@
-import { Building2, Users, Clock, CheckCircle, AlertTriangle } from 'lucide-react'
+import { Building2, Users, Clock, CheckCircle, AlertTriangle, ScrollText, FileDown, UserCog, ClipboardCheck, ClipboardList } from 'lucide-react'
+import { Link } from 'react-router-dom'
 import { AdminHeader } from '../../components/admin/AdminHeader'
 import { StatCard } from '../../components/admin/StatCard'
 import { AnalyticsCharts } from '../../components/admin/AnalyticsCharts'
@@ -15,8 +16,28 @@ import {
 export default function DashboardPage() {
   return (
     <>
-      <AdminHeader title="Barangay Assistance Matching Dashboard" />
+      <AdminHeader title="Barangay Captain Dashboard" />
       <main className="flex-1 overflow-y-auto p-4 sm:p-5 md:p-6">
+        <div className="mb-6 grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+          {[
+            { to: '/admin/audit-logs', label: 'View Audit Logs', icon: ScrollText },
+            { to: '/admin/reports', label: 'Export Reports', icon: FileDown },
+            { to: '/admin/users', label: 'Manage Users', icon: UserCog },
+            { to: '/admin/associations', label: 'Manage Association', icon: Building2 },
+            { to: '/admin/recommendations', label: 'View AI-Generated Recommendation', icon: ClipboardCheck },
+            { to: '/admin/programs', label: 'Manage Assistance Lists', icon: ClipboardList },
+          ].map((item) => (
+            <Link
+              key={item.to}
+              to={item.to}
+              className="flex items-center gap-3 rounded-lg border border-gray-200 bg-white px-4 py-3 text-sm font-semibold text-gray-900 shadow-sm hover:border-primary hover:text-primary"
+            >
+              <item.icon className="h-4 w-4 shrink-0 text-primary" />
+              {item.label}
+            </Link>
+          ))}
+        </div>
+
         <div className="mb-4 grid grid-cols-2 gap-3 sm:mb-6 sm:gap-4 lg:grid-cols-5">
           <StatCard label="Total Associations" value={dashboardStats.totalAssociations} icon={Building2} />
           <StatCard label="Total Beneficiaries" value={dashboardStats.totalBeneficiaries} icon={Users} />

@@ -33,7 +33,7 @@ export default function AidRecordsPage() {
   return (
     <>
       <DashboardNavbar
-        title="Aid Distribution Records"
+        title="Submit Aid Records"
         searchPlaceholder="Search aid records..."
         userName={associationUser.name}
         userInitials={associationUser.initials}

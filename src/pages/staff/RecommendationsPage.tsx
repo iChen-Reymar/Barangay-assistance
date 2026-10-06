@@ -40,8 +40,6 @@ export default function StaffRecommendationsPage() {
     return subscribeDecisionStorage(() => setItems(getRecommendationItems()))
   }, [])
 
-  const pending = items.filter((item) => item.status === 'PENDING' || item.status === 'UNDER REVIEW')
-
   function refreshItems() {
     setItems(getRecommendationItems())
   }
@@ -90,14 +88,14 @@ export default function StaffRecommendationsPage() {
   return (
     <>
       <DashboardNavbar
-        title="Assistance Decision & Approvals Console"
+        title="View AI-Generated Recommendation"
         searchPlaceholder="Search requests, associations, beneficiaries..."
         userName={displayName}
         userInitials={initials}
       />
       <main className="flex-1 overflow-y-auto p-4 sm:p-5 md:p-6">
         <h2 className="mb-4 text-base font-bold text-gray-900">
-          Pending AI-Matched Recommendations ({pending.length} items require review)
+          AI-Generated Recommendations ({items.length})
         </h2>
 
         <div className="space-y-4">
@@ -151,20 +149,6 @@ export default function StaffRecommendationsPage() {
                 <Button size="sm" variant="outline" onClick={() => setDetailsItem(rec)}>
                   View Full Details
                 </Button>
-                {(rec.status === 'PENDING' || rec.status === 'UNDER REVIEW') && (
-                  <Button size="sm" onClick={() => setDecisionModal({ type: 'approve', item: rec })}>
-                    Approve
-                  </Button>
-                )}
-                {rec.decisions.length > 0 && (
-                  <Button
-                    size="sm"
-                    variant="ghost"
-                    onClick={() => setDecisionModal({ type: 'override', item: rec })}
-                  >
-                    Override
-                  </Button>
-                )}
                 <Button
                   size="sm"
                   variant="ghost"
@@ -206,7 +190,6 @@ export default function StaffRecommendationsPage() {
         itemTitle={decisionModal?.item.association ?? ''}
         itemSubtitle={decisionModal?.item.program}
         currentStatus={decisionModal?.item.status}
-        allowOverrideStatus={decisionModal?.type === 'override'}
         onSubmit={handleDecision}
       />
     </>

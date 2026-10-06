@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { Users, Shield, AlertTriangle, Clock, CheckCircle } from 'lucide-react'
+import { Users, Shield, AlertTriangle, Clock, CheckCircle, ListOrdered, ClipboardCheck, PieChart, FileDown } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import { AnalyticsCharts } from '../../components/admin/AnalyticsCharts'
 import { DashboardNavbar } from '../../components/layout/DashboardNavbar'
@@ -81,7 +81,7 @@ export default function StaffDashboardPage() {
   return (
     <>
       <DashboardNavbar
-        title="Staff Dashboard"
+        title="Barangay Staff Dashboard"
         searchPlaceholder="Search records, requests, files..."
         userName={displayUser.name}
         userInitials={displayUser.initials}
@@ -92,6 +92,27 @@ export default function StaffDashboardPage() {
             {statusMessage}
           </div>
         ) : null}
+
+        <div className="mb-6 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+          {[
+            { to: '/staff/beneficiaries', label: 'Input Beneficiaries Data', icon: Users },
+            { to: '/staff/vulnerability-assessment', label: 'Classify Beneficiaries', icon: Shield },
+            { to: '/staff/priority-list', label: 'Generate Assistance Lists', icon: ListOrdered },
+            { to: '/staff/reports', label: 'Export Reports', icon: FileDown },
+            { to: '/staff/recommendations', label: 'View AI-Generated Recommendation', icon: CheckCircle },
+            { to: '/staff/status-reports', label: 'View Status Reports', icon: PieChart },
+            { to: '/staff/verify-qualification', label: 'Verify Qualification', icon: ClipboardCheck },
+          ].map((item) => (
+            <Link
+              key={item.to}
+              to={item.to}
+              className="flex items-center gap-3 rounded-lg border border-gray-200 bg-white px-4 py-3 text-sm font-semibold text-gray-900 shadow-sm hover:border-primary hover:text-primary"
+            >
+              <item.icon className="h-4 w-4 shrink-0 text-primary" />
+              {item.label}
+            </Link>
+          ))}
+        </div>
 
         <div className="mb-6 grid grid-cols-2 gap-4 lg:grid-cols-5">
           <StatCard label="Total Beneficiaries" value={staffStats.totalBeneficiaries} icon={Users} />

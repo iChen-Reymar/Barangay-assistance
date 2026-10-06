@@ -72,7 +72,7 @@ export default function StaffReportsPage() {
   return (
     <>
       <DashboardNavbar
-        title="System Reports Panel"
+        title="Export Reports"
         searchPlaceholder="Search records, requests, files..."
         userName={displayUser.name}
         userInitials={displayUser.initials}

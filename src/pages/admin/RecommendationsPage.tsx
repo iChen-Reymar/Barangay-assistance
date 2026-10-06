@@ -45,8 +45,6 @@ export default function RecommendationsPage() {
     return subscribeDecisionStorage(() => setItems(loadRecommendationItems(approvedOnly)))
   }, [approvedOnly])
 
-  const pending = items.filter((item) => item.status === 'PENDING' || item.status === 'UNDER REVIEW')
-
   function refreshItems() {
     setItems(loadRecommendationItems(approvedOnly))
   }
@@ -95,14 +93,14 @@ export default function RecommendationsPage() {
   return (
     <>
       <AdminHeader
-        title={approvedOnly ? 'Approved Recommendations' : 'Assistance Decision & Approvals Console'}
+        title="View AI-Generated Recommendation"
       />
       <main className="flex-1 overflow-y-auto p-4 sm:p-5 md:p-6">
         <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
           <h2 className="text-base font-bold text-gray-900">
             {approvedOnly
-              ? `Approved AI Recommendations (${items.length})`
-              : `Pending AI Recommendations (${pending.length} require review)`}
+              ? `AI-Generated Results (${items.length})`
+              : `AI-Generated Recommendations (${items.length})`}
           </h2>
           <div className="flex rounded-lg border border-gray-200 bg-white p-1 text-sm">
             <button
@@ -124,7 +122,7 @@ export default function RecommendationsPage() {
         {items.length === 0 ? (
           <div className="rounded-lg border border-gray-200 bg-white px-5 py-8 text-sm text-gray-500">
             {approvedOnly
-              ? 'No approved AI recommendations yet. Approve a pending recommendation to list it here.'
+              ? 'No AI-generated results yet.'
               : 'No recommendations to review.'}
           </div>
         ) : null}
@@ -180,22 +178,6 @@ export default function RecommendationsPage() {
                 <Button size="sm" variant="outline" onClick={() => setDetailsItem(rec)}>
                   View Full Details
                 </Button>
-                {(rec.status === 'PENDING' || rec.status === 'UNDER REVIEW') && (
-                  <>
-                    <Button size="sm" onClick={() => setDecisionModal({ type: 'approve', item: rec })}>
-                      Approve
-                    </Button>
-                  </>
-                )}
-                {rec.decisions.length > 0 && (
-                  <Button
-                    size="sm"
-                    variant="ghost"
-                    onClick={() => setDecisionModal({ type: 'override', item: rec })}
-                  >
-                    Override
-                  </Button>
-                )}
                 <Button
                   size="sm"
                   variant="ghost"
@@ -237,7 +219,6 @@ export default function RecommendationsPage() {
         itemTitle={decisionModal?.item.association ?? ''}
         itemSubtitle={decisionModal?.item.program}
         currentStatus={decisionModal?.item.status}
-        allowOverrideStatus={decisionModal?.type === 'override'}
         onSubmit={handleDecision}
       />
     </>

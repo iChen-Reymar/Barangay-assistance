@@ -55,8 +55,8 @@ export interface AssociationHeadRequestInput {
   email: string
   contactNumber: string
   password: string
-  associationName: string
-  associationType: string
+  associationName?: string
+  associationType?: string
   associationAddress: string
   registrationNumber?: string
 }

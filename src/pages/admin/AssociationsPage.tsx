@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { Building2, Users, UserCheck, Clock, Plus, Pencil, Settings, Eye } from 'lucide-react'
 import { AdminHeader } from '../../components/admin/AdminHeader'
 import { StatCard } from '../../components/admin/StatCard'
@@ -7,10 +7,17 @@ import { Pagination } from '../../components/admin/Pagination'
 import { AssociationFormModal, type AssociationFormInput } from '../../components/admin/AssociationFormModal'
 import { AssociationSettingsModal } from '../../components/admin/AssociationSettingsModal'
 import { AssociationViewModal } from '../../components/admin/AssociationViewModal'
+import { SearchBar } from '../../components/ui/SearchBar'
 import { useAuth } from '../../context/AuthContext'
+import { assignAssociationHead, releaseAssociationHead } from '../../services/authStorage'
 import { buildChanges, logAuditEvent } from '../../services/auditStorage'
 import {
-  associations as initialAssociations,
+  getAssociations,
+  subscribeAssociationStorage,
+  updateAssociationStatus,
+  upsertAssociation,
+} from '../../services/associationStorage'
+import {
   associationTypes,
   type Association,
   type AssociationStatus,
@@ -25,13 +32,15 @@ function formatDate(date: Date) {
 }
 
 export default function AssociationsPage() {
-  const { user, profile } = useAuth()
+  const { user, profile, refreshUsers } = useAuth()
   const actorName = profile?.fullName ?? user?.fullName ?? 'Administrator'
   const actorEmail = profile?.email ?? user?.email
 
-  const [items, setItems] = useState<Association[]>(initialAssociations)
+  const [items, setItems] = useState<Association[]>(() => getAssociations())
+  const [query, setQuery] = useState('')
   const [typeFilter, setTypeFilter] = useState<'All' | AssociationType>('All')
   const [statusFilter, setStatusFilter] = useState<'All' | AssociationStatus>('All')
+  const [message, setMessage] = useState('')
   const [formOpen, setFormOpen] = useState(false)
   const [settingsOpen, setSettingsOpen] = useState(false)
   const [editingAssociation, setEditingAssociation] = useState<Association | null>(null)
@@ -39,15 +48,26 @@ export default function AssociationsPage() {
   const [viewOpen, setViewOpen] = useState(false)
   const [viewingAssociation, setViewingAssociation] = useState<Association | null>(null)
 
+  useEffect(() => {
+    setItems(getAssociations())
+    return subscribeAssociationStorage(() => setItems(getAssociations()))
+  }, [])
+
   const filtered = useMemo(() => {
+    const term = query.trim().toLowerCase()
     return items.filter((row) => {
       const typeMatch = typeFilter === 'All' || row.type === typeFilter
       const statusMatch = statusFilter === 'All' || row.status === statusFilter
-      return typeMatch && statusMatch
+      const searchMatch =
+        term.length === 0 ||
+        row.name.toLowerCase().includes(term) ||
+        row.contactPerson.toLowerCase().includes(term) ||
+        row.type.toLowerCase().includes(term)
+      return typeMatch && statusMatch && searchMatch
     })
-  }, [items, typeFilter, statusFilter])
+  }, [items, typeFilter, statusFilter, query])
 
-  const pagination = usePagination(filtered, PAGE_SIZE_DEFAULT, `${typeFilter}-${statusFilter}`)
+  const pagination = usePagination(filtered, PAGE_SIZE_DEFAULT, `${typeFilter}-${statusFilter}-${query}`)
 
   const stats = useMemo(() => {
     const active = items.filter((row) => row.status === 'ACTIVE').length
@@ -87,13 +107,26 @@ export default function AssociationsPage() {
     return pagination.paginatedItems[index] ?? null
   })
 
-  function handleSaveForm(input: AssociationFormInput) {
+  const takenHeads = items
+    .filter((row) => row.headUserId && row.id !== editingAssociation?.id)
+    .map((row) => ({ userId: row.headUserId as string, associationName: row.name }))
+
+  function handleSaveForm(input: AssociationFormInput, headUserId?: string) {
     if (editingAssociation) {
-      setItems((prev) =>
-        prev.map((row) =>
-          row.id === editingAssociation.id ? { ...row, ...input } : row,
-        ),
-      )
+      const nextHeadId = headUserId ?? editingAssociation.headUserId
+      if (
+        editingAssociation.headUserId &&
+        nextHeadId &&
+        (editingAssociation.headUserId !== nextHeadId || editingAssociation.name !== input.name)
+      ) {
+        releaseAssociationHead(editingAssociation.headUserId, editingAssociation.name)
+      }
+
+      const updated = upsertAssociation({
+        ...editingAssociation,
+        ...input,
+        headUserId: nextHeadId,
+      })
       logAuditEvent({
         user: actorName,
         userEmail: actorEmail,
@@ -106,10 +139,12 @@ export default function AssociationsPage() {
           { key: 'name', label: 'Association Name', oldValue: editingAssociation.name, newValue: input.name },
           { key: 'type', label: 'Type', oldValue: editingAssociation.type, newValue: input.type },
           { key: 'members', label: 'Total Members', oldValue: editingAssociation.members, newValue: input.members },
-          { key: 'contactPerson', label: 'Contact Person', oldValue: editingAssociation.contactPerson, newValue: input.contactPerson },
+          { key: 'contactPerson', label: 'Association Head', oldValue: editingAssociation.contactPerson, newValue: input.contactPerson },
           { key: 'contactNumber', label: 'Contact Number', oldValue: editingAssociation.contactNumber, newValue: input.contactNumber },
         ]),
       })
+      assignHead(nextHeadId, input.name, input.type)
+      setMessage(`${updated.name} was updated.`)
       return
     }
 
@@ -118,8 +153,9 @@ export default function AssociationsPage() {
       ...input,
       dateRegistered: formatDate(new Date()),
       status: 'ACTIVE',
+      headUserId,
     }
-    setItems((prev) => [newAssociation, ...prev])
+    upsertAssociation(newAssociation)
     logAuditEvent({
       user: actorName,
       userEmail: actorEmail,
@@ -133,13 +169,22 @@ export default function AssociationsPage() {
         { key: 'type', label: 'Type', oldValue: '—', newValue: input.type },
         { key: 'members', label: 'Total Members', oldValue: '—', newValue: input.members },
         { key: 'status', label: 'Status', oldValue: '—', newValue: 'ACTIVE' },
+        { key: 'contactPerson', label: 'Association Head', oldValue: '—', newValue: input.contactPerson },
       ]),
     })
+    assignHead(headUserId, input.name, input.type)
+    setMessage(`${newAssociation.name} was added and assigned to ${input.contactPerson}.`)
+  }
+
+  function assignHead(headUserId: string | undefined, associationName: string, associationType: string) {
+    if (!headUserId) return
+    assignAssociationHead(headUserId, associationName, associationType)
+    refreshUsers()
   }
 
   function handleSaveSettings(id: string, status: AssociationStatus) {
     const current = items.find((row) => row.id === id)
-    setItems((prev) => prev.map((row) => (row.id === id ? { ...row, status } : row)))
+    updateAssociationStatus(id, status)
     if (current && current.status !== status) {
       logAuditEvent({
         user: actorName,
@@ -158,8 +203,17 @@ export default function AssociationsPage() {
 
   return (
     <>
-      <AdminHeader title="Manage Barangay Associations" />
+      <AdminHeader title="Manage Association" />
       <main className="flex-1 overflow-y-auto p-4 sm:p-5 md:p-6">
+        <p className="mb-4 max-w-3xl text-sm text-gray-500">
+          Handles the management of all association profiles and their relevant records within the system.
+          Create new associations and assign who will serve as the Association Head for each group.
+        </p>
+        {message ? (
+          <div className="mb-4 rounded-lg border border-green-200 bg-green-50 px-4 py-3 text-sm text-green-800">
+            {message}
+          </div>
+        ) : null}
         <div className="mb-6 grid grid-cols-2 gap-4 lg:grid-cols-4">
           <StatCard label="Total Associations" value={stats.total} icon={Building2} />
           <StatCard label="Active Associations" value={stats.active} icon={UserCheck} />
@@ -169,7 +223,13 @@ export default function AssociationsPage() {
 
         <div className="rounded-lg border border-gray-200 bg-white shadow-sm">
           <div className="flex flex-wrap items-center justify-between gap-3 border-b border-gray-200 px-5 py-4">
-            <div className="flex gap-3">
+            <div className="flex min-w-0 flex-1 flex-wrap gap-3">
+              <SearchBar
+                placeholder="Search associations or heads..."
+                value={query}
+                onChange={setQuery}
+                className="w-full sm:w-72"
+              />
               <select
                 value={typeFilter}
                 onChange={(e) => setTypeFilter(e.target.value as 'All' | AssociationType)}
@@ -217,7 +277,7 @@ export default function AssociationsPage() {
                   <th className="px-4 py-3">Association Name</th>
                   <th className="px-4 py-3">Type</th>
                   <th className="px-4 py-3">Total Members</th>
-                  <th className="px-4 py-3">Contact Person</th>
+                  <th className="px-4 py-3">Association Head</th>
                   <th className="px-4 py-3">Contact Number</th>
                   <th className="px-4 py-3">Date Registered</th>
                   <th className="px-4 py-3">Status</th>
@@ -300,6 +360,10 @@ export default function AssociationsPage() {
         onClose={() => setFormOpen(false)}
         title={editingAssociation ? 'Edit Association' : 'Add Association'}
         initialValues={editingAssociation ?? undefined}
+        takenHeads={takenHeads}
+        existingNames={items
+          .filter((row) => row.id !== editingAssociation?.id)
+          .map((row) => row.name)}
         onSave={handleSaveForm}
       />
 

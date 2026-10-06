@@ -157,7 +157,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           userEmail: input.email.trim(),
           action: 'Access Request',
           actionColor: 'teal',
-          description: `Submitted Association Head registration for ${input.associationName.trim()}.`,
+          description: input.associationName?.trim()
+            ? `Submitted Association Head registration for ${input.associationName.trim()}.`
+            : 'Submitted Association Head registration.',
           entityType: 'user',
           changes: buildChanges([
             { key: 'email', label: 'Email', oldValue: '—', newValue: input.email.trim() },
@@ -166,7 +168,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
               key: 'association',
               label: 'Association',
               oldValue: '—',
-              newValue: input.associationName.trim(),
+              newValue: input.associationName?.trim() || 'Assigned by administrator',
             },
             { key: 'status', label: 'Status', oldValue: '—', newValue: 'PENDING' },
           ]),

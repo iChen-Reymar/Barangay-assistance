@@ -58,7 +58,7 @@ export function AssociationSettingsModal({
 
         <dl className="grid gap-3 rounded-lg border border-gray-100 bg-gray-50 p-4 text-sm sm:grid-cols-2">
           <div>
-            <dt className="text-[10px] font-semibold uppercase text-gray-400">Contact Person</dt>
+            <dt className="text-[10px] font-semibold uppercase text-gray-400">Association Head</dt>
             <dd className="mt-0.5 text-gray-900">{selected.contactPerson}</dd>
           </div>
           <div>

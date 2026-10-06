@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { PAGE_SIZE_DEFAULT, usePagination } from '../../hooks/usePagination'
 import { TableActionsCell } from '../../components/ui/TableActionsCell'
 import { Plus, Pencil, Eye } from 'lucide-react'
@@ -15,13 +15,13 @@ import { ResponsiveTable } from '../../components/ui/ResponsiveTable'
 import { useAuth } from '../../context/AuthContext'
 import { buildChanges, logAuditEvent } from '../../services/auditStorage'
 import {
-  associations,
   beneficiaries as initialBeneficiaries,
   computeVulnerability,
   formatElderlyPwd,
   type Beneficiary,
   type VulnerabilityLevel,
 } from '../../data/mockData'
+import { getAssociations, subscribeAssociationStorage } from '../../services/associationStorage'
 
 function formatCurrency(amount: number) {
   return `₱ ${amount.toLocaleString('en-PH', { minimumFractionDigits: 2 })}`
@@ -56,12 +56,18 @@ export default function BeneficiariesPage() {
   const actorEmail = profile?.email ?? user?.email
 
   const [items, setItems] = useState<Beneficiary[]>(initialBeneficiaries)
+  const [associations, setAssociations] = useState(() => getAssociations())
   const [associationFilter, setAssociationFilter] = useState('All')
   const [vulnerabilityFilter, setVulnerabilityFilter] = useState<'All' | VulnerabilityLevel>('All')
   const [formOpen, setFormOpen] = useState(false)
   const [viewOpen, setViewOpen] = useState(false)
   const [editingBeneficiary, setEditingBeneficiary] = useState<Beneficiary | null>(null)
   const [viewingBeneficiary, setViewingBeneficiary] = useState<Beneficiary | null>(null)
+
+  useEffect(() => {
+    setAssociations(getAssociations())
+    return subscribeAssociationStorage(() => setAssociations(getAssociations()))
+  }, [])
 
   const filtered = useMemo(() => {
     return items.filter((row) => {

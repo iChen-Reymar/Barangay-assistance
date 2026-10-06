@@ -12,29 +12,29 @@ import {
 import type { ReviewableAssistanceItem } from '../../types/approval'
 import type { RequestStatus } from '../../data/mockData'
 
-const reviewSteps = ['Submitted', 'Under Review', 'Approved'] as const
+const reviewSteps = ['Submitted', 'AI Processing', 'Generated'] as const
 
 function timelineFor(status: RequestStatus) {
   if (status === 'REJECTED') {
     return {
-      steps: ['Submitted', 'Under Review', 'Rejected'],
-      currentStep: 'Rejected',
+      steps: ['Submitted', 'AI Processing', 'Not Qualified'],
+      currentStep: 'Not Qualified',
       completedSteps: 3,
-      badge: 'REJECTED',
+      badge: 'NOT QUALIFIED',
     }
   }
   if (status === 'APPROVED') {
     return {
       steps: [...reviewSteps],
-      currentStep: 'Approved',
+      currentStep: 'Generated',
       completedSteps: reviewSteps.length,
-      badge: 'APPROVED',
+      badge: 'AI GENERATED',
     }
   }
   if (status === 'UNDER REVIEW') {
     return {
       steps: [...reviewSteps],
-      currentStep: 'Under Review',
+      currentStep: 'AI Processing',
       completedSteps: 2,
       badge: 'UNDER REVIEW',
     }
@@ -73,7 +73,7 @@ export default function RequestStatusPage() {
   return (
     <>
       <DashboardNavbar
-        title="Request Status"
+        title="Track Request Status"
         searchPlaceholder="Search requests..."
         userName={displayName}
         userInitials={initials}
@@ -102,7 +102,7 @@ export default function RequestStatusPage() {
                     {timeline.steps.map((step, index) => {
                       const isCompleted = index < timeline.completedSteps
                       const isCurrent = step === timeline.currentStep
-                      const isRejected = step === 'Rejected'
+                      const isRejected = step === 'Not Qualified'
 
                       return (
                         <div key={step} className="relative pb-6 last:pb-0">

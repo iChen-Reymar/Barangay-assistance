@@ -178,7 +178,7 @@ export default function StaffBeneficiariesPage() {
   return (
     <>
       <DashboardNavbar
-        title="Beneficiary Management"
+        title="Input Beneficiaries Data"
         searchPlaceholder="Search records, requests, files..."
         userName={displayUser.name}
         userInitials={displayUser.initials}

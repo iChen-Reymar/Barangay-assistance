@@ -2,6 +2,8 @@ import { useEffect, useState, type FormEvent } from 'react'
 import { Modal } from '../ui/Modal'
 import { Button } from '../ui/Button'
 import { associationTypes, type Association, type AssociationType } from '../../data/mockData'
+import { getAssociationHeadUsers } from '../../services/authStorage'
+import type { StoredUser } from '../../types/auth'
 
 export type AssociationFormInput = Omit<Association, 'id' | 'dateRegistered' | 'status'>
 
@@ -10,7 +12,9 @@ interface AssociationFormModalProps {
   onClose: () => void
   title: string
   initialValues?: Association
-  onSave: (input: AssociationFormInput) => void
+  takenHeads?: { userId: string; associationName: string }[]
+  existingNames?: string[]
+  onSave: (input: AssociationFormInput, headUserId?: string) => void
 }
 
 const emptyForm: AssociationFormInput = {
@@ -26,20 +30,33 @@ export function AssociationFormModal({
   onClose,
   title,
   initialValues,
+  takenHeads = [],
+  existingNames = [],
   onSave,
 }: AssociationFormModalProps) {
   const [form, setForm] = useState<AssociationFormInput>(emptyForm)
+  const [heads, setHeads] = useState<StoredUser[]>([])
+  const [headUserId, setHeadUserId] = useState('')
   const [error, setError] = useState('')
 
   useEffect(() => {
     if (!open) return
+    const users = getAssociationHeadUsers()
+    setHeads(users)
+    const matched = initialValues
+      ? users.find((user) => user.id === initialValues.headUserId) ??
+        users.find(
+          (user) => user.fullName.trim().toLowerCase() === initialValues.contactPerson.trim().toLowerCase(),
+        )
+      : undefined
+    setHeadUserId(matched?.id ?? '')
     if (initialValues) {
       setForm({
         name: initialValues.name,
         type: initialValues.type,
         members: initialValues.members,
-        contactPerson: initialValues.contactPerson,
-        contactNumber: initialValues.contactNumber,
+        contactPerson: matched?.fullName ?? initialValues.contactPerson,
+        contactNumber: matched?.contactNumber ?? initialValues.contactNumber,
       })
     } else {
       setForm(emptyForm)
@@ -47,25 +64,58 @@ export function AssociationFormModal({
     setError('')
   }, [open, initialValues])
 
+  function selectHead(userId: string) {
+    setHeadUserId(userId)
+    const user = heads.find((entry) => entry.id === userId)
+    if (!user) {
+      if (initialValues) {
+        setForm((prev) => ({
+          ...prev,
+          contactPerson: initialValues.contactPerson,
+          contactNumber: initialValues.contactNumber,
+        }))
+      }
+      return
+    }
+    setForm((prev) => ({
+      ...prev,
+      contactPerson: user.fullName,
+      contactNumber: user.contactNumber,
+    }))
+  }
+
   function handleSubmit(e: FormEvent) {
     e.preventDefault()
-    if (!form.name.trim()) {
+    const name = form.name.trim()
+    if (!name) {
       setError('Association name is required.')
       return
     }
-    if (!form.contactPerson.trim()) {
-      setError('Contact person is required.')
+    if (existingNames.some((entry) => entry.trim().toLowerCase() === name.toLowerCase())) {
+      setError('An association with this name already exists.')
       return
     }
-    if (!form.contactNumber.trim()) {
-      setError('Contact number is required.')
+    if (!initialValues && !headUserId) {
+      setError('Assign an association head.')
       return
     }
-    if (form.members < 1) {
-      setError('Total members must be at least 1.')
+    if (headUserId && takenHeads.some((head) => head.userId === headUserId)) {
+      setError('That user already heads another association.')
       return
     }
-    onSave(form)
+    if (!form.contactPerson.trim() || !form.contactNumber.trim()) {
+      setError('Association head and contact number are required.')
+      return
+    }
+    onSave(
+      {
+        ...form,
+        name,
+        contactPerson: form.contactPerson.trim(),
+        contactNumber: form.contactNumber.trim(),
+      },
+      headUserId || undefined,
+    )
     onClose()
   }
 
@@ -108,31 +158,30 @@ export function AssociationFormModal({
         </div>
 
         <div>
-          <label className="mb-1 block text-xs font-semibold uppercase text-gray-500">
-            Total Members
+          <label htmlFor="association-head" className="mb-1 block text-xs font-semibold uppercase text-gray-500">
+            Association Head
           </label>
-          <input
-            required
-            type="number"
-            min={1}
-            value={form.members || ''}
-            onChange={(e) =>
-              setForm((prev) => ({ ...prev, members: Number(e.target.value) || 0 }))
-            }
+          <select
+            id="association-head"
+            required={!initialValues}
+            value={headUserId}
+            onChange={(e) => selectHead(e.target.value)}
             className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
-          />
-        </div>
-
-        <div>
-          <label className="mb-1 block text-xs font-semibold uppercase text-gray-500">
-            Contact Person
-          </label>
-          <input
-            required
-            value={form.contactPerson}
-            onChange={(e) => setForm((prev) => ({ ...prev, contactPerson: e.target.value }))}
-            className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
-          />
+          >
+            <option value="">{initialValues ? 'Keep current head' : 'Select a user'}</option>
+            {heads
+              .filter((user) => !takenHeads.some((head) => head.userId === user.id))
+              .map((user) => (
+                <option key={user.id} value={user.id}>
+                  {user.fullName}
+                </option>
+              ))}
+          </select>
+          {heads.length === 0 && (
+            <p className="mt-1 text-xs text-gray-500">
+              Add an Association Head account first, then assign that user here.
+            </p>
+          )}
         </div>
 
         <div>
@@ -142,9 +191,9 @@ export function AssociationFormModal({
           <input
             required
             type="tel"
+            readOnly
             value={form.contactNumber}
-            onChange={(e) => setForm((prev) => ({ ...prev, contactNumber: e.target.value }))}
-            className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
+            className="w-full rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-700"
           />
         </div>
 

@@ -4,7 +4,6 @@ import { AuthBrandingPanel } from '../components/auth/AuthBrandingPanel'
 import {
   BuildingIcon,
   FormField,
-  FormSelect,
   LockIcon,
   MailIcon,
   PhoneIcon,
@@ -12,7 +11,6 @@ import {
 } from '../components/auth/FormField'
 import { PublicOnlyRoute } from '../components/auth/ProtectedRoute'
 import { useAuth } from '../context/AuthContext'
-import { associationTypes } from '../data/mockData'
 
 function RegisterAssociationHeadForm() {
   const { submitAssociationHeadRequest } = useAuth()
@@ -20,8 +18,6 @@ function RegisterAssociationHeadForm() {
   const [lastName, setLastName] = useState('')
   const [email, setEmail] = useState('')
   const [contactNumber, setContactNumber] = useState('')
-  const [associationName, setAssociationName] = useState('')
-  const [associationType, setAssociationType] = useState('Agricultural')
   const [associationAddress, setAssociationAddress] = useState('')
   const [registrationNumber, setRegistrationNumber] = useState('')
   const [password, setPassword] = useState('')
@@ -49,8 +45,6 @@ function RegisterAssociationHeadForm() {
       lastName,
       email,
       contactNumber,
-      associationName,
-      associationType,
       associationAddress,
       registrationNumber: registrationNumber || undefined,
       password,
@@ -75,9 +69,9 @@ function RegisterAssociationHeadForm() {
             </div>
             <h2 className="mb-2 text-2xl font-bold text-gray-900">Registration Submitted</h2>
             <p className="mb-6 text-sm text-gray-600">
-              Your Association Head registration for <strong>{associationName}</strong> has been sent
-              to the barangay administrator. You will be able to sign in once your account is
-              approved.
+              Your Association Head registration has been sent to the barangay administrator.
+              The administrator will assign your association. You will be able to sign in once
+              your account is approved.
             </p>
             <Link
               to="/login"
@@ -172,38 +166,13 @@ function RegisterAssociationHeadForm() {
               </p>
               <div className="space-y-5">
                 <FormField
-                  label="Association Name"
-                  id="associationName"
+                  label="Registration Number (optional)"
+                  id="registrationNumber"
                   icon={BuildingIcon}
-                  value={associationName}
-                  onChange={(e) => setAssociationName(e.target.value)}
-                  placeholder="e.g. Sitoy Farmer's Group"
-                  required
+                  value={registrationNumber}
+                  onChange={(e) => setRegistrationNumber(e.target.value)}
+                  placeholder="BRU-AG-2020-014"
                 />
-                <div className="grid gap-5 sm:grid-cols-2">
-                  <FormSelect
-                    label="Association Type"
-                    id="associationType"
-                    icon={BuildingIcon}
-                    value={associationType}
-                    onChange={(e) => setAssociationType(e.target.value)}
-                    required
-                  >
-                    {associationTypes.map((type) => (
-                      <option key={type} value={type}>
-                        {type}
-                      </option>
-                    ))}
-                  </FormSelect>
-                  <FormField
-                    label="Registration Number (optional)"
-                    id="registrationNumber"
-                    icon={BuildingIcon}
-                    value={registrationNumber}
-                    onChange={(e) => setRegistrationNumber(e.target.value)}
-                    placeholder="BRU-AG-2020-014"
-                  />
-                </div>
                 <FormField
                   label="Association Address"
                   id="associationAddress"

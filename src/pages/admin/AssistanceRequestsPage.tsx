@@ -143,7 +143,6 @@ export default function AssistanceRequestsPage() {
                     onView={setViewItem}
                     onApprove={(item) => setDecisionModal({ type: 'approve', item })}
                     onReject={(item) => setDecisionModal({ type: 'reject', item })}
-                    onOverride={(item) => setDecisionModal({ type: 'override', item })}
                   />
                 ),
               },
@@ -166,7 +165,6 @@ export default function AssistanceRequestsPage() {
         itemTitle={decisionModal?.item.association ?? ''}
         itemSubtitle={decisionModal?.item.requestType}
         currentStatus={decisionModal?.item.status}
-        allowOverrideStatus={decisionModal?.type === 'override'}
         onSubmit={handleDecision}
       />
 

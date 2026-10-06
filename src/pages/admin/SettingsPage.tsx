@@ -1,5 +1,4 @@
 import { useState } from 'react'
-import { Link } from 'react-router-dom'
 import { AdminHeader } from '../../components/admin/AdminHeader'
 import { PrivacyControlsPanel } from '../../components/admin/PrivacyControlsPanel'
 import { UserProfileSection } from '../../components/profile/UserProfileSection'
@@ -8,7 +7,6 @@ import { formatDate } from '../../services/authStorage'
 
 const settingsTabs = [
   'Profile',
-  'User Management',
   'Privacy & Data',
   'System Settings',
   'About',
@@ -18,8 +16,7 @@ type SettingsTab = (typeof settingsTabs)[number]
 
 export default function SettingsPage() {
   const [activeTab, setActiveTab] = useState<SettingsTab>('Profile')
-  const { user, profile, allUsers } = useAuth()
-  const approvedUsers = allUsers.filter((u) => u.status === 'approved')
+  const { user, profile } = useAuth()
 
   if (!user || !profile) {
     return null
@@ -71,50 +68,6 @@ export default function SettingsPage() {
                       </dd>
                     </div>
                   </dl>
-                </div>
-              </div>
-            )}
-
-            {activeTab === 'User Management' && (
-              <div className="rounded-lg border border-gray-200 bg-white shadow-sm">
-                <div className="flex flex-wrap items-center justify-between gap-3 border-b border-gray-200 px-5 py-4">
-                  <h2 className="text-base font-bold text-gray-900">Registered System Users</h2>
-                  <Link
-                    to="/admin/access-requests"
-                    className="rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-white hover:bg-primary-dark"
-                  >
-                    Manage Access Requests
-                  </Link>
-                </div>
-                <div className="overflow-x-auto">
-                  <table className="w-full text-sm">
-                    <thead>
-                      <tr className="border-b border-gray-100 bg-gray-50 text-left text-xs font-semibold uppercase text-gray-500">
-                        <th className="px-4 py-3">Name</th>
-                        <th className="px-4 py-3">Role</th>
-                        <th className="px-4 py-3">Email</th>
-                        <th className="px-4 py-3">Status</th>
-                        <th className="px-4 py-3">Joined</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {approvedUsers.map((account) => (
-                        <tr key={account.id} className="border-b border-gray-50 hover:bg-gray-50">
-                          <td className="px-4 py-3 font-medium text-gray-900">{account.fullName}</td>
-                          <td className="px-4 py-3 text-gray-600">{account.roleLabel}</td>
-                          <td className="px-4 py-3 text-gray-600">{account.email}</td>
-                          <td className="px-4 py-3">
-                            <span className="inline-flex rounded-full bg-green-50 px-2.5 py-0.5 text-xs font-semibold text-green-700">
-                              ACTIVE
-                            </span>
-                          </td>
-                          <td className="px-4 py-3 text-gray-500">
-                            {account.approvedAt ? formatDate(account.approvedAt) : formatDate(account.createdAt)}
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
                 </div>
               </div>
             )}

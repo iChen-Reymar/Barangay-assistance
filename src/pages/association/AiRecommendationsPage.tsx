@@ -13,7 +13,7 @@ export default function AiRecommendationsPage() {
   return (
     <>
       <DashboardNavbar
-        title="Assistance Recommendations"
+        title="View AI Recommendations"
         searchPlaceholder="Search recommendations..."
         userName={associationUser.name}
         userInitials={associationUser.initials}

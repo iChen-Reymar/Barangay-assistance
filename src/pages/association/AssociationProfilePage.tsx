@@ -10,24 +10,45 @@ import {
   saveAssociationDetails,
   subscribeMemberStorage,
 } from '../../services/memberStorage'
+import {
+  getAssociationByName,
+  saveAssociationProfile,
+  subscribeAssociationStorage,
+  toAssociationDetails,
+} from '../../services/associationStorage'
 import { useAuth } from '../../context/AuthContext'
 import { getInitials } from '../../utils/userDisplay'
+
+function loadAssignedDetails(associationName?: string): AssociationDetails {
+  if (associationName) {
+    const match = getAssociationByName(associationName)
+    if (match) return toAssociationDetails(match)
+  }
+  return getAssociationDetails()
+}
 
 export default function AssociationProfilePage() {
   const { user, profile } = useAuth()
   const displayName = profile?.fullName ?? user?.fullName ?? 'Association Head'
   const initials = getInitials(displayName)
+  const associationName = profile?.associationName
 
-  const [details, setDetails] = useState<AssociationDetails>(() => getAssociationDetails())
+  const [details, setDetails] = useState<AssociationDetails>(() => loadAssignedDetails(associationName))
   const [editing, setEditing] = useState(false)
-  const [form, setForm] = useState<AssociationDetails>(() => getAssociationDetails())
+  const [form, setForm] = useState<AssociationDetails>(() => loadAssignedDetails(associationName))
   const [error, setError] = useState('')
   const [saved, setSaved] = useState(false)
 
   useEffect(() => {
-    setDetails(getAssociationDetails())
-    return subscribeMemberStorage(() => setDetails(getAssociationDetails()))
-  }, [])
+    const refresh = () => setDetails(loadAssignedDetails(associationName))
+    refresh()
+    const unsubscribeMembers = subscribeMemberStorage(refresh)
+    const unsubscribeAssociations = subscribeAssociationStorage(refresh)
+    return () => {
+      unsubscribeMembers()
+      unsubscribeAssociations()
+    }
+  }, [associationName])
 
   function startEdit() {
     setForm(details)
@@ -48,14 +69,21 @@ export default function AssociationProfilePage() {
       setError('Contact person, number, and email are required.')
       return
     }
-    const updated = saveAssociationDetails({
+    const nextDetails: AssociationDetails = {
       ...form,
       contactPerson: form.contactPerson.trim(),
       contactNumber: form.contactNumber.trim(),
       email: form.email.trim(),
       address: form.address.trim(),
       description: form.description.trim(),
-    })
+    }
+    const assigned = associationName ? getAssociationByName(associationName) : null
+    const savedProfile = assigned ? saveAssociationProfile(assigned.id, nextDetails) : null
+    const sharedDetails = getAssociationDetails()
+    const updated =
+      !savedProfile || sharedDetails.name.trim().toLowerCase() === nextDetails.name.trim().toLowerCase()
+        ? saveAssociationDetails(savedProfile ? toAssociationDetails(savedProfile) : nextDetails)
+        : toAssociationDetails(savedProfile)
     setDetails(updated)
     setEditing(false)
     setSaved(true)

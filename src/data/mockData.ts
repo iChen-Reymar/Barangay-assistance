@@ -53,6 +53,11 @@ export interface Association {
   contactNumber: string
   dateRegistered: string
   status: AssociationStatus
+  headUserId?: string
+  email?: string
+  address?: string
+  description?: string
+  registrationNumber?: string
 }
 
 export const associationTypes: AssociationType[] = [

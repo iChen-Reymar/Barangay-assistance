@@ -237,6 +237,56 @@ export function getApprovedUsers(): StoredUser[] {
   return readUsers().filter((u) => u.status === 'approved')
 }
 
+export function getAssociationHeadUsers(): StoredUser[] {
+  initializeAuthStorage()
+  return getApprovedUsers()
+    .filter((user) => user.role === 'association')
+    .sort((a, b) => a.fullName.localeCompare(b.fullName))
+}
+
+export function assignAssociationHead(
+  userId: string,
+  associationName: string,
+  associationType?: string,
+): { success: boolean; error?: string } {
+  const users = readUsers()
+  const index = users.findIndex((user) => user.id === userId)
+  if (index === -1) return { success: false, error: 'User not found.' }
+
+  const name = associationName.trim()
+  const updated: StoredUser = {
+    ...users[index],
+    role: 'association',
+    roleLabel: 'Association Head',
+    position: 'Association Head',
+    department: 'registered-associations',
+    associationName: name,
+    associationType: associationType?.trim() || users[index].associationType,
+  }
+  users[index] = updated
+  writeUsers(users)
+  if (getSession()?.id === userId) syncSession(updated)
+  return { success: true }
+}
+
+export function releaseAssociationHead(userId: string, associationName: string) {
+  const users = readUsers()
+  const index = users.findIndex((user) => user.id === userId)
+  if (index === -1) return
+
+  const current = users[index]
+  if ((current.associationName ?? '').trim().toLowerCase() !== associationName.trim().toLowerCase()) return
+
+  const updated: StoredUser = {
+    ...current,
+    associationName: undefined,
+    associationType: undefined,
+  }
+  users[index] = updated
+  writeUsers(users)
+  if (getSession()?.id === userId) syncSession(updated)
+}
+
 export function getUserById(userId: string): StoredUser | null {
   return readUsers().find((u) => u.id === userId) ?? null
 }
@@ -352,8 +402,8 @@ export function submitAssociationHeadRequest(
     roleLabel: 'Association Head',
     status: 'pending',
     createdAt: new Date().toISOString(),
-    associationName: input.associationName.trim(),
-    associationType: input.associationType,
+    associationName: input.associationName?.trim() || undefined,
+    associationType: input.associationType?.trim() || undefined,
     associationAddress: input.associationAddress.trim(),
     registrationNumber: input.registrationNumber?.trim() || undefined,
   }

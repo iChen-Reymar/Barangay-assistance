@@ -67,7 +67,7 @@ export default function AuditLogsPage() {
 
   return (
     <>
-      <AdminHeader title="System Audit Logs" />
+      <AdminHeader title="View Audit Logs" />
       <main className="flex-1 overflow-y-auto p-4 sm:p-5 md:p-6">
         <div className="rounded-lg border border-gray-200 bg-white shadow-sm">
           <ResponsiveToolbar>

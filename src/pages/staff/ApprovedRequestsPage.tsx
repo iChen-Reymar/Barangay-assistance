@@ -84,7 +84,7 @@ export default function StaffApprovedRequestsPage() {
   return (
     <>
       <DashboardNavbar
-        title="Approved Requests"
+        title="View Approved Requests"
         searchPlaceholder="Search approved requests..."
         userName={displayUser.name}
         userInitials={displayUser.initials}

@@ -9,12 +9,12 @@ function InputIcon({ children }: { children: ReactNode }) {
 }
 
 const fieldClassName =
-  'w-full rounded-lg border border-gray-200 py-2.5 pl-10 pr-4 text-sm text-gray-900 outline-none transition placeholder:text-gray-400 focus:border-primary focus:ring-2 focus:ring-primary/20'
+  'w-full rounded-lg border border-gray-200 py-2.5 pr-4 text-sm text-gray-900 outline-none transition placeholder:text-gray-400 focus:border-primary focus:ring-2 focus:ring-primary/20'
 
 type FormFieldProps = {
   label: string
   id: string
-  icon: ReactNode
+  icon?: ReactNode
 } & InputHTMLAttributes<HTMLInputElement>
 
 export function FormField({ label, id, icon, className, ...props }: FormFieldProps) {
@@ -24,8 +24,8 @@ export function FormField({ label, id, icon, className, ...props }: FormFieldPro
         {label}
       </label>
       <div className="relative">
-        <InputIcon>{icon}</InputIcon>
-        <input id={id} className={`${fieldClassName} ${className ?? ''}`} {...props} />
+        {icon ? <InputIcon>{icon}</InputIcon> : null}
+        <input id={id} className={`${fieldClassName} ${icon ? 'pl-10' : 'pl-4'} ${className ?? ''}`} {...props} />
       </div>
     </div>
   )
@@ -34,7 +34,7 @@ export function FormField({ label, id, icon, className, ...props }: FormFieldPro
 type FormSelectProps = {
   label: string
   id: string
-  icon: ReactNode
+  icon?: ReactNode
   children: ReactNode
 } & SelectHTMLAttributes<HTMLSelectElement>
 
@@ -45,10 +45,10 @@ export function FormSelect({ label, id, icon, children, className, ...props }: F
         {label}
       </label>
       <div className="relative">
-        <InputIcon>{icon}</InputIcon>
+        {icon ? <InputIcon>{icon}</InputIcon> : null}
         <select
           id={id}
-          className={`${fieldClassName} appearance-none bg-white pr-10 ${className ?? ''}`}
+          className={`${fieldClassName} appearance-none bg-white pr-10 ${icon ? 'pl-10' : 'pl-4'} ${className ?? ''}`}
           {...props}
         >
           {children}
