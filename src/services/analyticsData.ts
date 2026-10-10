@@ -1,12 +1,6 @@
-import {
-  aiRecommendations,
-  assistanceRequests,
-  pendingRecommendations,
-  type MatchStatus,
-  type RequestStatus,
-} from '../data/mockData'
-import { staffApprovedRequests } from '../data/staffMockData'
+import { type MatchStatus, type RequestStatus } from '../data/mockData'
 import type { BarChartItem, ChartSegment } from '../types/charts'
+import { getGeneratedAssistanceList } from './aiProcessing'
 import { getAssistanceItems, getRecommendationItems } from './decisionStorage'
 
 const REQUEST_STATUS_COLORS: Record<RequestStatus, string> = {
@@ -50,14 +44,7 @@ function normalizeProgramName(program: string) {
 }
 
 export function getRequestStatusChartData(): ChartSegment[] {
-  const items = getAssistanceItems()
-  const source =
-    items.length > 0
-      ? items
-      : assistanceRequests.map((row, index) => ({
-          id: `seed-${index}`,
-          status: row.status,
-        }))
+  const source = getAssistanceItems()
 
   const counts: Record<RequestStatus, number> = {
     PENDING: 0,
@@ -83,6 +70,7 @@ export function getRequestStatusTotal() {
 
 export function getProgramMatchChartData(): BarChartItem[] {
   const recommendations = getRecommendationItems()
+  const generated = getGeneratedAssistanceList()
   const source =
     recommendations.length > 0
       ? recommendations.map((item) => ({
@@ -90,18 +78,11 @@ export function getProgramMatchChartData(): BarChartItem[] {
           score: item.score ?? 0,
           matchStatus: (item.score ?? 0) >= 80 ? 'HIGH MATCH' : (item.score ?? 0) >= 70 ? 'MEDIUM MATCH' : 'MODERATE MATCH',
         }))
-      : [
-          ...aiRecommendations.map((row) => ({
-            program: normalizeProgramName(row.program),
-            score: row.score,
-            matchStatus: row.matchStatus,
-          })),
-          ...pendingRecommendations.map((row) => ({
-            program: normalizeProgramName(row.program),
-            score: row.score,
-            matchStatus: (row.score >= 80 ? 'HIGH MATCH' : row.score >= 70 ? 'MEDIUM MATCH' : 'MODERATE MATCH') as MatchStatus,
-          })),
-        ]
+      : generated.map((row) => ({
+          program: normalizeProgramName(row.program),
+          score: row.score,
+          matchStatus: (row.score >= 80 ? 'HIGH MATCH' : row.score >= 70 ? 'MEDIUM MATCH' : 'MODERATE MATCH') as MatchStatus,
+        }))
 
   const byProgram = new Map<string, { score: number; matchStatus: MatchStatus }>()
 
@@ -126,8 +107,8 @@ export function getProgramMatchChartData(): BarChartItem[] {
 export function getDistributionStatusChartData(): ChartSegment[] {
   const counts = new Map<string, number>()
 
-  for (const row of staffApprovedRequests) {
-    counts.set(row.status, (counts.get(row.status) ?? 0) + 1)
+  for (const row of getGeneratedAssistanceList()) {
+    counts.set(row.classification, (counts.get(row.classification) ?? 0) + 1)
   }
 
   return [...counts.entries()].map(([label, value]) => ({
@@ -140,9 +121,9 @@ export function getDistributionStatusChartData(): ChartSegment[] {
 export function getDistributionByProgramChartData(): BarChartItem[] {
   const byProgram = new Map<string, number>()
 
-  for (const row of staffApprovedRequests) {
+  for (const row of getGeneratedAssistanceList()) {
     const program = normalizeProgramName(row.program)
-    byProgram.set(program, (byProgram.get(program) ?? 0) + row.beneficiaries)
+    byProgram.set(program, (byProgram.get(program) ?? 0) + 1)
   }
 
   return [...byProgram.entries()]
@@ -157,5 +138,5 @@ export function getDistributionByProgramChartData(): BarChartItem[] {
 }
 
 export function getDistributionBeneficiaryTotal() {
-  return staffApprovedRequests.reduce((sum, row) => sum + row.beneficiaries, 0)
+  return getGeneratedAssistanceList().length
 }

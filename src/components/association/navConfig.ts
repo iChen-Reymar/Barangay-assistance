@@ -6,7 +6,6 @@ import {
   Sparkles,
   Package,
   Bell,
-  ClipboardCheck,
   Settings,
 } from 'lucide-react'
 
@@ -18,12 +17,11 @@ export const associationNavItems = [
   { to: '/association/ai-recommendations', label: 'View AI Recommendations', icon: Sparkles },
   { to: '/association/aid-records', label: 'Submit Aid Records', icon: Package },
   { to: '/association/notifications', label: 'Notifications', icon: Bell },
-  { to: '/association/approved-requests', label: 'View AI-Generated Recommendation', icon: ClipboardCheck },
   { to: '/association/settings', label: 'Settings', icon: Settings },
 ]
 
 export const associationUser = {
-  initials: 'RS',
-  name: 'Ricardo Lopez',
+  initials: 'AH',
+  name: 'Association Head',
   role: 'Association Head',
 }

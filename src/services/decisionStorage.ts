@@ -1,10 +1,4 @@
-import {
-  assistanceRequests,
-  pendingRecommendations,
-  type RequestStatus,
-  type VulnerabilityLevel,
-} from '../data/mockData'
-import { staffAssistanceRequests } from '../data/staffMockData'
+import { type RequestStatus } from '../data/mockData'
 import { enrichReviewableItem } from '../data/requestDetailsSeed'
 import type {
   DecisionInput,
@@ -32,59 +26,7 @@ function writeItems(items: ReviewableAssistanceItem[]) {
   window.dispatchEvent(new CustomEvent(UPDATED_EVENT))
 }
 
-function seedItems(): ReviewableAssistanceItem[] {
-  const assistance: ReviewableAssistanceItem[] = assistanceRequests.map((row, index) =>
-    enrichReviewableItem({
-      id: `asst-${index + 1}`,
-      source: 'assistance',
-      association: row.association,
-      requestType: row.requestType,
-      vulnerability: row.vulnerability,
-      date: row.date,
-      status: row.status,
-      decisions: [],
-    }),
-  )
-
-  const recommendations: ReviewableAssistanceItem[] = pendingRecommendations.map((row, index) =>
-    enrichReviewableItem({
-      id: `rec-${index + 1}`,
-      source: 'recommendation',
-      association: row.name,
-      requestType: row.program,
-      vulnerability: row.level,
-      date: row.date.replace('Submitted ', ''),
-      status: 'PENDING' as RequestStatus,
-      score: row.score,
-      program: row.program,
-      description: row.description,
-      previousAssistance: row.previousAssistance,
-      decisions: [],
-    }),
-  )
-
-  const staffAssistance: ReviewableAssistanceItem[] = staffAssistanceRequests.map((row) =>
-    enrichReviewableItem({
-      id: row.id,
-      source: 'assistance',
-      association: row.association,
-      requestType: row.program,
-      vulnerability: (row.priority >= 80 ? 'HIGH' : row.priority >= 60 ? 'MEDIUM' : 'LOW') as VulnerabilityLevel,
-      date: row.date,
-      status: row.status,
-      score: row.priority,
-      decisions: [],
-    }),
-  )
-
-  return [...assistance, ...staffAssistance, ...recommendations]
-}
-
-export function initializeDecisionStorage() {
-  if (!localStorage.getItem(ITEMS_KEY)) {
-    writeItems(seedItems())
-  }
-}
+export function initializeDecisionStorage() {}
 
 export function formatDecisionDate(iso: string): string {
   return new Date(iso).toLocaleString('en-PH', {

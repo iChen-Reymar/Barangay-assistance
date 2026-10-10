@@ -1,4 +1,5 @@
-import { assessmentBeneficiaries, type VulnerabilityLevel } from '../data/staffMockData'
+import type { VulnerabilityLevel } from '../data/staffMockData'
+import { getStaffBeneficiaries } from './staffBeneficiaryStorage'
 
 const LIST_KEY = 'barangay_generated_assistance_list'
 const UPDATED_EVENT = 'ai-list-generated'
@@ -21,10 +22,12 @@ function matchProgram(level: VulnerabilityLevel) {
   return 'Skills Training'
 }
 
-function classify(score: number): VulnerabilityLevel {
-  if (score >= 80) return 'HIGH'
-  if (score >= 60) return 'MEDIUM'
-  return 'LOW'
+function scoreFor(income: number, familySize: number, level: VulnerabilityLevel) {
+  let score = level === 'HIGH' ? 70 : level === 'MEDIUM' ? 50 : 30
+  if (income < 5000) score += 20
+  else if (income < 8000) score += 10
+  score += Math.min(10, Math.max(0, familySize))
+  return Math.min(100, score)
 }
 
 export function getGeneratedAssistanceList(): GeneratedAssistanceRow[] {
@@ -52,11 +55,11 @@ export function subscribeGeneratedAssistanceList(callback: () => void) {
 export function generateAssistanceList(): GeneratedAssistanceRow[] {
   const generatedAt = new Date().toISOString()
   const seen = new Set<string>()
-  const rows = assessmentBeneficiaries
-    .filter((beneficiary) => beneficiary.name.trim() && beneficiary.monthlyIncome > 0 && beneficiary.familySize > 0)
+  const rows = getStaffBeneficiaries()
+    .filter((beneficiary) => beneficiary.verification === 'VERIFIED' && beneficiary.name.trim())
     .map((beneficiary) => {
-      const score = beneficiary.score
-      const classification = classify(score)
+      const score = scoreFor(beneficiary.monthlyIncome, beneficiary.familySize, beneficiary.vulnerability)
+      const classification = beneficiary.vulnerability
       return {
         name: beneficiary.name.trim(),
         association: beneficiary.association,
@@ -64,7 +67,7 @@ export function generateAssistanceList(): GeneratedAssistanceRow[] {
         classification,
         program: matchProgram(classification),
         verification: 'VERIFIED' as const,
-        reason: `Vulnerability score ${score} from household income and family size. Program matched by eligibility rules with no duplicate beneficiary.`,
+        reason: `Vulnerability score ${score} from household income, family size, and recorded classification. Program matched by eligibility rules with no duplicate beneficiary.`,
         generatedAt,
       }
     })

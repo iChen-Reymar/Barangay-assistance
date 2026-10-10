@@ -7,9 +7,9 @@ interface DonutChartProps {
 
 export function DonutChart({ high, medium, low, total }: DonutChartProps) {
   const sum = high + medium + low
-  const highPct = (high / sum) * 100
-  const mediumPct = (medium / sum) * 100
-  const lowPct = (low / sum) * 100
+  const highPct = sum ? (high / sum) * 100 : 0
+  const mediumPct = sum ? (medium / sum) * 100 : 0
+  const lowPct = sum ? (low / sum) * 100 : 0
 
   return (
     <div className="flex flex-col items-center gap-4 sm:flex-row sm:items-center sm:gap-8">

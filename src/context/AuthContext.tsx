@@ -13,6 +13,8 @@ import { initializePrivacyStorage } from '../services/privacyStorage'
 import { initializePriorityStorage } from '../services/priorityStorage'
 import { initializeStaffBeneficiaryStorage } from '../services/staffBeneficiaryStorage'
 import { initializeReportHistoryStorage } from '../services/reportHistoryService'
+import { initializeAssociationStorage } from '../services/associationStorage'
+import { initializeProgramStorage } from '../services/programStorage'
 import {
   approveUser,
   changeUserPassword,
@@ -29,7 +31,7 @@ import {
   submitAssociationHeadRequest,
   updateUserProfile,
 } from '../services/authStorage'
-import { syncAssociationFromApprovedUser } from '../services/memberStorage'
+import { initializeMemberStorage, syncAssociationFromApprovedUser } from '../services/memberStorage'
 import type {
   AccessRequestInput,
   AssociationHeadRequestInput,
@@ -72,6 +74,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     initializePriorityStorage()
     initializeStaffBeneficiaryStorage()
     initializeReportHistoryStorage()
+    initializeAssociationStorage()
+    initializeProgramStorage()
+    initializeMemberStorage()
     setPendingRequests(getPendingUsers())
     setAllUsers(getAllUsers())
     setUser(getSession())
@@ -83,11 +88,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [])
 
   const login = useCallback(
-    (email: string, password: string, rememberMe: boolean) => {
-      const result = loginUser(email, password, rememberMe)
+    async (email: string, password: string, rememberMe: boolean) => {
+      const result = await loginUser(email, password, rememberMe)
       if (result.success) {
         const session = getSession()
         setUser(session)
+        setPendingRequests(getPendingUsers())
+        setAllUsers(getAllUsers())
         if (session) {
           logAuditEvent({
             user: session.fullName,
@@ -123,8 +130,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [])
 
   const submitRequest = useCallback(
-    (input: AccessRequestInput) => {
-      const result = submitAccessRequest(input)
+    async (input: AccessRequestInput) => {
+      const result = await submitAccessRequest(input)
       if (result.success) {
         refreshUsers()
         logAuditEvent({
@@ -148,8 +155,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   )
 
   const submitAssociationHeadRequestHandler = useCallback(
-    (input: AssociationHeadRequestInput) => {
-      const result = submitAssociationHeadRequest(input)
+    async (input: AssociationHeadRequestInput) => {
+      const result = await submitAssociationHeadRequest(input)
       if (result.success) {
         refreshUsers()
         logAuditEvent({

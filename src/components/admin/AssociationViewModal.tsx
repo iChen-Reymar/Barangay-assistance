@@ -1,8 +1,8 @@
 import { Modal } from '../ui/Modal'
 import { Button } from '../ui/Button'
 import { ActiveBadge, StatusBadge } from './StatusBadge'
-import { beneficiaries } from '../../data/mockData'
 import type { Association } from '../../data/mockData'
+import { getStaffBeneficiaries } from '../../services/staffBeneficiaryStorage'
 import { getAssociationDetails, getAssociationMembers } from '../../services/memberStorage'
 import { getAssistanceItems } from '../../services/decisionStorage'
 
@@ -25,7 +25,7 @@ export function AssociationViewModal({
 
   const selected = association
   const associationName = selected.name.trim().toLowerCase()
-  const linkedBeneficiaries = beneficiaries.filter(
+  const linkedBeneficiaries = getStaffBeneficiaries().filter(
     (row) => row.association.trim().toLowerCase() === associationName,
   )
   const linkedRequests = getAssistanceItems().filter(

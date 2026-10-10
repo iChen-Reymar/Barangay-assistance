@@ -1,4 +1,4 @@
-import { seedPrograms, type AssistanceProgram, type ProgramStatus } from '../data/programsMockData'
+import { type AssistanceProgram, type ProgramStatus } from '../data/programsMockData'
 
 const PROGRAMS_KEY = 'barangay_assistance_programs'
 const UPDATED_EVENT = 'program-storage-updated'
@@ -18,11 +18,7 @@ function writePrograms(programs: AssistanceProgram[]) {
   window.dispatchEvent(new CustomEvent(UPDATED_EVENT))
 }
 
-export function initializeProgramStorage() {
-  if (!localStorage.getItem(PROGRAMS_KEY)) {
-    writePrograms(seedPrograms)
-  }
-}
+export function initializeProgramStorage() {}
 
 export function getPrograms(): AssistanceProgram[] {
   initializeProgramStorage()

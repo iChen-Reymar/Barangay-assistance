@@ -1,6 +1,5 @@
 import {
   beneficiaries,
-  reportHistory as seedReportHistory,
   reportTemplates,
   type ReportFormat,
   type ReportHistoryEntry,
@@ -41,11 +40,7 @@ function writeHistory(entries: ReportHistoryEntry[]) {
   window.dispatchEvent(new CustomEvent(UPDATED_EVENT))
 }
 
-export function initializeReportHistoryStorage() {
-  if (!localStorage.getItem(REPORT_HISTORY_KEY)) {
-    writeHistory(seedReportHistory)
-  }
-}
+export function initializeReportHistoryStorage() {}
 
 export function getReportHistory(): ReportHistoryEntry[] {
   initializeReportHistoryStorage()

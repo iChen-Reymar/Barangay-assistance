@@ -1,13 +1,10 @@
-import { associationDetailsSeed, type AssociationDetails } from '../data/associationMockData'
+import { type AssociationDetails } from '../data/associationMockData'
 import {
-  associations as seedAssociations,
   associationTypes,
   type Association,
   type AssociationStatus,
   type AssociationType,
 } from '../data/mockData'
-import { getAssociationHeadUsers } from './authStorage'
-
 const ASSOCIATIONS_KEY = 'barangay_associations'
 const UPDATED_EVENT = 'association-storage-updated'
 
@@ -38,33 +35,7 @@ function isAssociationType(value?: string): value is AssociationType {
   return associationTypes.includes(value as AssociationType)
 }
 
-function buildSeed(): Association[] {
-  const heads = getAssociationHeadUsers()
-  return seedAssociations.map((association) => {
-    const head = heads.find(
-      (user) =>
-        user.associationName?.trim().toLowerCase() === association.name.trim().toLowerCase() ||
-        user.fullName.trim().toLowerCase() === association.contactPerson.trim().toLowerCase(),
-    )
-    const isSitoy = association.name === associationDetailsSeed.name
-    return {
-      ...association,
-      headUserId: head?.id,
-      email: head?.email ?? (isSitoy ? associationDetailsSeed.email : undefined),
-      address: isSitoy ? associationDetailsSeed.address : association.address,
-      description: isSitoy ? associationDetailsSeed.description : association.description,
-      registrationNumber: isSitoy
-        ? associationDetailsSeed.registrationNumber
-        : association.registrationNumber,
-    }
-  })
-}
-
-export function initializeAssociationStorage() {
-  if (!localStorage.getItem(ASSOCIATIONS_KEY)) {
-    writeAssociations(buildSeed())
-  }
-}
+export function initializeAssociationStorage() {}
 
 export function getAssociations(): Association[] {
   initializeAssociationStorage()

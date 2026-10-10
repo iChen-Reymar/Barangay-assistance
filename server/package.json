@@ -1,0 +1,10 @@
+{
+  "name": "barangay-assistance-api",
+  "private": true,
+  "type": "module",
+  "dependencies": {
+    "@supabase/supabase-js": "^2.76.1",
+    "cors": "^2.8.5",
+    "express": "^5.1.0"
+  }
+}

@@ -1,6 +1,7 @@
+import { supabase } from '../lib/supabase'
+import { writeStoreWithoutSync } from './databaseSync'
 import type { ReviewInput } from '../types/approval'
 import {
-  DEFAULT_ADMIN,
   roleLabelToRole,
   roleToDashboardPath,
   type AccessRequestInput,
@@ -15,7 +16,6 @@ import {
 
 const USERS_KEY = 'barangay_users'
 const SESSION_KEY = 'barangay_session'
-const DEMO_USERS_KEY = 'barangay_managed_users_seeded'
 
 function readUsers(): StoredUser[] {
   const raw = localStorage.getItem(USERS_KEY)
@@ -37,98 +37,8 @@ function roleToLabel(role: UserRole): string {
   return 'Barangay Staff'
 }
 
-function demoUsers(now: string): StoredUser[] {
-  return [
-    {
-      id: 'user-bryan-martinez',
-      email: 'bryan.martinez@barangayburuun.gov.ph',
-      password: 'Staff@2026',
-      firstName: 'Bryan',
-      lastName: 'Martinez',
-      fullName: 'Bryan S. Martinez',
-      contactNumber: '+63 917 111 2201',
-      position: 'Barangay Staff',
-      department: 'social-services',
-      role: 'staff',
-      roleLabel: 'Barangay Staff',
-      status: 'approved',
-      createdAt: now,
-      approvedAt: now,
-    },
-    {
-      id: 'user-maria-santos',
-      email: 'maria.santos@barangayburuun.gov.ph',
-      password: 'Staff@2026',
-      firstName: 'Maria',
-      lastName: 'Santos',
-      fullName: 'Maria L. Santos',
-      contactNumber: '+63 917 111 2202',
-      position: 'Barangay Staff',
-      department: 'health',
-      role: 'staff',
-      roleLabel: 'Barangay Staff',
-      status: 'approved',
-      createdAt: now,
-      approvedAt: now,
-    },
-    {
-      id: 'user-ricardo-lopez',
-      email: 'ricardo.lopez@sitoyfarmers.org',
-      password: 'Assoc@2026',
-      firstName: 'Ricardo',
-      lastName: 'Lopez',
-      fullName: 'Ricardo Lopez',
-      contactNumber: '+63 921 567 8901',
-      position: 'Association Head',
-      department: 'registered-associations',
-      role: 'association',
-      roleLabel: 'Association Head',
-      status: 'approved',
-      createdAt: now,
-      approvedAt: now,
-      associationName: "Sitoy Farmer's Group",
-      associationType: 'Agricultural',
-    },
-  ]
-}
-
 export function initializeAuthStorage() {
-  let users = readUsers()
-  const hasAdmin = users.some(
-    (u) => u.email.toLowerCase() === DEFAULT_ADMIN.email.toLowerCase(),
-  )
-  if (!hasAdmin) {
-    const now = new Date().toISOString()
-    const adminUser: StoredUser = {
-      id: crypto.randomUUID(),
-      email: DEFAULT_ADMIN.email,
-      password: DEFAULT_ADMIN.password,
-      firstName: 'Ricardo',
-      lastName: 'Dela Cruz',
-      fullName: DEFAULT_ADMIN.fullName,
-      contactNumber: '+63 917 000 0000',
-      position: 'Barangay Captain',
-      department: 'barangay-hall',
-      role: 'admin',
-      roleLabel: 'Administrator',
-      status: 'approved',
-      createdAt: now,
-      approvedAt: now,
-    }
-    users = [adminUser, ...users]
-  }
-
-  if (!localStorage.getItem(DEMO_USERS_KEY)) {
-    const now = new Date().toISOString()
-    for (const demo of demoUsers(now)) {
-      if (!users.some((user) => user.email.toLowerCase() === demo.email.toLowerCase())) {
-        users.push(demo)
-      }
-    }
-    localStorage.setItem(DEMO_USERS_KEY, '1')
-  }
-
-  writeUsers(users)
+  // Accounts live in Supabase. The app does not create a local administrator.
 }
 
 function approvedAdminCount(users: StoredUser[], exceptId?: string) {
@@ -311,46 +221,252 @@ export function setSession(user: SessionUser, rememberMe: boolean) {
   }
 }
 
+const ACCESS_TOKEN_KEY = 'supabase_access_token'
+
 export function clearSession() {
   sessionStorage.removeItem(SESSION_KEY)
   localStorage.removeItem(SESSION_KEY)
+  sessionStorage.removeItem(ACCESS_TOKEN_KEY)
+  localStorage.removeItem(ACCESS_TOKEN_KEY)
 }
 
-export function login(email: string, password: string, rememberMe: boolean): LoginResult {
-  const users = readUsers()
-  const user = users.find((u) => u.email.toLowerCase() === email.trim().toLowerCase())
+function roleFromLabel(value: string | undefined): UserRole | null {
+  const text = (value ?? '').trim().toLowerCase()
+  if (text.includes('admin') || text.includes('captain')) return 'admin'
+  if (text.includes('staff')) return 'staff'
+  if (text.includes('association')) return 'association'
+  return null
+}
 
-  if (!user || user.password !== password) {
-    return { success: false, error: 'Invalid email or password.' }
+function saveAccessToken(token: string, rememberMe: boolean) {
+  sessionStorage.setItem(ACCESS_TOKEN_KEY, token)
+  if (rememberMe) localStorage.setItem(ACCESS_TOKEN_KEY, token)
+  else localStorage.removeItem(ACCESS_TOKEN_KEY)
+}
+
+function readAccessToken() {
+  return sessionStorage.getItem(ACCESS_TOKEN_KEY) ?? localStorage.getItem(ACCESS_TOKEN_KEY)
+}
+
+function metadataValue(bag: Record<string, unknown> | undefined, names: string[]) {
+  if (!bag) return undefined
+  for (const [key, value] of Object.entries(bag)) {
+    if (names.includes(key.toLowerCase()) && typeof value === 'string' && value.trim()) return value
+  }
+  return undefined
+}
+
+function profileFromRow(row: Record<string, unknown>): StoredUser | null {
+  const extra = row.payload && typeof row.payload === 'object' ? row.payload as Record<string, unknown> : {}
+  const role = roleFromLabel(typeof row.role === 'string' ? row.role : undefined)
+    ?? roleFromLabel(typeof extra.roleLabel === 'string' ? extra.roleLabel : undefined)
+    ?? roleFromLabel(typeof row.role_label === 'string' ? row.role_label : undefined)
+  if (!role || row.id == null || typeof row.email !== 'string') return null
+  const fullName = typeof row.full_name === 'string' ? row.full_name : row.email
+  const parts = fullName.trim().split(/\s+/).filter(Boolean)
+  const status = row.status === 'pending' || row.status === 'rejected' ? row.status : 'approved'
+  const text = (value: unknown, fallback = '') => typeof value === 'string' ? value : fallback
+  return {
+    id: String(row.id),
+    email: row.email,
+    password: '',
+    firstName: text(extra.firstName, text(row.first_name, parts[0] ?? '')),
+    lastName: text(extra.lastName, text(row.last_name, parts.slice(1).join(' '))),
+    fullName,
+    contactNumber: text(extra.contactNumber, text(row.contact_number)),
+    position: text(extra.position, text(row.position)),
+    department: text(extra.department, text(row.department)),
+    role,
+    roleLabel: text(extra.roleLabel, text(row.role_label, roleToLabel(role))),
+    status,
+    createdAt: text(extra.createdAt, text(row.created_at, new Date().toISOString())),
+    associationName: text(row.association_name, text(extra.associationName)) || undefined,
+    associationType: text(extra.associationType, text(row.association_type)) || undefined,
+    associationAddress: text(extra.associationAddress, text(row.association_address)) || undefined,
+    registrationNumber: text(extra.registrationNumber, text(row.registration_number)) || undefined,
+  }
+}
+
+function rememberUser(account: StoredUser) {
+  const users = readUsers().filter((user) => user.id !== account.id && user.email.toLowerCase() !== account.email.toLowerCase())
+  writeStoreWithoutSync(USERS_KEY, JSON.stringify([account, ...users]))
+}
+
+async function fetchVisibleUsers() {
+  const { data, error } = await supabase.from('users').select('*')
+  if (error || !Array.isArray(data)) return []
+  return data.flatMap((row) => {
+    const account = profileFromRow(row as Record<string, unknown>)
+    return account ? [account] : []
+  })
+}
+
+async function createUserRow(account: StoredUser) {
+  await supabase.from('users').insert({
+    id: account.id,
+    email: account.email,
+    full_name: account.fullName,
+    role: account.role,
+    status: account.status,
+    association_name: account.associationName || null,
+    payload: {
+      firstName: account.firstName,
+      lastName: account.lastName,
+      contactNumber: account.contactNumber,
+      position: account.position,
+      department: account.department,
+      roleLabel: account.roleLabel,
+      associationType: account.associationType || null,
+      associationAddress: account.associationAddress || null,
+      registrationNumber: account.registrationNumber || null,
+      createdAt: account.createdAt,
+    },
+  })
+}
+
+export async function restoreUsersFromSession() {
+  const token = readAccessToken()
+  if (token) {
+    const visible = await fetchVisibleUsers()
+    if (visible.length > 0) {
+      const merged = new Map(readUsers().map((user) => [user.email.toLowerCase(), user]))
+      for (const account of visible) merged.set(account.email.toLowerCase(), account)
+      writeStoreWithoutSync(USERS_KEY, JSON.stringify([...merged.values()]))
+      return
+    }
   }
 
-  if (user.status === 'pending') {
+  const session = getSession()
+  if (!session) return
+  if (readUsers().some((user) => user.email.toLowerCase() === session.email.toLowerCase())) return
+  rememberUser({
+    id: session.id,
+    email: session.email,
+    password: '',
+    firstName: session.fullName.split(' ')[0] ?? '',
+    lastName: session.fullName.split(' ').slice(1).join(' '),
+    fullName: session.fullName,
+    contactNumber: '',
+    position: '',
+    department: '',
+    role: session.role,
+    roleLabel: session.roleLabel,
+    status: 'approved',
+    createdAt: new Date().toISOString(),
+  })
+}
+
+export async function login(email: string, password: string, rememberMe: boolean): Promise<LoginResult> {
+  if (!import.meta.env.VITE_SUPABASE_URL || !import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY) {
+    return { success: false, error: 'Supabase is not configured.' }
+  }
+
+  const { data, error } = await supabase.auth.signInWithPassword({
+    email: email.trim(),
+    password,
+  })
+  if (error || !data.user || !data.session) {
+    return { success: false, error: error?.message || 'Invalid email or password.' }
+  }
+
+  saveAccessToken(data.session.access_token, rememberMe)
+  const visible = await fetchVisibleUsers()
+  const signedInEmail = email.trim().toLowerCase()
+  const fromTable = visible.find((user) => user.email.toLowerCase() === signedInEmail)
+    ?? readUsers().find((user) => user.email.toLowerCase() === signedInEmail)
+  const userMetadata = data.user.user_metadata as Record<string, unknown>
+  const appMetadata = data.user.app_metadata as Record<string, unknown>
+  const metadataRole = roleFromLabel(metadataValue(userMetadata, ['role', 'user_role', 'role_label']))
+    ?? roleFromLabel(metadataValue(appMetadata, ['role', 'user_role', 'role_label']))
+  const metadataStatus = metadataValue(userMetadata, ['status'])
+  const role = fromTable?.role ?? metadataRole ?? 'admin'
+  const status = fromTable?.status ?? (metadataStatus === 'pending' || metadataStatus === 'rejected' ? metadataStatus : 'approved')
+  if (status === 'pending') {
     return {
       success: false,
       error: 'Your account is pending admin approval. Please wait for confirmation before signing in.',
     }
   }
-
-  if (user.status === 'rejected') {
+  if (status === 'rejected') {
     return {
       success: false,
       error: 'Your access request was rejected. Contact the barangay administrator for assistance.',
     }
   }
 
-  const session: SessionUser = {
-    id: user.id,
-    email: user.email,
-    fullName: user.fullName,
-    role: user.role,
-    roleLabel: user.roleLabel,
+  const fullName = fromTable?.fullName
+    || metadataValue(userMetadata, ['full_name', 'name'])
+    || email.trim()
+  const account: StoredUser = fromTable ?? {
+    id: data.user.id,
+    email: email.trim(),
+    password: '',
+    firstName: fullName.split(' ')[0] ?? '',
+    lastName: fullName.split(' ').slice(1).join(' '),
+    fullName,
+    contactNumber: '',
+    position: '',
+    department: '',
+    role,
+    roleLabel: roleToLabel(role),
+    status: 'approved',
+    createdAt: new Date().toISOString(),
   }
+  rememberUser(account)
+  if (!fromTable) await createUserRow(account)
 
+  const session: SessionUser = {
+    id: account.id,
+    email: account.email,
+    fullName: account.fullName,
+    role: account.role,
+    roleLabel: account.roleLabel,
+  }
   setSession(session, rememberMe)
-  return { success: true, redirectTo: roleToDashboardPath(user.role) }
+  return { success: true, redirectTo: roleToDashboardPath(account.role) }
 }
 
-export function submitAccessRequest(input: AccessRequestInput): { success: boolean; error?: string } {
+async function saveAccessRequest(user: StoredUser, password: string): Promise<{ success: boolean; error?: string }> {
+  if (!import.meta.env.VITE_SUPABASE_URL || !import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY) {
+    return { success: false, error: 'Supabase is not configured.' }
+  }
+
+  const response = await fetch('/api/access-requests', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(user),
+  })
+  if (!response.ok) {
+    const body = (await response.json().catch(() => ({}))) as { error?: string }
+    return { success: false, error: body.error ?? 'The request could not be saved to Supabase.' }
+  }
+
+  const { error: signupError } = await supabase.auth.signUp({
+    email: user.email,
+    password,
+    options: {
+      data: {
+        role: user.role,
+        full_name: user.fullName,
+        status: 'pending',
+        contact_number: user.contactNumber,
+        position: user.position,
+        department: user.department,
+      },
+    },
+  })
+  if (signupError) {
+    if (signupError.message.toLowerCase().includes('already')) {
+      return { success: false, error: 'An account with this email already exists.' }
+    }
+    return { success: false, error: signupError.message }
+  }
+
+  rememberUser(user)
+  return { success: true }
+}
+
+export async function submitAccessRequest(input: AccessRequestInput): Promise<{ success: boolean; error?: string }> {
   const users = readUsers()
   const email = input.email.trim().toLowerCase()
 
@@ -374,13 +490,12 @@ export function submitAccessRequest(input: AccessRequestInput): { success: boole
     createdAt: new Date().toISOString(),
   }
 
-  writeUsers([...users, newUser])
-  return { success: true }
+  return saveAccessRequest(newUser, input.password)
 }
 
-export function submitAssociationHeadRequest(
+export async function submitAssociationHeadRequest(
   input: AssociationHeadRequestInput,
-): { success: boolean; error?: string } {
+): Promise<{ success: boolean; error?: string }> {
   const users = readUsers()
   const email = input.email.trim().toLowerCase()
 
@@ -408,8 +523,7 @@ export function submitAssociationHeadRequest(
     registrationNumber: input.registrationNumber?.trim() || undefined,
   }
 
-  writeUsers([...users, newUser])
-  return { success: true }
+  return saveAccessRequest(newUser, input.password)
 }
 
 export function approveUser(userId: string, review: ReviewInput): boolean {

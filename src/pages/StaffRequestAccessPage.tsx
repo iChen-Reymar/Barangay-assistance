@@ -29,7 +29,7 @@ function StaffRequestAccessForm() {
   const [error, setError] = useState('')
   const [submitted, setSubmitted] = useState(false)
 
-  function handleSubmit(event: FormEvent<HTMLFormElement>) {
+  async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
     setError('')
 
@@ -43,7 +43,7 @@ function StaffRequestAccessForm() {
       return
     }
 
-    const result = submitRequest({
+    const result = await submitRequest({
       firstName,
       lastName,
       email,

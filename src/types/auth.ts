@@ -81,12 +81,6 @@ export interface LoginResult {
   redirectTo?: string
 }
 
-export const DEFAULT_ADMIN = {
-  email: 'admin@barangayburuun.gov.ph',
-  password: 'Admin@2026',
-  fullName: 'Hon. Ricardo L. Dela Cruz',
-}
-
 export function roleLabelToRole(roleLabel: string): UserRole {
   if (roleLabel === 'Association Head') return 'association'
   if (roleLabel === 'Barangay Staff') return 'staff'

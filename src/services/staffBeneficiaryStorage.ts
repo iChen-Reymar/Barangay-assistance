@@ -1,7 +1,4 @@
-import {
-  staffBeneficiaries as seedBeneficiaries,
-  type StaffBeneficiary,
-} from '../data/staffMockData'
+import { type StaffBeneficiary } from '../data/staffMockData'
 
 const STORAGE_KEY = 'barangay_staff_beneficiaries'
 const UPDATED_EVENT = 'staff-beneficiaries-updated'
@@ -21,25 +18,7 @@ function writeBeneficiaries(items: StaffBeneficiary[]) {
   window.dispatchEvent(new CustomEvent(UPDATED_EVENT))
 }
 
-export function initializeStaffBeneficiaryStorage() {
-  if (!localStorage.getItem(STORAGE_KEY)) {
-    writeBeneficiaries(seedBeneficiaries)
-    return
-  }
-
-  const existing = readBeneficiaries()
-  const merged = [...existing]
-  let changed = false
-  for (const seed of seedBeneficiaries) {
-    if (!merged.some((row) => row.id === seed.id)) {
-      merged.push(seed)
-      changed = true
-    }
-  }
-  if (changed) {
-    writeBeneficiaries(merged)
-  }
-}
+export function initializeStaffBeneficiaryStorage() {}
 
 export function getStaffBeneficiaries(): StaffBeneficiary[] {
   initializeStaffBeneficiaryStorage()
@@ -48,6 +27,11 @@ export function getStaffBeneficiaries(): StaffBeneficiary[] {
 
 export function getStaffBeneficiaryById(id: string): StaffBeneficiary | null {
   return getStaffBeneficiaries().find((row) => row.id === id) ?? null
+}
+
+export function addStaffBeneficiary(beneficiary: StaffBeneficiary): StaffBeneficiary {
+  writeBeneficiaries([beneficiary, ...readBeneficiaries()])
+  return beneficiary
 }
 
 export function updateStaffBeneficiary(updated: StaffBeneficiary): StaffBeneficiary | null {

@@ -41,11 +41,7 @@ function writeSettings(settings: PrivacySettings) {
   window.dispatchEvent(new CustomEvent(UPDATED_EVENT))
 }
 
-export function initializePrivacyStorage() {
-  if (!localStorage.getItem(PRIVACY_KEY)) {
-    writeSettings(defaultPrivacySettings)
-  }
-}
+export function initializePrivacyStorage() {}
 
 export function getPrivacySettings(): PrivacySettings {
   initializePrivacyStorage()

@@ -5,10 +5,10 @@ import { DashboardNavbar } from '../../components/layout/DashboardNavbar'
 import { StatCard } from '../../components/ui/StatCard'
 import { Badge } from '../../components/ui/Badge'
 import { NotificationPanel } from '../../components/ui/NotificationPanel'
-import { associationStats, associationNotifications } from '../../data/associationMockData'
+import { associationNotifications } from '../../data/associationMockData'
 import { useAuth } from '../../context/AuthContext'
 import { getInitials } from '../../utils/userDisplay'
-import { getAssociationDetails } from '../../services/memberStorage'
+import { getAssociationDetails, getAssociationMembers, subscribeMemberStorage } from '../../services/memberStorage'
 import {
   getAssociationAssistanceItems,
   subscribeDecisionStorage,
@@ -42,11 +42,17 @@ export default function AssociationDashboardPage() {
   const [requests, setRequests] = useState<ReviewableAssistanceItem[]>(() =>
     getAssociationAssistanceItems(associationName),
   )
+  const [memberCount, setMemberCount] = useState(() => getAssociationMembers().length)
 
   useEffect(() => {
     const refresh = () => setRequests(getAssociationAssistanceItems(associationName))
     refresh()
-    return subscribeDecisionStorage(refresh)
+    const stopRequests = subscribeDecisionStorage(refresh)
+    const stopMembers = subscribeMemberStorage(() => setMemberCount(getAssociationMembers().length))
+    return () => {
+      stopRequests()
+      stopMembers()
+    }
   }, [associationName])
 
   const pendingCount = requests.filter(
@@ -87,7 +93,7 @@ export default function AssociationDashboardPage() {
           ))}
         </div>
         <div className="mb-6 grid grid-cols-2 gap-4 lg:grid-cols-4">
-          <StatCard label="Total Members" value={associationStats.totalMembers} icon={Users} />
+          <StatCard label="Total Members" value={memberCount} icon={Users} />
           <StatCard label="Pending Requests" value={pendingCount} icon={Clock} />
           <StatCard label="AI Generated" value={approvedItems.length} icon={CheckCircle} />
           <StatCard label="Not Qualified" value={rejectedCount} icon={XCircle} />

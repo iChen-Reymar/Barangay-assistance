@@ -4,7 +4,6 @@ import { AuthBrandingPanel } from '../components/auth/AuthBrandingPanel'
 import { FormField, LockIcon, MailIcon } from '../components/auth/FormField'
 import { PublicOnlyRoute } from '../components/auth/ProtectedRoute'
 import { useAuth } from '../context/AuthContext'
-import { DEFAULT_ADMIN } from '../types/auth'
 
 function LoginForm() {
   const navigate = useNavigate()
@@ -14,10 +13,10 @@ function LoginForm() {
   const [rememberMe, setRememberMe] = useState(true)
   const [error, setError] = useState('')
 
-  function handleSubmit(event: FormEvent<HTMLFormElement>) {
+  async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
     setError('')
-    const result = login(email, password, rememberMe)
+    const result = await login(email, password, rememberMe)
     if (result.success && result.redirectTo) {
       navigate(result.redirectTo)
       return
@@ -35,12 +34,6 @@ function LoginForm() {
           <p className="mb-8 text-sm text-gray-500">
             Sign in to access the Barangay Assistance Matching System
           </p>
-
-          <div className="mb-6 rounded-lg border border-green-100 bg-green-50 p-4 text-sm text-gray-700">
-            <p className="font-semibold text-primary">Default Admin Account</p>
-            <p className="mt-1">Email: {DEFAULT_ADMIN.email}</p>
-            <p>Password: {DEFAULT_ADMIN.password}</p>
-          </div>
 
           <form onSubmit={handleSubmit} className="space-y-5">
             {error && (

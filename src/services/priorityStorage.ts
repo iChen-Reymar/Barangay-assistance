@@ -1,6 +1,5 @@
 import {
   classificationFromScore,
-  priorityList as seedPriorityList,
   type PriorityListEntry,
   type RequestStatus,
   type VulnerabilityLevel,
@@ -38,11 +37,7 @@ function withRanks(entries: PriorityListEntry[]): PriorityListEntry[] {
   return sorted.map((entry, index) => ({ ...entry, rank: index + 1 }))
 }
 
-export function initializePriorityStorage() {
-  if (!localStorage.getItem(PRIORITY_KEY)) {
-    writeEntries(seedPriorityList)
-  }
-}
+export function initializePriorityStorage() {}
 
 export function getPriorityList(): PriorityListEntry[] {
   initializePriorityStorage()

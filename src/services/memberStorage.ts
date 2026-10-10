@@ -1,6 +1,4 @@
 import {
-  associationDetailsSeed,
-  seedAssociationMembers,
   type AssociationDetails,
   type AssociationMember,
 } from '../data/associationMockData'
@@ -40,14 +38,22 @@ function writeDetails(details: AssociationDetails) {
   window.dispatchEvent(new CustomEvent(UPDATED_EVENT))
 }
 
-export function initializeMemberStorage() {
-  if (!localStorage.getItem(MEMBERS_KEY)) {
-    writeMembers(seedAssociationMembers)
-  }
-  if (!localStorage.getItem(DETAILS_KEY)) {
-    writeDetails(associationDetailsSeed)
-  }
+const blankAssociationDetails: AssociationDetails = {
+  id: '',
+  name: '',
+  type: 'Agricultural',
+  registrationNumber: '',
+  dateRegistered: '',
+  address: '',
+  contactPerson: '',
+  contactNumber: '',
+  email: '',
+  totalMembers: 0,
+  description: '',
+  status: 'ACTIVE',
 }
+
+export function initializeMemberStorage() {}
 
 export function getAssociationMembers(): AssociationMember[] {
   initializeMemberStorage()
@@ -77,7 +83,7 @@ export function upsertAssociationMember(member: AssociationMember) {
 
 export function getAssociationDetails(): AssociationDetails {
   initializeMemberStorage()
-  return readDetails() ?? associationDetailsSeed
+  return readDetails() ?? blankAssociationDetails
 }
 
 export function saveAssociationDetails(details: AssociationDetails) {

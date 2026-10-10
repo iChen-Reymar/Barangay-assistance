@@ -26,7 +26,7 @@ function RegisterAssociationHeadForm() {
   const [error, setError] = useState('')
   const [submitted, setSubmitted] = useState(false)
 
-  function handleSubmit(event: FormEvent<HTMLFormElement>) {
+  async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
     setError('')
 
@@ -40,7 +40,7 @@ function RegisterAssociationHeadForm() {
       return
     }
 
-    const result = submitAssociationHeadRequest({
+    const result = await submitAssociationHeadRequest({
       firstName,
       lastName,
       email,
