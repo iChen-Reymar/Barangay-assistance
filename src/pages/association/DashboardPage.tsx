@@ -7,7 +7,6 @@ import { Badge } from '../../components/ui/Badge'
 import { NotificationPanel } from '../../components/ui/NotificationPanel'
 import { associationNotifications } from '../../data/associationMockData'
 import { useAuth } from '../../context/AuthContext'
-import { getInitials } from '../../utils/userDisplay'
 import { getAssociationDetails, getAssociationMembers, subscribeMemberStorage } from '../../services/memberStorage'
 import {
   getAssociationAssistanceItems,
@@ -15,6 +14,7 @@ import {
 } from '../../services/decisionStorage'
 import type { ReviewableAssistanceItem } from '../../types/approval'
 import type { RequestStatus } from '../../data/mockData'
+import { useAssociationDisplayUser } from '../../hooks/useAssociationDisplayUser'
 
 function statusVariant(status: RequestStatus) {
   if (status === 'APPROVED') return 'success' as const
@@ -35,9 +35,8 @@ function approvedOn(item: ReviewableAssistanceItem) {
 }
 
 export default function AssociationDashboardPage() {
-  const { user, profile } = useAuth()
-  const displayName = profile?.fullName ?? user?.fullName ?? 'Association Head'
-  const initials = getInitials(displayName)
+  const { profile } = useAuth()
+  const displayUser = useAssociationDisplayUser()
   const associationName = profile?.associationName ?? getAssociationDetails().name
   const [requests, setRequests] = useState<ReviewableAssistanceItem[]>(() =>
     getAssociationAssistanceItems(associationName),
@@ -67,8 +66,8 @@ export default function AssociationDashboardPage() {
       <DashboardNavbar
         title="Association Head Dashboard"
         searchPlaceholder="Search members, requests, records..."
-        userName={displayName}
-        userInitials={initials}
+        userName={displayUser.name}
+        userInitials={displayUser.initials}
         notificationsPath="/association/notifications"
       />
       <main className="flex-1 overflow-y-auto p-4 sm:p-5 md:p-6">
@@ -92,6 +91,7 @@ export default function AssociationDashboardPage() {
             </Link>
           ))}
         </div>
+
         <div className="mb-6 grid grid-cols-2 gap-4 lg:grid-cols-4">
           <StatCard label="Total Members" value={memberCount} icon={Users} />
           <StatCard label="Pending Requests" value={pendingCount} icon={Clock} />

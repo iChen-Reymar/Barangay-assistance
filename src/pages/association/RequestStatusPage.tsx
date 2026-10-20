@@ -3,7 +3,6 @@ import { Check } from 'lucide-react'
 import { DashboardNavbar } from '../../components/layout/DashboardNavbar'
 import { Badge } from '../../components/ui/Badge'
 import { useAuth } from '../../context/AuthContext'
-import { getInitials } from '../../utils/userDisplay'
 import { getAssociationDetails } from '../../services/memberStorage'
 import {
   getAssociationAssistanceItems,
@@ -11,6 +10,7 @@ import {
 } from '../../services/decisionStorage'
 import type { ReviewableAssistanceItem } from '../../types/approval'
 import type { RequestStatus } from '../../data/mockData'
+import { useAssociationDisplayUser } from '../../hooks/useAssociationDisplayUser'
 
 const reviewSteps = ['Submitted', 'AI Processing', 'Generated'] as const
 
@@ -55,9 +55,8 @@ function badgeVariant(status: RequestStatus) {
 }
 
 export default function RequestStatusPage() {
-  const { user, profile } = useAuth()
-  const displayName = profile?.fullName ?? user?.fullName ?? 'Association Head'
-  const initials = getInitials(displayName)
+  const { profile } = useAuth()
+  const displayUser = useAssociationDisplayUser()
   const associationName = profile?.associationName ?? getAssociationDetails().name
 
   const [requests, setRequests] = useState<ReviewableAssistanceItem[]>(() =>
@@ -75,8 +74,8 @@ export default function RequestStatusPage() {
       <DashboardNavbar
         title="Track Request Status"
         searchPlaceholder="Search requests..."
-        userName={displayName}
-        userInitials={initials}
+        userName={displayUser.name}
+        userInitials={displayUser.initials}
         notificationsPath="/association/notifications"
       />
       <main className="flex-1 overflow-y-auto p-4 sm:p-5 md:p-6">

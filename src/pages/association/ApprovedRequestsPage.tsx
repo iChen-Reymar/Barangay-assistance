@@ -1,16 +1,18 @@
 import { DashboardNavbar } from '../../components/layout/DashboardNavbar'
 import { Badge } from '../../components/ui/Badge'
 import { approvedAssistance } from '../../data/associationMockData'
-import { associationUser } from '../../components/association/navConfig'
+import { useAssociationDisplayUser } from '../../hooks/useAssociationDisplayUser'
 
 export default function ApprovedRequestsPage() {
+  const displayUser = useAssociationDisplayUser()
+
   return (
     <>
       <DashboardNavbar
         title="View AI-Generated Recommendation"
         searchPlaceholder="Search approved requests..."
-        userName={associationUser.name}
-        userInitials={associationUser.initials}
+        userName={displayUser.name}
+        userInitials={displayUser.initials}
         notificationsPath="/association/notifications"
       />
       <main className="flex-1 overflow-y-auto p-4 sm:p-5 md:p-6">

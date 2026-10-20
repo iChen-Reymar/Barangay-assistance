@@ -1,7 +1,7 @@
 import { DashboardNavbar } from '../../components/layout/DashboardNavbar'
 import { Badge } from '../../components/ui/Badge'
 import { aiRecommendations, type VulnerabilityLevel } from '../../data/associationMockData'
-import { associationUser } from '../../components/association/navConfig'
+import { useAssociationDisplayUser } from '../../hooks/useAssociationDisplayUser'
 
 function vulnerabilityVariant(level: VulnerabilityLevel) {
   if (level === 'HIGH') return 'danger'
@@ -10,13 +10,15 @@ function vulnerabilityVariant(level: VulnerabilityLevel) {
 }
 
 export default function AiRecommendationsPage() {
+  const displayUser = useAssociationDisplayUser()
+
   return (
     <>
       <DashboardNavbar
         title="View AI Recommendations"
         searchPlaceholder="Search recommendations..."
-        userName={associationUser.name}
-        userInitials={associationUser.initials}
+        userName={displayUser.name}
+        userInitials={displayUser.initials}
         notificationsPath="/association/notifications"
       />
       <main className="flex-1 overflow-y-auto p-4 sm:p-5 md:p-6">

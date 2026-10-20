@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Building2, Users, UserCheck, Clock, Plus, Pencil, Settings, Eye } from 'lucide-react'
 import { AdminHeader } from '../../components/admin/AdminHeader'
-import { StatCard } from '../../components/admin/StatCard'
+import { StatCard } from '../../components/ui/StatCard'
 import { ActiveBadge } from '../../components/admin/StatusBadge'
 import { Pagination } from '../../components/admin/Pagination'
 import { AssociationFormModal, type AssociationFormInput } from '../../components/admin/AssociationFormModal'

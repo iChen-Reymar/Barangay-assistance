@@ -25,7 +25,6 @@ interface StaffBeneficiaryFormModalProps {
   onSave: (input: StaffBeneficiaryFormInput) => void
 }
 
-const vulnerabilityOptions: VulnerabilityLevel[] = ['HIGH', 'MEDIUM', 'LOW']
 const verificationOptions: VerificationStatus[] = ['VERIFIED', 'PENDING', 'UNVERIFIED']
 
 const emptyForm: StaffBeneficiaryFormInput = {
@@ -161,22 +160,12 @@ export function StaffBeneficiaryFormModal({
             <label className="mb-1 block text-xs font-semibold uppercase text-gray-500">
               Vulnerability
             </label>
-            <select
+            <input
+              readOnly
               value={form.vulnerability}
-              onChange={(e) =>
-                setForm((prev) => ({
-                  ...prev,
-                  vulnerability: e.target.value as VulnerabilityLevel,
-                }))
-              }
-              className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
-            >
-              {vulnerabilityOptions.map((level) => (
-                <option key={level} value={level}>
-                  {level}
-                </option>
-              ))}
-            </select>
+              className="w-full cursor-default rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-700"
+              aria-readonly="true"
+            />
           </div>
           <div>
             <label className="mb-1 block text-xs font-semibold uppercase text-gray-500">
@@ -202,6 +191,18 @@ export function StaffBeneficiaryFormModal({
         </div>
 
         <div className="flex justify-end gap-3 pt-2">
+          {form.verification !== 'VERIFIED' && (
+            <Button
+              type="button"
+              onClick={() => {
+                const verified = { ...form, verification: 'VERIFIED' as VerificationStatus }
+                onSave(verified)
+                onClose()
+              }}
+            >
+              Verify
+            </Button>
+          )}
           <Button type="button" variant="outline" onClick={onClose}>
             Cancel
           </Button>

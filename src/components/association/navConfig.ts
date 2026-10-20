@@ -20,8 +20,3 @@ export const associationNavItems = [
   { to: '/association/settings', label: 'Settings', icon: Settings },
 ]
 
-export const associationUser = {
-  initials: 'AH',
-  name: 'Association Head',
-  role: 'Association Head',
-}

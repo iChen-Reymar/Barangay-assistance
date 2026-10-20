@@ -3,27 +3,26 @@ import { DashboardNavbar } from '../../components/layout/DashboardNavbar'
 import { PrivacyNoticePanel } from '../../components/settings/PrivacyNoticePanel'
 import { UserProfileSection } from '../../components/profile/UserProfileSection'
 import { useAuth } from '../../context/AuthContext'
-import { getInitials } from '../../utils/userDisplay'
+import { useAssociationDisplayUser } from '../../hooks/useAssociationDisplayUser'
 
 const settingsTabs = ['Profile', 'Privacy', 'Security', 'About'] as const
 
 export default function AssociationSettingsPage() {
   const [activeTab, setActiveTab] = useState<(typeof settingsTabs)[number]>('Profile')
   const { user, profile } = useAuth()
+  const displayUser = useAssociationDisplayUser()
 
   if (!user || !profile) {
     return null
   }
-
-  const initials = getInitials(profile.fullName)
 
   return (
     <>
       <DashboardNavbar
         title="Settings"
         searchPlaceholder="Search settings..."
-        userName={profile.fullName}
-        userInitials={initials}
+        userName={displayUser.name}
+        userInitials={displayUser.initials}
         notificationsPath="/association/notifications"
       />
       <main className="flex-1 overflow-y-auto p-4 sm:p-5 md:p-6">

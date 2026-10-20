@@ -8,13 +8,12 @@ import { submitAssociationAssistanceRequest } from '../../services/decisionStora
 import { getAssociationDetails } from '../../services/memberStorage'
 import type { AssistanceProgram } from '../../data/programsMockData'
 import { useAuth } from '../../context/AuthContext'
-import { getInitials } from '../../utils/userDisplay'
 import { buildChanges, logAuditEvent } from '../../services/auditStorage'
+import { useAssociationDisplayUser } from '../../hooks/useAssociationDisplayUser'
 
 export default function AssistanceRequestPage() {
   const { user, profile } = useAuth()
-  const displayName = profile?.fullName ?? user?.fullName ?? 'Association Head'
-  const initials = getInitials(displayName)
+  const displayUser = useAssociationDisplayUser()
   const associationName = profile?.associationName ?? getAssociationDetails().name
 
   const [programs, setPrograms] = useState<AssistanceProgram[]>(() => getActivePrograms())
@@ -39,12 +38,12 @@ export default function AssistanceRequestPage() {
       purpose,
       requestedAssistance,
       supportingInfo,
-      submittedBy: displayName,
+      submittedBy: displayUser.name,
       contactNumber: profile?.contactNumber,
       email: profile?.email ?? user?.email,
     })
     logAuditEvent({
-      user: displayName,
+      user: displayUser.name,
       userEmail: profile?.email ?? user?.email,
       action: 'Assistance Request',
       actionColor: 'blue',
@@ -69,8 +68,8 @@ export default function AssistanceRequestPage() {
       <DashboardNavbar
         title="Submit Assistance Request"
         searchPlaceholder="Search programs..."
-        userName={displayName}
-        userInitials={initials}
+        userName={displayUser.name}
+        userInitials={displayUser.initials}
         notificationsPath="/association/notifications"
       />
       <main className="flex-1 overflow-y-auto p-4 sm:p-5 md:p-6">

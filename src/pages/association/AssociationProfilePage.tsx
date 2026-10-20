@@ -17,7 +17,7 @@ import {
   toAssociationDetails,
 } from '../../services/associationStorage'
 import { useAuth } from '../../context/AuthContext'
-import { getInitials } from '../../utils/userDisplay'
+import { useAssociationDisplayUser } from '../../hooks/useAssociationDisplayUser'
 
 function loadAssignedDetails(associationName?: string): AssociationDetails {
   if (associationName) {
@@ -28,9 +28,10 @@ function loadAssignedDetails(associationName?: string): AssociationDetails {
 }
 
 export default function AssociationProfilePage() {
-  const { user, profile } = useAuth()
-  const displayName = profile?.fullName ?? user?.fullName ?? 'Association Head'
-  const initials = getInitials(displayName)
+  const { profile } = useAuth()
+  const displayUser = useAssociationDisplayUser()
+  const displayName = displayUser.name
+  const initials = displayUser.initials
   const associationName = profile?.associationName
 
   const [details, setDetails] = useState<AssociationDetails>(() => loadAssignedDetails(associationName))

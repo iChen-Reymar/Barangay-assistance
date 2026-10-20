@@ -5,26 +5,19 @@ import { AnalyticsCharts } from '../../components/admin/AnalyticsCharts'
 import { DashboardNavbar } from '../../components/layout/DashboardNavbar'
 import { StatCard } from '../../components/ui/StatCard'
 import { Badge } from '../../components/ui/Badge'
-import { Button } from '../../components/ui/Button'
 import { useStaffDisplayUser } from '../../hooks/useStaffDisplayUser'
-import { useAuth } from '../../context/AuthContext'
-import { buildChanges, logAuditEvent } from '../../services/auditStorage'
 import type { StaffBeneficiary } from '../../data/staffMockData'
 import {
   countPendingVerification,
   getPendingVerificationBeneficiaries,
   getStaffBeneficiaries,
   subscribeStaffBeneficiaryStorage,
-  verifyStaffBeneficiary,
 } from '../../services/staffBeneficiaryStorage'
 import { getGeneratedAssistanceList, subscribeGeneratedAssistanceList } from '../../services/aiProcessing'
 import { getAuditLogs, subscribeAuditLogs } from '../../services/auditStorage'
 
 export default function StaffDashboardPage() {
   const displayUser = useStaffDisplayUser()
-  const { user, profile } = useAuth()
-  const actorName = profile?.fullName ?? user?.fullName ?? displayUser.name
-  const actorEmail = profile?.email ?? user?.email
 
   const [pendingItems, setPendingItems] = useState<StaffBeneficiary[]>(() =>
     getPendingVerificationBeneficiaries(),
@@ -33,8 +26,6 @@ export default function StaffDashboardPage() {
   const [beneficiaries, setBeneficiaries] = useState<StaffBeneficiary[]>(() => getStaffBeneficiaries())
   const [generatedCount, setGeneratedCount] = useState(() => getGeneratedAssistanceList().length)
   const [activities, setActivities] = useState(() => getAuditLogs().slice(0, 5))
-  const [statusMessage, setStatusMessage] = useState('')
-  const [verifyingId, setVerifyingId] = useState<string | null>(null)
 
   function refreshPending() {
     setPendingItems(getPendingVerificationBeneficiaries())
@@ -55,44 +46,6 @@ export default function StaffDashboardPage() {
     }
   }, [])
 
-  useEffect(() => {
-    if (!statusMessage) return
-    const timer = window.setTimeout(() => setStatusMessage(''), 4000)
-    return () => window.clearTimeout(timer)
-  }, [statusMessage])
-
-  function handleVerify(beneficiary: StaffBeneficiary) {
-    if (beneficiary.verification === 'VERIFIED') return
-
-    setVerifyingId(beneficiary.id)
-    const previous = beneficiary.verification
-    const updated = verifyStaffBeneficiary(beneficiary.id)
-    setVerifyingId(null)
-
-    if (!updated) return
-
-    logAuditEvent({
-      user: actorName,
-      userEmail: actorEmail,
-      action: 'Beneficiary Update',
-      actionColor: 'green',
-      description: `Verified beneficiary record for ${beneficiary.name}.`,
-      entityType: 'beneficiary',
-      entityId: beneficiary.id,
-      changes: buildChanges([
-        {
-          key: 'verification',
-          label: 'Verification',
-          oldValue: previous,
-          newValue: 'VERIFIED',
-        },
-      ]),
-    })
-
-    setStatusMessage(`${beneficiary.name} is now verified.`)
-    refreshPending()
-  }
-
   return (
     <>
       <DashboardNavbar
@@ -102,12 +55,6 @@ export default function StaffDashboardPage() {
         userInitials={displayUser.initials}
       />
       <main className="flex-1 overflow-y-auto p-4 sm:p-5 md:p-6">
-        {statusMessage ? (
-          <div className="mb-4 rounded-lg border border-green-200 bg-green-50 px-4 py-3 text-sm text-green-800">
-            {statusMessage}
-          </div>
-        ) : null}
-
         <div className="mb-6 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
           {[
             { to: '/staff/beneficiaries', label: 'Input Beneficiaries Data', icon: Users },
@@ -128,7 +75,6 @@ export default function StaffDashboardPage() {
             </Link>
           ))}
         </div>
-
         <div className="mb-6 grid grid-cols-2 gap-4 lg:grid-cols-5">
           <StatCard label="Total Beneficiaries" value={beneficiaries.length} icon={Users} />
           <StatCard label="Assessed Beneficiaries" value={beneficiaries.filter((row) => row.vulnerability).length} icon={Shield} />
@@ -183,21 +129,12 @@ export default function StaffDashboardPage() {
             ) : (
               <ul className="divide-y divide-gray-100">
                 {pendingItems.map((item) => (
-                  <li key={item.id} className="flex items-center justify-between gap-3 px-5 py-4">
-                    <div className="min-w-0">
-                      <p className="font-medium text-gray-900">{item.name}</p>
-                      <p className="text-xs text-gray-500">{item.association}</p>
-                      <p className="mt-0.5 text-[10px] font-semibold uppercase text-amber-600">
-                        {item.verification}
-                      </p>
-                    </div>
-                    <Button
-                      size="sm"
-                      disabled={verifyingId === item.id}
-                      onClick={() => handleVerify(item)}
-                    >
-                      {verifyingId === item.id ? 'Verifying…' : 'Verify'}
-                    </Button>
+                  <li key={item.id} className="px-5 py-4">
+                    <p className="font-medium text-gray-900">{item.name}</p>
+                    <p className="text-xs text-gray-500">{item.association}</p>
+                    <p className="mt-0.5 text-[10px] font-semibold uppercase text-amber-600">
+                      {item.verification}
+                    </p>
                   </li>
                 ))}
               </ul>

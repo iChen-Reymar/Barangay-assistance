@@ -8,11 +8,12 @@ import { Pagination } from '../../components/ui/Pagination'
 import { Modal } from '../../components/ui/Modal'
 import { aidRecords } from '../../data/associationMockData'
 import { PAGE_SIZE_DEFAULT, usePagination } from '../../hooks/usePagination'
-import { associationUser } from '../../components/association/navConfig'
+import { useAssociationDisplayUser } from '../../hooks/useAssociationDisplayUser'
 
 type AidRecord = (typeof aidRecords)[number]
 
 export default function AidRecordsPage() {
+  const displayUser = useAssociationDisplayUser()
   const [showModal, setShowModal] = useState(false)
   const pagination = usePagination(aidRecords, PAGE_SIZE_DEFAULT, 'aid-records', 'records')
 
@@ -35,8 +36,8 @@ export default function AidRecordsPage() {
       <DashboardNavbar
         title="Submit Aid Records"
         searchPlaceholder="Search aid records..."
-        userName={associationUser.name}
-        userInitials={associationUser.initials}
+        userName={displayUser.name}
+        userInitials={displayUser.initials}
         notificationsPath="/association/notifications"
       />
       <main className="flex-1 overflow-y-auto p-4 sm:p-5 md:p-6">

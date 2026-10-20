@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Package, CheckCircle, Wallet, CalendarClock, Plus, Pencil, Settings } from 'lucide-react'
 import { AdminHeader } from '../../components/admin/AdminHeader'
-import { StatCard } from '../../components/admin/StatCard'
+import { StatCard } from '../../components/ui/StatCard'
 import { ProgramStatusBadge } from '../../components/admin/StatusBadge'
 import { Pagination } from '../../components/admin/Pagination'
 import { ProgramFormModal, type ProgramFormInput } from '../../components/admin/ProgramFormModal'

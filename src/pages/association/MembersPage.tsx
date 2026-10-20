@@ -14,10 +14,9 @@ import {
   removeAssociationMember,
   subscribeMemberStorage,
 } from '../../services/memberStorage'
-import { useAuth } from '../../context/AuthContext'
 import { PAGE_SIZE_DEFAULT, usePagination } from '../../hooks/usePagination'
 import { TableActionsCell } from '../../components/ui/TableActionsCell'
-import { getInitials } from '../../utils/userDisplay'
+import { useAssociationDisplayUser } from '../../hooks/useAssociationDisplayUser'
 
 function vulnerabilityVariant(level: VulnerabilityLevel) {
   if (level === 'HIGH') return 'danger'
@@ -26,9 +25,9 @@ function vulnerabilityVariant(level: VulnerabilityLevel) {
 }
 
 export default function MembersPage() {
-  const { user, profile } = useAuth()
-  const displayName = profile?.fullName ?? user?.fullName ?? 'Association Head'
-  const initials = getInitials(displayName)
+  const displayUser = useAssociationDisplayUser()
+  const displayName = displayUser.name
+  const initials = displayUser.initials
 
   const [items, setItems] = useState<AssociationMember[]>(() => getAssociationMembers())
   const [membershipFilter, setMembershipFilter] = useState<'All' | 'ACTIVE' | 'INACTIVE'>('All')
