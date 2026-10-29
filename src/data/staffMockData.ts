@@ -47,6 +47,19 @@ export interface AssessmentBeneficiary {
   monthlyIncome: number
   score: number
   classification: VulnerabilityLevel
+  /**
+   * Which engine produced the score above. `ml` means the decision tree and
+   * logistic regression scored the household; `rules` means the ML service was
+   * unreachable and the local rule scorer stood in. The two are never allowed
+   * to look alike on screen.
+   */
+  engine: 'ml' | 'rules'
+  decisionTreePrediction?: VulnerabilityLevel
+  logisticRegressionPrediction?: VulnerabilityLevel
+  /** False when the two models chose different classes. */
+  agreement?: boolean
+  /** Short human-readable list of the household's salient features. */
+  factors?: string[]
 }
 
 export const assessmentBeneficiaries: AssessmentBeneficiary[] = []

@@ -1,4 +1,4 @@
-import { useEffect, useState, type FormEvent } from 'react'
+﻿import { useEffect, useState, type FormEvent } from 'react'
 import { Building2, Pencil, Save, X } from 'lucide-react'
 import { DashboardNavbar } from '../../components/layout/DashboardNavbar'
 import { ActiveBadge } from '../../components/admin/StatusBadge'
@@ -16,7 +16,7 @@ import {
   subscribeAssociationStorage,
   toAssociationDetails,
 } from '../../services/associationStorage'
-import { useAuth } from '../../context/AuthContext'
+import { useAuth } from '../../context/useAuth'
 import { useAssociationDisplayUser } from '../../hooks/useAssociationDisplayUser'
 
 function loadAssignedDetails(associationName?: string): AssociationDetails {

@@ -4,6 +4,7 @@
   "type": "module",
   "dependencies": {
     "@supabase/supabase-js": "^2.76.1",
+    "barangay-system": "file:..",
     "cors": "^2.8.5",
     "express": "^5.1.0"
   }

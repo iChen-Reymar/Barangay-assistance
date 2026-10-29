@@ -1,12 +1,5 @@
-import {
-  createContext,
-  useCallback,
-  useContext,
-  useEffect,
-  useMemo,
-  useState,
-  type ReactNode,
-} from 'react'
+﻿import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react'
+import { AuthContext } from './authContextValue'
 import { initializeAuditStorage, buildChanges, logAuditEvent } from '../services/auditStorage'
 import { initializeDecisionStorage } from '../services/decisionStorage'
 import { initializePrivacyStorage } from '../services/privacyStorage'
@@ -41,26 +34,6 @@ import type {
   StoredUser,
 } from '../types/auth'
 
-interface AuthContextValue {
-  user: SessionUser | null
-  profile: StoredUser | null
-  pendingRequests: StoredUser[]
-  allUsers: StoredUser[]
-  login: (email: string, password: string, rememberMe: boolean) => ReturnType<typeof loginUser>
-  logout: () => void
-  submitRequest: (input: AccessRequestInput) => ReturnType<typeof submitAccessRequest>
-  submitAssociationHeadRequest: (
-    input: AssociationHeadRequestInput,
-  ) => ReturnType<typeof submitAssociationHeadRequest>
-  approveRequest: (userId: string, notes: string) => void
-  rejectRequest: (userId: string, notes: string) => void
-  updateProfile: (input: ProfileUpdateInput) => ReturnType<typeof updateUserProfile>
-  changePassword: (input: PasswordChangeInput) => ReturnType<typeof changeUserPassword>
-  refreshUsers: () => void
-}
-
-const AuthContext = createContext<AuthContextValue | null>(null)
-
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<SessionUser | null>(() => getSession())
   const [pendingRequests, setPendingRequests] = useState<StoredUser[]>(() => getPendingUsers())
@@ -77,9 +50,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     initializeAssociationStorage()
     initializeProgramStorage()
     initializeMemberStorage()
-    setPendingRequests(getPendingUsers())
-    setAllUsers(getAllUsers())
-    setUser(getSession())
   }, [])
 
   const refreshUsers = useCallback(() => {
@@ -142,10 +112,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           description: `Submitted access request for ${input.roleLabel} account.`,
           entityType: 'user',
           changes: buildChanges([
-            { key: 'email', label: 'Email', oldValue: '—', newValue: input.email.trim() },
-            { key: 'role', label: 'Role', oldValue: '—', newValue: input.roleLabel },
-            { key: 'department', label: 'Department', oldValue: '—', newValue: formatDepartment(input.department) },
-            { key: 'status', label: 'Status', oldValue: '—', newValue: 'PENDING' },
+            { key: 'email', label: 'Email', oldValue: 'â€”', newValue: input.email.trim() },
+            { key: 'role', label: 'Role', oldValue: 'â€”', newValue: input.roleLabel },
+            { key: 'department', label: 'Department', oldValue: 'â€”', newValue: formatDepartment(input.department) },
+            { key: 'status', label: 'Status', oldValue: 'â€”', newValue: 'PENDING' },
           ]),
         })
       }
@@ -169,15 +139,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             : 'Submitted Association Head registration.',
           entityType: 'user',
           changes: buildChanges([
-            { key: 'email', label: 'Email', oldValue: '—', newValue: input.email.trim() },
-            { key: 'role', label: 'Role', oldValue: '—', newValue: 'Association Head' },
+            { key: 'email', label: 'Email', oldValue: 'â€”', newValue: input.email.trim() },
+            { key: 'role', label: 'Role', oldValue: 'â€”', newValue: 'Association Head' },
             {
               key: 'association',
               label: 'Association',
-              oldValue: '—',
+              oldValue: 'â€”',
               newValue: input.associationName?.trim() || 'Assigned by administrator',
             },
-            { key: 'status', label: 'Status', oldValue: '—', newValue: 'PENDING' },
+            { key: 'status', label: 'Status', oldValue: 'â€”', newValue: 'PENDING' },
           ]),
         })
       }
@@ -212,8 +182,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         entityId: userId,
         changes: buildChanges([
           { key: 'status', label: 'Account Status', oldValue: 'PENDING', newValue: 'APPROVED' },
-          { key: 'notes', label: 'Decision Notes', oldValue: '—', newValue: notes || '—' },
-          { key: 'reviewedAt', label: 'Reviewed At', oldValue: '—', newValue: new Date().toISOString() },
+          { key: 'notes', label: 'Decision Notes', oldValue: 'â€”', newValue: notes || 'â€”' },
+          { key: 'reviewedAt', label: 'Reviewed At', oldValue: 'â€”', newValue: new Date().toISOString() },
         ]),
       })
     },
@@ -242,8 +212,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         entityId: userId,
         changes: buildChanges([
           { key: 'status', label: 'Account Status', oldValue: 'PENDING', newValue: 'REJECTED' },
-          { key: 'notes', label: 'Decision Notes', oldValue: '—', newValue: notes },
-          { key: 'reviewedAt', label: 'Reviewed At', oldValue: '—', newValue: new Date().toISOString() },
+          { key: 'notes', label: 'Decision Notes', oldValue: 'â€”', newValue: notes },
+          { key: 'reviewedAt', label: 'Reviewed At', oldValue: 'â€”', newValue: new Date().toISOString() },
         ]),
       })
     },
@@ -327,12 +297,4 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   )
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>
-}
-
-export function useAuth() {
-  const ctx = useContext(AuthContext)
-  if (!ctx) {
-    throw new Error('useAuth must be used within AuthProvider')
-  }
-  return ctx
 }

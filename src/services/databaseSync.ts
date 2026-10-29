@@ -1,19 +1,3 @@
-const STORE_KEYS = [
-  'barangay_users',
-  'barangay_reviewable_items',
-  'barangay_associations',
-  'barangay_staff_beneficiaries',
-  'barangay_assistance_programs',
-  'barangay_association_members',
-  'barangay_association_details',
-  'barangay_priority_list',
-  'barangay_audit_logs',
-  'barangay_report_history',
-  'barangay_privacy_settings',
-  'barangay_generated_assistance_list',
-  'barangay_managed_users_seeded',
-]
-
 const VERSION_KEY = 'barangay_store_version'
 const VERSION = 'supabase-live-1'
 const SKIP_KEYS = new Set(['barangay_session', 'barangay_client_ip', VERSION_KEY])
@@ -68,27 +52,58 @@ export function writeStoreWithoutSync(key: string, value: string) {
   hydrating = false
 }
 
+const NOTIFICATIONS_KEY = 'barangay_association_notifications'
+
+function readNotificationList(raw: string | null) {
+  if (!raw) return [] as { id?: string; createdAt?: string }[]
+  try {
+    const parsed = JSON.parse(raw) as unknown
+    return Array.isArray(parsed) ? parsed as { id?: string; createdAt?: string }[] : []
+  } catch {
+    return []
+  }
+}
+
+function mergeNotifications(localRaw: string | null, remotePayload: string) {
+  const byId = new Map<string, { id?: string; createdAt?: string }>()
+  for (const item of readNotificationList(remotePayload)) {
+    if (item?.id) byId.set(item.id, item)
+  }
+  for (const item of readNotificationList(localRaw)) {
+    if (item?.id && !byId.has(item.id)) byId.set(item.id, item)
+  }
+  return [...byId.values()].sort((left, right) =>
+    String(right.createdAt ?? '').localeCompare(String(left.createdAt ?? '')),
+  )
+}
+
 export async function pullFromDatabase() {
   installDatabaseSync()
-  hydrating = true
-  for (const key of STORE_KEYS) localStorage.removeItem(key)
   if (localStorage.getItem(VERSION_KEY) !== VERSION) {
     localStorage.removeItem('barangay_session')
     sessionStorage.removeItem('barangay_session')
     localStorage.setItem(VERSION_KEY, VERSION)
   }
-  hydrating = false
 
   try {
     const response = await fetch('/api/bootstrap')
     if (!response.ok) return
     const body = (await response.json()) as { stores?: { key: string; payload: string }[] }
     const stores = body.stores ?? []
+    let notificationsToPush: string | null = null
     hydrating = true
     for (const row of stores) {
-      if (shouldSync(row.key)) localStorage.setItem(row.key, row.payload)
+      if (!shouldSync(row.key)) continue
+      if (row.key === NOTIFICATIONS_KEY) {
+        const merged = JSON.stringify(mergeNotifications(localStorage.getItem(row.key), row.payload))
+        if (merged !== row.payload) notificationsToPush = merged
+        localStorage.setItem(row.key, merged)
+        continue
+      }
+      localStorage.setItem(row.key, row.payload)
     }
     hydrating = false
+    if (notificationsToPush) void pushKey(NOTIFICATIONS_KEY, notificationsToPush)
   } catch {
     hydrating = false
   }

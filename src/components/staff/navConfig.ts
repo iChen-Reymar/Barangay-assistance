@@ -8,6 +8,7 @@ import {
   PieChart,
   FileDown,
   Settings,
+  Activity,
 } from 'lucide-react'
 
 export const staffNavItems = [
@@ -15,6 +16,7 @@ export const staffNavItems = [
   { to: '/staff/beneficiaries', label: 'Input Beneficiaries Data', icon: UserCircle },
   { to: '/staff/vulnerability-assessment', label: 'Classify Beneficiaries', icon: Shield },
   { to: '/staff/priority-list', label: 'Generate Assistance Lists', icon: ListOrdered },
+  { to: '/staff/model-performance', label: 'ML Model Performance', icon: Activity },
   { to: '/staff/reports', label: 'Export Reports', icon: FileDown },
   { to: '/staff/recommendations', label: 'View AI-Generated Recommendation', icon: Sparkles },
   { to: '/staff/status-reports', label: 'View Status Reports', icon: PieChart },

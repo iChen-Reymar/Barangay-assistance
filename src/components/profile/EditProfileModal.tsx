@@ -1,4 +1,5 @@
-import { useEffect, useState, type FormEvent } from 'react'
+﻿import { useState, type FormEvent } from 'react'
+import { useResetWhenOpen } from '../../hooks/useResetWhenOpen'
 import { Modal } from '../ui/Modal'
 import { Button } from '../ui/Button'
 import { departmentOptions } from '../../services/authStorage'
@@ -21,8 +22,7 @@ export function EditProfileModal({ open, onClose, profile, onSave }: EditProfile
   const [error, setError] = useState('')
   const [success, setSuccess] = useState(false)
 
-  useEffect(() => {
-    if (!open) return
+  useResetWhenOpen(open, profile, () => {
     setFirstName(profile.firstName)
     setLastName(profile.lastName)
     setEmail(profile.email)
@@ -31,7 +31,7 @@ export function EditProfileModal({ open, onClose, profile, onSave }: EditProfile
     setDepartment(profile.department)
     setError('')
     setSuccess(false)
-  }, [open, profile])
+  })
 
   function handleSubmit(e: FormEvent) {
     e.preventDefault()

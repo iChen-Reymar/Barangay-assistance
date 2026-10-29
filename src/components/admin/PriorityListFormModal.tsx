@@ -1,8 +1,9 @@
-import { useEffect, useMemo, useState, type FormEvent } from 'react'
+import { useState, type FormEvent } from 'react'
 import { Modal } from '../ui/Modal'
 import { Button } from '../ui/Button'
 import { classificationFromScore, type PriorityListEntry, type RequestStatus } from '../../data/mockData'
 import { getActiveProgramNames } from '../../services/programStorage'
+import { useResetWhenOpen } from '../../hooks/useResetWhenOpen'
 import type { PriorityListUpdateInput } from '../../services/priorityStorage'
 
 interface PriorityListFormModalProps {
@@ -14,14 +15,24 @@ interface PriorityListFormModalProps {
 
 const statusOptions: RequestStatus[] = ['PENDING', 'UNDER REVIEW', 'APPROVED', 'REJECTED']
 
+/**
+ * Active programs, plus the entry's current choice if it is no longer offered so
+ * an existing recommendation is never silently swapped for something else.
+ *
+ * Read on open rather than kept in a useMemo: the program list lives in
+ * storage, so a memo would only recompute when the entry changed and could
+ * offer a stale list after a program was added or retired.
+ */
+function buildProgramOptions(entry: PriorityListEntry | null) {
+  const active = getActiveProgramNames()
+  if (entry && !active.includes(entry.recommended)) {
+    return [entry.recommended, ...active]
+  }
+  return active.length > 0 ? active : ['Food Assistance', 'Medical Assistance', 'Livelihood Training']
+}
+
 export function PriorityListFormModal({ open, onClose, entry, onSave }: PriorityListFormModalProps) {
-  const programOptions = useMemo(() => {
-    const active = getActiveProgramNames()
-    if (entry && !active.includes(entry.recommended)) {
-      return [entry.recommended, ...active]
-    }
-    return active.length > 0 ? active : ['Food Assistance', 'Medical Assistance', 'Livelihood Training']
-  }, [entry, open])
+  const [programOptions, setProgramOptions] = useState<string[]>(() => buildProgramOptions(entry))
 
   const [association, setAssociation] = useState('')
   const [score, setScore] = useState(0)
@@ -31,8 +42,9 @@ export function PriorityListFormModal({ open, onClose, entry, onSave }: Priority
   const [notes, setNotes] = useState('')
   const [error, setError] = useState('')
 
-  useEffect(() => {
-    if (!open || !entry) return
+  useResetWhenOpen(open, entry, () => {
+    if (!entry) return
+    setProgramOptions(buildProgramOptions(entry))
     setAssociation(entry.association)
     setScore(entry.score)
     setRecommended(entry.recommended)
@@ -40,7 +52,7 @@ export function PriorityListFormModal({ open, onClose, entry, onSave }: Priority
     setStatus(entry.status)
     setNotes(entry.notes ?? '')
     setError('')
-  }, [open, entry])
+  })
 
   const previewClassification = classificationFromScore(score)
 

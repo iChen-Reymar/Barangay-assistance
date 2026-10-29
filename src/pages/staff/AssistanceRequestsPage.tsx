@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+﻿import { useEffect, useMemo, useState } from 'react'
 import { Download } from 'lucide-react'
 import { DashboardNavbar } from '../../components/layout/DashboardNavbar'
 import { ApprovalDecisionModal } from '../../components/approval/ApprovalDecisionModal'
@@ -22,7 +22,7 @@ import {
 } from '../../services/decisionStorage'
 import type { DecisionType, DocumentStatus, QualificationStatus, ReviewableAssistanceItem } from '../../types/approval'
 import type { RequestStatus } from '../../data/mockData'
-import { useAuth } from '../../context/AuthContext'
+import { useAuth } from '../../context/useAuth'
 import { getInitials } from '../../utils/userDisplay'
 
 function statusVariant(status: RequestStatus) {
@@ -48,10 +48,7 @@ export default function StaffAssistanceRequestsPage() {
   } | null>(null)
   const [viewItem, setViewItem] = useState<ReviewableAssistanceItem | null>(null)
 
-  useEffect(() => {
-    setItems(getAssistanceItems())
-    return subscribeDecisionStorage(() => setItems(getAssistanceItems()))
-  }, [])
+  useEffect(() => subscribeDecisionStorage(() => setItems(getAssistanceItems())), [])
 
   const filtered = useMemo(() => {
     if (activeTab === 'All') return items
@@ -97,7 +94,7 @@ export default function StaffAssistanceRequestsPage() {
         entityId: result.id,
         changes: buildChanges([
           { key: 'status', label: 'Status', oldValue: decisionModal.item.status, newValue: result.status },
-          { key: 'notes', label: 'Notes', oldValue: '—', newValue: notes || '—' },
+          { key: 'notes', label: 'Notes', oldValue: 'â€”', newValue: notes || 'â€”' },
         ]),
       })
     }
@@ -117,7 +114,7 @@ export default function StaffAssistanceRequestsPage() {
       header: 'V-Score',
       render: (r) => (
         <span className={r.score && r.score >= 80 ? 'font-semibold text-red-500' : 'text-gray-700'}>
-          {r.score ?? '—'}
+          {r.score ?? 'â€”'}
         </span>
       ),
     },

@@ -1,4 +1,5 @@
-import { useEffect, useState, type FormEvent } from 'react'
+﻿import { useState, type FormEvent } from 'react'
+import { useResetWhenOpen } from '../../hooks/useResetWhenOpen'
 import { Modal } from '../ui/Modal'
 import { Button } from '../ui/Button'
 import {
@@ -40,8 +41,7 @@ export function ProgramFormModal({
   const [form, setForm] = useState<ProgramFormInput>(emptyForm)
   const [error, setError] = useState('')
 
-  useEffect(() => {
-    if (!open) return
+  useResetWhenOpen(open, initialValues, () => {
     if (initialValues) {
       setForm({
         name: initialValues.name,
@@ -58,7 +58,7 @@ export function ProgramFormModal({
       setForm(emptyForm)
     }
     setError('')
-  }, [open, initialValues])
+  })
 
   function handleSubmit(e: FormEvent) {
     e.preventDefault()
@@ -198,7 +198,7 @@ export function ProgramFormModal({
           </div>
           <div>
             <label className="mb-1 block text-xs font-semibold uppercase text-gray-500">
-              Budget Allocation (₱)
+              Budget Allocation (â‚±)
             </label>
             <input
               type="number"

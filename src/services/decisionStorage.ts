@@ -1,5 +1,6 @@
 import { type RequestStatus } from '../data/mockData'
 import { enrichReviewableItem } from '../data/requestDetailsSeed'
+import { notifyDocumentRejected } from './associationNotificationStorage'
 import type {
   DecisionInput,
   DecisionRecord,
@@ -152,12 +153,17 @@ export function verifyDocument(
   documentId: string,
   status: DocumentStatus,
   reviewer: { name: string; email?: string },
+  documentName?: string,
+  memberName?: string,
+  associationName?: string,
+  reason?: string,
 ): ReviewableAssistanceItem | null {
   const items = readItems()
   const index = items.findIndex((item) => item.id === itemId)
   if (index === -1) return null
 
   const current = enrichReviewableItem(items[index])
+  const target = (current.documents ?? []).find((doc) => doc.id === documentId)
   const now = new Date().toISOString()
   const documents = (current.documents ?? []).map((doc) =>
     doc.id === documentId
@@ -166,12 +172,22 @@ export function verifyDocument(
           status,
           verifiedBy: reviewer.name,
           verifiedAt: now,
+          rejectionReason: status === 'rejected' ? reason?.trim() || undefined : undefined,
         }
       : doc,
   )
 
   items[index] = { ...current, documents }
   writeItems(items)
+  if (status === 'rejected') {
+    notifyDocumentRejected({
+      associationName: associationName || current.association,
+      documentName: documentName || target?.name || 'Document',
+      memberName,
+      rejectedBy: reviewer.name,
+      reason,
+    })
+  }
   return enrichReviewableItem(items[index])
 }
 

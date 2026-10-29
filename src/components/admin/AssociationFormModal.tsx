@@ -1,4 +1,5 @@
-import { useEffect, useState, type FormEvent } from 'react'
+﻿import { useState, type FormEvent } from 'react'
+import { useResetWhenOpen } from '../../hooks/useResetWhenOpen'
 import { Modal } from '../ui/Modal'
 import { Button } from '../ui/Button'
 import { associationTypes, type Association, type AssociationType } from '../../data/mockData'
@@ -39,8 +40,7 @@ export function AssociationFormModal({
   const [headUserId, setHeadUserId] = useState('')
   const [error, setError] = useState('')
 
-  useEffect(() => {
-    if (!open) return
+  useResetWhenOpen(open, initialValues, () => {
     const users = getAssociationHeadUsers()
     setHeads(users)
     const matched = initialValues
@@ -62,7 +62,7 @@ export function AssociationFormModal({
       setForm(emptyForm)
     }
     setError('')
-  }, [open, initialValues])
+  })
 
   function selectHead(userId: string) {
     setHeadUserId(userId)

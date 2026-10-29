@@ -1,12 +1,15 @@
-import { useEffect, useState } from 'react'
-import { Users, Clock, CheckCircle, XCircle, FileText, GitBranch, Sparkles, Package, Bell, ClipboardCheck } from 'lucide-react'
-import { Link } from 'react-router-dom'
+﻿import { useEffect, useState } from 'react'
+import { Users, Clock, CheckCircle, XCircle } from 'lucide-react'
 import { DashboardNavbar } from '../../components/layout/DashboardNavbar'
 import { StatCard } from '../../components/ui/StatCard'
 import { Badge } from '../../components/ui/Badge'
 import { NotificationPanel } from '../../components/ui/NotificationPanel'
-import { associationNotifications } from '../../data/associationMockData'
-import { useAuth } from '../../context/AuthContext'
+import { useAuth } from '../../context/useAuth'
+import {
+  getAssociationNotifications,
+  resolveAssociationViewer,
+  subscribeAssociationNotifications,
+} from '../../services/associationNotificationStorage'
 import { getAssociationDetails, getAssociationMembers, subscribeMemberStorage } from '../../services/memberStorage'
 import {
   getAssociationAssistanceItems,
@@ -35,24 +38,40 @@ function approvedOn(item: ReviewableAssistanceItem) {
 }
 
 export default function AssociationDashboardPage() {
-  const { profile } = useAuth()
+  const { profile, user } = useAuth()
   const displayUser = useAssociationDisplayUser()
-  const associationName = profile?.associationName ?? getAssociationDetails().name
+  const viewer = resolveAssociationViewer({
+    id: profile?.id ?? user?.id,
+    associationName: profile?.associationName,
+  })
+  const associationName = viewer.associationName || (profile?.associationName ?? getAssociationDetails().name)
+  const [notifications, setNotifications] = useState(() =>
+    getAssociationNotifications(associationName, viewer.userId).slice(0, 4),
+  )
   const [requests, setRequests] = useState<ReviewableAssistanceItem[]>(() =>
     getAssociationAssistanceItems(associationName),
   )
-  const [memberCount, setMemberCount] = useState(() => getAssociationMembers().length)
+  const [memberCount, setMemberCount] = useState(() =>
+    getAssociationMembers(associationName).length,
+  )
 
   useEffect(() => {
     const refresh = () => setRequests(getAssociationAssistanceItems(associationName))
     refresh()
     const stopRequests = subscribeDecisionStorage(refresh)
-    const stopMembers = subscribeMemberStorage(() => setMemberCount(getAssociationMembers().length))
+    const stopMembers = subscribeMemberStorage(() =>
+      setMemberCount(getAssociationMembers(associationName).length),
+    )
+    const refreshNotifications = () =>
+      setNotifications(getAssociationNotifications(associationName, viewer.userId).slice(0, 4))
+    refreshNotifications()
+    const stopNotifications = subscribeAssociationNotifications(refreshNotifications)
     return () => {
       stopRequests()
       stopMembers()
+      stopNotifications()
     }
-  }, [associationName])
+  }, [associationName, viewer.userId])
 
   const pendingCount = requests.filter(
     (item) => item.status === 'PENDING' || item.status === 'UNDER REVIEW',
@@ -71,27 +90,6 @@ export default function AssociationDashboardPage() {
         notificationsPath="/association/notifications"
       />
       <main className="flex-1 overflow-y-auto p-4 sm:p-5 md:p-6">
-        <div className="mb-6 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-          {[
-            { to: '/association/members', label: 'Manage Association Members', icon: Users },
-            { to: '/association/assistance-request', label: 'Submit Assistance Request', icon: FileText },
-            { to: '/association/request-status', label: 'Track Request Status', icon: GitBranch },
-            { to: '/association/ai-recommendations', label: 'View AI Recommendations', icon: Sparkles },
-            { to: '/association/aid-records', label: 'Submit Aid Records', icon: Package },
-            { to: '/association/notifications', label: 'Notifications', icon: Bell },
-            { to: '/association/approved-requests', label: 'View AI-Generated Recommendation', icon: ClipboardCheck },
-          ].map((item) => (
-            <Link
-              key={item.to}
-              to={item.to}
-              className="flex items-center gap-3 rounded-lg border border-gray-200 bg-white px-4 py-3 text-sm font-semibold text-gray-900 shadow-sm hover:border-primary hover:text-primary"
-            >
-              <item.icon className="h-4 w-4 shrink-0 text-primary" />
-              {item.label}
-            </Link>
-          ))}
-        </div>
-
         <div className="mb-6 grid grid-cols-2 gap-4 lg:grid-cols-4">
           <StatCard label="Total Members" value={memberCount} icon={Users} />
           <StatCard label="Pending Requests" value={pendingCount} icon={Clock} />
@@ -114,7 +112,7 @@ export default function AssociationDashboardPage() {
                       <p className="font-medium text-gray-900">{req.requestType}</p>
                       <p className="text-xs text-gray-500">
                         {req.date}
-                        {req.details?.memberCount ? ` · ${req.details.memberCount} members` : ''}
+                        {req.details?.memberCount ? ` Â· ${req.details.memberCount} members` : ''}
                       </p>
                     </div>
                     <Badge variant={statusVariant(req.status)}>{req.status}</Badge>
@@ -126,7 +124,7 @@ export default function AssociationDashboardPage() {
 
           <div className="rounded-lg border border-gray-200 bg-white p-5 shadow-sm">
             <h2 className="mb-4 text-sm font-bold text-gray-900">Latest Notifications</h2>
-            <NotificationPanel notifications={associationNotifications.slice(0, 4)} compact />
+            <NotificationPanel notifications={notifications} compact />
           </div>
         </div>
 
@@ -145,7 +143,7 @@ export default function AssociationDashboardPage() {
                   <p className="font-bold text-green-800">{item.requestType}</p>
                   <p className="mt-1 text-xs text-gray-500">Approved: {approvedOn(item)}</p>
                   <p className="text-sm text-gray-600">
-                    {item.details?.memberCount ?? '—'} members
+                    {item.details?.memberCount ?? 'â€”'} members
                   </p>
                   <div className="mt-2">
                     <Badge variant="success">APPROVED</Badge>

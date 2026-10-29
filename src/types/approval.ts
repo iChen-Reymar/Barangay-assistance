@@ -36,6 +36,8 @@ export interface SupportingDocument {
   status: DocumentStatus
   verifiedBy?: string
   verifiedAt?: string
+  dataUrl?: string
+  rejectionReason?: string
 }
 
 export interface QualificationCheck {

@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+﻿import { useEffect, useState } from 'react'
 import { DashboardNavbar } from '../../components/layout/DashboardNavbar'
 import { ApprovalDecisionModal } from '../../components/approval/ApprovalDecisionModal'
 import { DecisionTimeline } from '../../components/approval/DecisionTimeline'
@@ -18,7 +18,7 @@ import {
   verifyQualification,
 } from '../../services/decisionStorage'
 import type { DecisionType, DocumentStatus, QualificationStatus, ReviewableAssistanceItem } from '../../types/approval'
-import { useAuth } from '../../context/AuthContext'
+import { useAuth } from '../../context/useAuth'
 import { getInitials } from '../../utils/userDisplay'
 
 export default function StaffRecommendationsPage() {
@@ -35,10 +35,7 @@ export default function StaffRecommendationsPage() {
     item: ReviewableAssistanceItem
   } | null>(null)
 
-  useEffect(() => {
-    setItems(getRecommendationItems())
-    return subscribeDecisionStorage(() => setItems(getRecommendationItems()))
-  }, [])
+  useEffect(() => subscribeDecisionStorage(() => setItems(getRecommendationItems())), [])
 
   function refreshItems() {
     setItems(getRecommendationItems())
@@ -78,8 +75,8 @@ export default function StaffRecommendationsPage() {
         entityId: result.id,
         changes: buildChanges([
           { key: 'decision', label: 'Decision', oldValue: decisionModal.item.status, newValue: result.status },
-          { key: 'notes', label: 'Notes', oldValue: '—', newValue: notes || '—' },
-          { key: 'timestamp', label: 'Timestamp', oldValue: '—', newValue: new Date().toISOString() },
+          { key: 'notes', label: 'Notes', oldValue: 'â€”', newValue: notes || 'â€”' },
+          { key: 'timestamp', label: 'Timestamp', oldValue: 'â€”', newValue: new Date().toISOString() },
         ]),
       })
     }

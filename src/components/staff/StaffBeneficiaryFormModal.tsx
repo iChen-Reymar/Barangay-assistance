@@ -1,4 +1,5 @@
-import { useEffect, useState, type FormEvent } from 'react'
+﻿import { useState, type FormEvent } from 'react'
+import { useResetWhenOpen } from '../../hooks/useResetWhenOpen'
 import { Modal } from '../ui/Modal'
 import { Button } from '../ui/Button'
 import {
@@ -46,8 +47,7 @@ export function StaffBeneficiaryFormModal({
   const [form, setForm] = useState<StaffBeneficiaryFormInput>(emptyForm)
   const [error, setError] = useState('')
 
-  useEffect(() => {
-    if (!open) return
+  useResetWhenOpen(open, initialValues, () => {
     if (initialValues) {
       setForm({
         name: initialValues.name,
@@ -61,7 +61,7 @@ export function StaffBeneficiaryFormModal({
       setForm(emptyForm)
     }
     setError('')
-  }, [open, initialValues])
+  })
 
   function handleSubmit(e: FormEvent) {
     e.preventDefault()
@@ -140,7 +140,7 @@ export function StaffBeneficiaryFormModal({
               Monthly Income
             </label>
             <div className="relative">
-              <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm text-gray-500">₱</span>
+              <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm text-gray-500">â‚±</span>
               <input
                 required
                 type="number"

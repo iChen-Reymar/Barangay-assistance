@@ -567,8 +567,15 @@ export function rejectUser(userId: string, review: ReviewInput): boolean {
   return true
 }
 
-export function getReviewedAccessRequests(): StoredUser[] {
-  return readUsers()
+/**
+ * Reviewed access requests, newest first.
+ *
+ * Takes the user list so callers that already hold it - the auth context, for
+ * instance - can pass it straight through and stay reactive to it, rather than
+ * re-reading storage behind a memo dependency.
+ */
+export function getReviewedAccessRequests(users: StoredUser[] = readUsers()): StoredUser[] {
+  return users
     .filter((u) => u.reviewedAt && u.status !== 'pending')
     .sort((a, b) => new Date(b.reviewedAt!).getTime() - new Date(a.reviewedAt!).getTime())
 }

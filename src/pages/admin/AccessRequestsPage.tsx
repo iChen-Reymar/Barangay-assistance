@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+﻿import { useMemo, useState } from 'react'
 import { AdminHeader } from '../../components/admin/AdminHeader'
 import { ApprovalDecisionModal } from '../../components/approval/ApprovalDecisionModal'
 import { DecisionTimeline } from '../../components/approval/DecisionTimeline'
@@ -7,7 +7,7 @@ import { Button } from '../../components/ui/Button'
 import { TableActionsCell } from '../../components/ui/TableActionsCell'
 import { Modal } from '../../components/ui/Modal'
 import { DataTable, type Column } from '../../components/ui/DataTable'
-import { useAuth } from '../../context/AuthContext'
+import { useAuth } from '../../context/useAuth'
 import { formatDate, formatDepartment, getReviewedAccessRequests } from '../../services/authStorage'
 import type { DecisionType } from '../../types/approval'
 import type { StoredUser } from '../../types/auth'
@@ -20,7 +20,9 @@ export default function AccessRequestsPage() {
   } | null>(null)
   const [historyUser, setHistoryUser] = useState<StoredUser | null>(null)
 
-  const reviewedRequests = useMemo(() => getReviewedAccessRequests(), [allUsers])
+  // Depends on the context's user list directly, so an approval refreshes this
+  // without a memo dependency that exists only to trigger a recompute.
+  const reviewedRequests = useMemo(() => getReviewedAccessRequests(allUsers), [allUsers])
 
   const columns: Column<StoredUser>[] = [
     {
@@ -35,7 +37,7 @@ export default function AccessRequestsPage() {
       key: 'associationName',
       header: 'Association',
       hideOnMobile: true,
-      render: (r) => r.associationName ?? '—',
+      render: (r) => r.associationName ?? 'â€”',
     },
     { key: 'position', header: 'Position', hideOnMobile: true },
     {
@@ -140,7 +142,7 @@ export default function AccessRequestsPage() {
         itemTitle={decisionModal?.user.fullName ?? ''}
         itemSubtitle={
           decisionModal?.user.associationName
-            ? `${decisionModal.user.email} · ${decisionModal.user.associationName}`
+            ? `${decisionModal.user.email} Â· ${decisionModal.user.associationName}`
             : decisionModal?.user.email
         }
         currentStatus="PENDING"
@@ -154,7 +156,7 @@ export default function AccessRequestsPage() {
       <Modal
         open={!!historyUser}
         onClose={() => setHistoryUser(null)}
-        title={historyUser ? `Decision Record — ${historyUser.fullName}` : 'Decision Record'}
+        title={historyUser ? `Decision Record â€” ${historyUser.fullName}` : 'Decision Record'}
       >
         {historyUser && (
           <DecisionTimeline

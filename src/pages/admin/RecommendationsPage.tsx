@@ -32,7 +32,9 @@ export default function RecommendationsPage() {
   const actor = useReviewActor()
   const [searchParams, setSearchParams] = useSearchParams()
   const approvedOnly = searchParams.get('status') === 'approved'
-  const [items, setItems] = useState<ReviewableAssistanceItem[]>(() => loadRecommendationItems(approvedOnly))
+  const [items, setItems] = useState<ReviewableAssistanceItem[]>(() =>
+    loadRecommendationItems(approvedOnly),
+  )
   const [expandedId, setExpandedId] = useState<string | null>(null)
   const [detailsItem, setDetailsItem] = useState<ReviewableAssistanceItem | null>(null)
   const [decisionModal, setDecisionModal] = useState<{
@@ -40,10 +42,19 @@ export default function RecommendationsPage() {
     item: ReviewableAssistanceItem
   } | null>(null)
 
-  useEffect(() => {
+  // Switching the filter re-reads the list before paint instead of in an
+  // effect, which would render once holding the previous filter's rows and
+  // again with the new ones.
+  const [previousApprovedOnly, setPreviousApprovedOnly] = useState(approvedOnly)
+  if (previousApprovedOnly !== approvedOnly) {
+    setPreviousApprovedOnly(approvedOnly)
     setItems(loadRecommendationItems(approvedOnly))
-    return subscribeDecisionStorage(() => setItems(loadRecommendationItems(approvedOnly)))
-  }, [approvedOnly])
+  }
+
+  useEffect(
+    () => subscribeDecisionStorage(() => setItems(loadRecommendationItems(approvedOnly))),
+    [approvedOnly],
+  )
 
   function refreshItems() {
     setItems(loadRecommendationItems(approvedOnly))

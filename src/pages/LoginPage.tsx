@@ -1,9 +1,10 @@
-import { useState, type FormEvent } from 'react'
+﻿import { useState, type FormEvent } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { AuthBrandingPanel } from '../components/auth/AuthBrandingPanel'
-import { FormField, LockIcon, MailIcon } from '../components/auth/FormField'
+import { FormField } from '../components/auth/FormField'
+import { LockIcon, MailIcon } from '../components/auth/fieldIcons'
 import { PublicOnlyRoute } from '../components/auth/ProtectedRoute'
-import { useAuth } from '../context/AuthContext'
+import { useAuth } from '../context/useAuth'
 
 function LoginForm() {
   const navigate = useNavigate()
@@ -60,7 +61,7 @@ function LoginForm() {
               icon={LockIcon}
               value={password}
               onChange={(e) => setPassword(e.target.value)}
-              placeholder="••••••••••"
+              placeholder="Enter your password"
               required
             />
 

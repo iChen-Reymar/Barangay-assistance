@@ -74,6 +74,23 @@ create table if not exists public.association_members (
   payload jsonb not null default '{}'::jsonb
 );
 
+-- Association Head: barangay certification and valid ID for each member.
+create table if not exists public.member_documents (
+  id text primary key,
+  member_id text not null references public.association_members (id) on delete cascade,
+  document_kind text not null
+    check (document_kind in ('barangay_certificate', 'government_id')),
+  name text not null,
+  data_url text not null,
+  file_size text not null,
+  uploaded_at text not null,
+  status text not null default 'uploaded'
+    check (status in ('uploaded', 'verified', 'rejected')),
+  verified_by text,
+  verified_at text,
+  unique (member_id, document_kind)
+);
+
 -- Barangay Staff: input, classify, and verify beneficiaries.
 create table if not exists public.beneficiaries (
   id text primary key,
@@ -150,6 +167,7 @@ create table if not exists public.request_documents (
     check (status in ('uploaded', 'verified', 'rejected')),
   verified_by text,
   verified_at text,
+  data_url text,
   payload jsonb not null default '{}'::jsonb
 );
 
@@ -257,14 +275,20 @@ create table if not exists public.aid_records (
   payload jsonb not null default '{}'::jsonb
 );
 
--- Role notifications.
+-- Association Head is notified when staff reject a document.
 create table if not exists public.notifications (
   id text primary key,
   user_id text references public.users (id) on delete set null,
+  association_name text,
   message text not null,
   notice_time text not null,
+  created_at text,
   is_read boolean not null default false,
-  notice_type text not null,
+  notice_type text not null
+    check (notice_type in ('info', 'success', 'warning')),
+  document_name text,
+  member_name text,
+  rejected_by text,
   payload jsonb not null default '{}'::jsonb
 );
 
@@ -306,6 +330,12 @@ alter table public.report_history add column if not exists payload jsonb not nul
 alter table public.aid_records add column if not exists payload jsonb not null default '{}'::jsonb;
 alter table public.notifications add column if not exists payload jsonb not null default '{}'::jsonb;
 alter table public.privacy_settings add column if not exists payload jsonb not null default '{}'::jsonb;
+alter table public.request_documents add column if not exists data_url text;
+alter table public.notifications add column if not exists association_name text;
+alter table public.notifications add column if not exists created_at text;
+alter table public.notifications add column if not exists document_name text;
+alter table public.notifications add column if not exists member_name text;
+alter table public.notifications add column if not exists rejected_by text;
 
 create index if not exists users_email_idx on public.users (lower(email));
 create index if not exists users_role_status_idx on public.users (role, status);
@@ -314,6 +344,8 @@ create index if not exists beneficiaries_association_idx on public.beneficiaries
 create index if not exists assistance_requests_status_idx on public.assistance_requests (status);
 create index if not exists assistance_requests_association_idx on public.assistance_requests (association_name);
 create index if not exists notifications_user_idx on public.notifications (user_id, is_read);
+create index if not exists notifications_association_idx on public.notifications (association_name, is_read);
+create index if not exists member_documents_member_idx on public.member_documents (member_id);
 create index if not exists audit_logs_created_idx on public.audit_logs (created_at);
 
 -- RLS remains enabled. The local API uses SUPABASE_SECRET_KEY for writes.
@@ -323,7 +355,7 @@ declare
   table_name text;
 begin
   foreach table_name in array array[
-    'users', 'associations', 'association_profiles', 'association_members',
+    'users', 'associations', 'association_profiles', 'association_members', 'member_documents',
     'beneficiaries', 'assistance_programs', 'assistance_requests', 'request_documents',
     'qualification_checks', 'request_decisions', 'generated_assistance_list', 'priority_list',
     'audit_logs', 'audit_changes', 'report_history', 'aid_records', 'notifications',

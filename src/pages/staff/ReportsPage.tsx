@@ -1,10 +1,10 @@
-import { useEffect, useState } from 'react'
+﻿import { useEffect, useState } from 'react'
 import { FileText, Download } from 'lucide-react'
 import { DashboardNavbar } from '../../components/layout/DashboardNavbar'
 import { ReportHistoryViewModal } from '../../components/admin/ReportHistoryViewModal'
 import { Button } from '../../components/ui/Button'
 import { staffReports } from '../../data/staffMockData'
-import { useAuth } from '../../context/AuthContext'
+import { useAuth } from '../../context/useAuth'
 import { useStaffDisplayUser } from '../../hooks/useStaffDisplayUser'
 import { logAuditEvent } from '../../services/auditStorage'
 import {

@@ -1,5 +1,5 @@
-import { Navigate, useLocation } from 'react-router-dom'
-import { useAuth } from '../../context/AuthContext'
+﻿import { Navigate, useLocation } from 'react-router-dom'
+import { useAuth } from '../../context/useAuth'
 import { roleToDashboardPath, type UserRole } from '../../types/auth'
 
 interface ProtectedRouteProps {

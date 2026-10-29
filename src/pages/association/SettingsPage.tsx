@@ -1,8 +1,8 @@
-import { useState } from 'react'
+﻿import { useState } from 'react'
 import { DashboardNavbar } from '../../components/layout/DashboardNavbar'
 import { PrivacyNoticePanel } from '../../components/settings/PrivacyNoticePanel'
 import { UserProfileSection } from '../../components/profile/UserProfileSection'
-import { useAuth } from '../../context/AuthContext'
+import { useAuth } from '../../context/useAuth'
 import { useAssociationDisplayUser } from '../../hooks/useAssociationDisplayUser'
 
 const settingsTabs = ['Profile', 'Privacy', 'Security', 'About'] as const

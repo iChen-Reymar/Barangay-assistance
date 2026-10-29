@@ -1,4 +1,5 @@
-import { useEffect, useState, type FormEvent } from 'react'
+﻿import { useState, type FormEvent } from 'react'
+import { useResetWhenOpen } from '../../hooks/useResetWhenOpen'
 import { Modal } from '../ui/Modal'
 import { Button } from '../ui/Button'
 import type { Association, AssociationStatus } from '../../data/mockData'
@@ -18,10 +19,10 @@ export function AssociationSettingsModal({
 }: AssociationSettingsModalProps) {
   const [status, setStatus] = useState<AssociationStatus>('ACTIVE')
 
-  useEffect(() => {
-    if (!open || !association) return
+  useResetWhenOpen(open, association, () => {
+    if (!association) return
     setStatus(association.status)
-  }, [open, association])
+  })
 
   if (!association) return null
 

@@ -1,7 +1,7 @@
 import { Modal } from '../ui/Modal'
 import { Button } from '../ui/Button'
 import { Badge } from '../ui/Badge'
-import type { AssociationMember, VulnerabilityLevel } from '../../data/associationMockData'
+import type { AssociationMember, MemberAttachment, VulnerabilityLevel } from '../../data/associationMockData'
 
 interface MemberViewModalProps {
   open: boolean
@@ -90,6 +90,11 @@ export function MemberViewModal({ open, onClose, member, onEdit }: MemberViewMod
           )}
         </dl>
 
+        <div className="grid gap-3 sm:grid-cols-2">
+          <AttachmentPreview label="Barangay Certification" attachment={selected.barangayCertificate} />
+          <AttachmentPreview label="Valid ID" attachment={selected.governmentId} />
+        </div>
+
         <div className="flex justify-end gap-3">
           <Button type="button" variant="outline" onClick={onClose}>
             Close
@@ -106,5 +111,25 @@ export function MemberViewModal({ open, onClose, member, onEdit }: MemberViewMod
         </div>
       </div>
     </Modal>
+  )
+}
+
+function AttachmentPreview({ label, attachment }: { label: string; attachment?: MemberAttachment }) {
+  return (
+    <div className="rounded-lg border border-gray-100 bg-gray-50 p-3">
+      <p className="text-[10px] font-semibold uppercase text-gray-400">{label}</p>
+      {attachment ? (
+        <>
+          <img
+            src={attachment.dataUrl}
+            alt={label}
+            className="mt-2 max-h-32 w-full rounded-lg border border-gray-200 bg-white object-contain"
+          />
+          <p className="mt-1 text-xs text-gray-500">{attachment.name}</p>
+        </>
+      ) : (
+        <p className="mt-2 text-sm text-gray-500">No image added.</p>
+      )}
+    </div>
   )
 }

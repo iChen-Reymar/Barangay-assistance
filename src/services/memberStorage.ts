@@ -2,6 +2,7 @@ import {
   type AssociationDetails,
   type AssociationMember,
 } from '../data/associationMockData'
+import { notifyDocumentRejected } from './associationNotificationStorage'
 import { ensureAssociationFromUser } from './associationStorage'
 
 const MEMBERS_KEY = 'barangay_association_members'
@@ -55,9 +56,12 @@ const blankAssociationDetails: AssociationDetails = {
 
 export function initializeMemberStorage() {}
 
-export function getAssociationMembers(): AssociationMember[] {
+export function getAssociationMembers(associationName?: string): AssociationMember[] {
   initializeMemberStorage()
-  return readMembers()
+  const members = readMembers()
+  if (!associationName) return members
+  const key = associationName.trim().toLowerCase()
+  return members.filter((row) => (row.associationName ?? '').trim().toLowerCase() === key)
 }
 
 export function getAssociationMemberById(id: string): AssociationMember | null {
@@ -66,6 +70,45 @@ export function getAssociationMemberById(id: string): AssociationMember | null {
 
 export function removeAssociationMember(id: string) {
   writeMembers(readMembers().filter((member) => member.id !== id))
+}
+
+export function verifyMemberAttachment(
+  memberId: string,
+  kind: 'barangayCertificate' | 'governmentId',
+  status: 'verified' | 'rejected',
+  reviewerName: string,
+  associationName?: string,
+  reason?: string,
+) {
+  const members = readMembers()
+  const index = members.findIndex((member) => member.id === memberId)
+  if (index === -1) return null
+  const attachment = members[index][kind]
+  if (!attachment) return null
+  const next = [...members]
+  next[index] = {
+    ...members[index],
+    [kind]: {
+      ...attachment,
+      status,
+      verifiedBy: reviewerName,
+      verifiedAt: new Date().toISOString(),
+      rejectionReason: status === 'rejected' ? reason?.trim() || undefined : undefined,
+    },
+  }
+  writeMembers(next)
+  if (status === 'rejected') {
+    const documentName =
+      kind === 'barangayCertificate' ? 'Barangay Certificate of Residency' : 'Valid Government ID'
+    notifyDocumentRejected({
+      associationName: associationName || members[index].associationName || '',
+      documentName,
+      memberName: members[index].name,
+      rejectedBy: reviewerName,
+      reason,
+    })
+  }
+  return next[index]
 }
 
 export function upsertAssociationMember(member: AssociationMember) {

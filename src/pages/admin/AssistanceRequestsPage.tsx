@@ -31,10 +31,7 @@ export default function AssistanceRequestsPage() {
   } | null>(null)
   const [viewItem, setViewItem] = useState<ReviewableAssistanceItem | null>(null)
 
-  useEffect(() => {
-    setItems(getAssistanceItems())
-    return subscribeDecisionStorage(() => setItems(getAssistanceItems()))
-  }, [])
+  useEffect(() => subscribeDecisionStorage(() => setItems(getAssistanceItems())), [])
 
   const filtered = useMemo(() => {
     if (statusFilter === 'All') return items

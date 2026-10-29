@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+﻿import { useEffect, useMemo, useState } from 'react'
 import { PAGE_SIZE_DEFAULT, usePagination } from '../../hooks/usePagination'
 import { TableActionsCell } from '../../components/ui/TableActionsCell'
 import { Plus, Pencil, Eye } from 'lucide-react'
@@ -12,7 +12,7 @@ import {
 import { BeneficiaryViewModal } from '../../components/admin/BeneficiaryViewModal'
 import { ResponsiveToolbar } from '../../components/layout/ResponsiveToolbar'
 import { ResponsiveTable } from '../../components/ui/ResponsiveTable'
-import { useAuth } from '../../context/AuthContext'
+import { useAuth } from '../../context/useAuth'
 import { buildChanges, logAuditEvent } from '../../services/auditStorage'
 import {
   beneficiaries as initialBeneficiaries,
@@ -24,7 +24,7 @@ import {
 import { getAssociations, subscribeAssociationStorage } from '../../services/associationStorage'
 
 function formatCurrency(amount: number) {
-  return `₱ ${amount.toLocaleString('en-PH', { minimumFractionDigits: 2 })}`
+  return `â‚± ${amount.toLocaleString('en-PH', { minimumFractionDigits: 2 })}`
 }
 
 function formToBeneficiary(input: BeneficiaryFormInput, existing?: Beneficiary): Beneficiary {
@@ -64,10 +64,10 @@ export default function BeneficiariesPage() {
   const [editingBeneficiary, setEditingBeneficiary] = useState<Beneficiary | null>(null)
   const [viewingBeneficiary, setViewingBeneficiary] = useState<Beneficiary | null>(null)
 
-  useEffect(() => {
-    setAssociations(getAssociations())
-    return subscribeAssociationStorage(() => setAssociations(getAssociations()))
-  }, [])
+  useEffect(
+    () => subscribeAssociationStorage(() => setAssociations(getAssociations())),
+    [],
+  )
 
   const filtered = useMemo(() => {
     return items.filter((row) => {
@@ -141,10 +141,10 @@ export default function BeneficiariesPage() {
       entityType: 'beneficiary',
       entityId: created.id,
       changes: buildChanges([
-        { key: 'name', label: 'Name', oldValue: '—', newValue: created.name },
-        { key: 'association', label: 'Association', oldValue: '—', newValue: created.association },
-        { key: 'status', label: 'Status', oldValue: '—', newValue: created.status },
-        { key: 'vulnerability', label: 'Vulnerability', oldValue: '—', newValue: created.vulnerability },
+        { key: 'name', label: 'Name', oldValue: 'â€”', newValue: created.name },
+        { key: 'association', label: 'Association', oldValue: 'â€”', newValue: created.association },
+        { key: 'status', label: 'Status', oldValue: 'â€”', newValue: created.status },
+        { key: 'vulnerability', label: 'Vulnerability', oldValue: 'â€”', newValue: created.vulnerability },
       ]),
     })
   }

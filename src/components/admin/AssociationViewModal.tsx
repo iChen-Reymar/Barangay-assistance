@@ -3,7 +3,7 @@ import { Button } from '../ui/Button'
 import { ActiveBadge, StatusBadge } from './StatusBadge'
 import type { Association } from '../../data/mockData'
 import { getStaffBeneficiaries } from '../../services/staffBeneficiaryStorage'
-import { getAssociationDetails, getAssociationMembers } from '../../services/memberStorage'
+import { getAssociationMembers } from '../../services/memberStorage'
 import { getAssistanceItems } from '../../services/decisionStorage'
 
 interface AssociationViewModalProps {
@@ -31,9 +31,8 @@ export function AssociationViewModal({
   const linkedRequests = getAssistanceItems().filter(
     (row) => row.association.trim().toLowerCase() === associationName,
   )
-  const memberProfile = getAssociationDetails()
-  const linkedMembers =
-    memberProfile.name.trim().toLowerCase() === associationName ? getAssociationMembers() : []
+  // Members belong to a named association - show only the one being viewed.
+  const linkedMembers = getAssociationMembers(selected.name)
 
   return (
     <Modal open={open} onClose={onClose} title="Association Details" size="lg">

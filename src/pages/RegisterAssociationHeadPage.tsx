@@ -1,16 +1,16 @@
-import { useState, type FormEvent } from 'react'
+﻿import { useState, type FormEvent } from 'react'
 import { Link } from 'react-router-dom'
 import { AuthBrandingPanel } from '../components/auth/AuthBrandingPanel'
+import { FormField } from '../components/auth/FormField'
 import {
   BuildingIcon,
-  FormField,
   LockIcon,
   MailIcon,
   PhoneIcon,
   UserIcon,
-} from '../components/auth/FormField'
+} from '../components/auth/fieldIcons'
 import { PublicOnlyRoute } from '../components/auth/ProtectedRoute'
-import { useAuth } from '../context/AuthContext'
+import { useAuth } from '../context/useAuth'
 
 function RegisterAssociationHeadForm() {
   const { submitAssociationHeadRequest } = useAuth()
@@ -65,7 +65,7 @@ function RegisterAssociationHeadForm() {
         <div className="relative flex flex-col justify-center bg-white px-8 py-16 lg:px-12 xl:px-20">
           <div className="mx-auto w-full max-w-lg text-center">
             <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-full bg-green-100 text-2xl text-green-600">
-              ✓
+              âœ“
             </div>
             <h2 className="mb-2 text-2xl font-bold text-gray-900">Registration Submitted</h2>
             <p className="mb-6 text-sm text-gray-600">
@@ -197,7 +197,7 @@ function RegisterAssociationHeadForm() {
                   icon={LockIcon}
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
-                  placeholder="••••••••••"
+                  placeholder="Enter your password"
                   required
                 />
                 <FormField
@@ -207,7 +207,7 @@ function RegisterAssociationHeadForm() {
                   icon={LockIcon}
                   value={confirmPassword}
                   onChange={(e) => setConfirmPassword(e.target.value)}
-                  placeholder="••••••••••"
+                  placeholder="Re-enter your password"
                   required
                 />
               </div>

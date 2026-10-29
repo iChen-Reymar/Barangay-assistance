@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useCallback, useMemo, useState } from 'react'
 
 export const PAGE_SIZE_DEFAULT = 6
 export const PAGE_SIZE_AUDIT = 10
@@ -21,17 +21,32 @@ export function usePagination<T>(
   resetKey = '',
   itemLabel = 'entries',
 ) {
-  const [currentPage, setCurrentPage] = useState(1)
+  const [page, setPage] = useState(1)
+  // Tracks the key the current page was computed against, so a change of key
+  // or page size can restart from page 1 during render instead of in an effect.
+  const [pageContext, setPageContext] = useState({ resetKey, pageSize })
+
   const totalItems = items.length
   const totalPages = Math.max(1, Math.ceil(totalItems / pageSize))
 
-  useEffect(() => {
-    setCurrentPage(1)
-  }, [resetKey, pageSize])
+  if (pageContext.resetKey !== resetKey || pageContext.pageSize !== pageSize) {
+    setPageContext({ resetKey, pageSize })
+    setPage(1)
+  }
 
-  useEffect(() => {
-    setCurrentPage((page) => Math.min(page, totalPages))
-  }, [totalPages])
+  // Clamp at the point of assignment rather than in a follow-up effect: if the
+  // list shrinks, the page can no longer be past the end.
+  const setCurrentPage = useCallback(
+    (value: number | ((previous: number) => number)) => {
+      setPage((previous) => {
+        const next = typeof value === 'function' ? value(previous) : value
+        return Math.max(1, Math.min(next, totalPages))
+      })
+    },
+    [totalPages],
+  )
+
+  const currentPage = Math.min(page, totalPages)
 
   const paginatedItems = useMemo(() => {
     const start = (currentPage - 1) * pageSize

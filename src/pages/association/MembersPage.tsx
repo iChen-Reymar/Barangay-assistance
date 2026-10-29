@@ -9,6 +9,7 @@ import { Button } from '../../components/ui/Button'
 import { Pagination } from '../../components/ui/Pagination'
 import type { AssociationMember, VulnerabilityLevel } from '../../data/associationMockData'
 import {
+  getAssociationDetails,
   getAssociationMembers,
   upsertAssociationMember,
   removeAssociationMember,
@@ -17,6 +18,7 @@ import {
 import { PAGE_SIZE_DEFAULT, usePagination } from '../../hooks/usePagination'
 import { TableActionsCell } from '../../components/ui/TableActionsCell'
 import { useAssociationDisplayUser } from '../../hooks/useAssociationDisplayUser'
+import { useAuth } from '../../context/useAuth'
 
 function vulnerabilityVariant(level: VulnerabilityLevel) {
   if (level === 'HIGH') return 'danger'
@@ -25,11 +27,17 @@ function vulnerabilityVariant(level: VulnerabilityLevel) {
 }
 
 export default function MembersPage() {
+  const { profile } = useAuth()
   const displayUser = useAssociationDisplayUser()
   const displayName = displayUser.name
   const initials = displayUser.initials
 
-  const [items, setItems] = useState<AssociationMember[]>(() => getAssociationMembers())
+  // Scope the roster to the signed-in head's association. Without this every
+  // head in the barangay sees every other association's members.
+  const associationName = profile?.associationName ?? getAssociationDetails().name
+  const [items, setItems] = useState<AssociationMember[]>(() =>
+    getAssociationMembers(associationName),
+  )
   const [membershipFilter, setMembershipFilter] = useState<'All' | 'ACTIVE' | 'INACTIVE'>('All')
   const [vulnerabilityFilter, setVulnerabilityFilter] = useState<'All' | VulnerabilityLevel>('All')
   const [formOpen, setFormOpen] = useState(false)
@@ -37,10 +45,10 @@ export default function MembersPage() {
   const [editingMember, setEditingMember] = useState<AssociationMember | null>(null)
   const [viewingMember, setViewingMember] = useState<AssociationMember | null>(null)
 
-  useEffect(() => {
-    setItems(getAssociationMembers())
-    return subscribeMemberStorage(() => setItems(getAssociationMembers()))
-  }, [])
+  useEffect(
+    () => subscribeMemberStorage(() => setItems(getAssociationMembers(associationName))),
+    [associationName],
+  )
 
   const filtered = useMemo(() => {
     return items.filter((row) => {
@@ -83,6 +91,7 @@ export default function MembersPage() {
     upsertAssociationMember({
       id: crypto.randomUUID(),
       ...input,
+      associationName,
       assistanceStatus: 'NONE',
     })
   }

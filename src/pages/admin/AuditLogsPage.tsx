@@ -32,7 +32,6 @@ export default function AuditLogsPage() {
   const [selectedEntry, setSelectedEntry] = useState<AuditLogEntry | null>(null)
 
   useEffect(() => {
-    setLogs(getAuditLogs())
     const refresh = () => setLogs(getAuditLogs())
     const unsubAudit = subscribeAuditLogs(refresh)
     const unsubPrivacy = subscribePrivacySettings(refresh)

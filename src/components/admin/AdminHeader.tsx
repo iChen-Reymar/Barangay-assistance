@@ -1,5 +1,5 @@
-import { DashboardNavbar } from '../layout/DashboardNavbar'
-import { useAuth } from '../../context/AuthContext'
+﻿import { DashboardNavbar } from '../layout/DashboardNavbar'
+import { useAuth } from '../../context/useAuth'
 import { getInitials } from '../../utils/userDisplay'
 
 interface AdminHeaderProps {

@@ -1,4 +1,4 @@
-import { useState, type FormEvent } from 'react'
+﻿import { useState, type FormEvent } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { DashboardNavbar } from '../../components/layout/DashboardNavbar'
 import { Button } from '../../components/ui/Button'
@@ -6,7 +6,7 @@ import { getAssociations } from '../../services/associationStorage'
 import { useStaffDisplayUser } from '../../hooks/useStaffDisplayUser'
 import { addStaffBeneficiary } from '../../services/staffBeneficiaryStorage'
 import { logAuditEvent } from '../../services/auditStorage'
-import { useAuth } from '../../context/AuthContext'
+import { useAuth } from '../../context/useAuth'
 import type { VulnerabilityLevel } from '../../data/staffMockData'
 
 const vulnerabilityIndicators = [
@@ -133,7 +133,7 @@ export default function AddBeneficiaryPage() {
               <div>
                 <label className="mb-1 block text-xs font-semibold uppercase text-gray-500">Monthly Income</label>
                 <div className="relative">
-                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm text-gray-500">₱</span>
+                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm text-gray-500">â‚±</span>
                   <input name="monthlyIncome" type="number" min="0" step="0.01" required className="w-full rounded-lg border border-gray-200 py-2 pl-8 pr-3 text-sm" placeholder="0.00" />
                 </div>
               </div>

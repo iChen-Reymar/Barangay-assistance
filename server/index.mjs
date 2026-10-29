@@ -131,6 +131,7 @@ async function saveAssociations(rows) {
 
 async function saveMembers(rows) {
   if (!Array.isArray(rows)) return
+  await clear('member_documents')
   await clear('association_members')
   await insert('association_members', rows.map((row) => ({
     id: row.id,
@@ -149,6 +150,24 @@ async function saveMembers(rows) {
     notes: row.notes ?? null,
     payload: row,
   })))
+  await insert('member_documents', rows.flatMap((row) => {
+    const files = [
+      ['barangay_certificate', row.barangayCertificate],
+      ['government_id', row.governmentId],
+    ]
+    return files.flatMap(([kind, file]) => (file ? [{
+      id: `${row.id}:${kind}`,
+      member_id: row.id,
+      document_kind: kind,
+      name: file.name,
+      data_url: file.dataUrl,
+      file_size: file.fileSize,
+      uploaded_at: file.uploadedAt,
+      status: file.status ?? 'uploaded',
+      verified_by: file.verifiedBy ?? null,
+      verified_at: file.verifiedAt ?? null,
+    }] : []))
+  }))
 }
 
 async function saveBeneficiaries(rows) {
@@ -184,6 +203,32 @@ async function savePrograms(rows) {
     date_created: row.dateCreated,
     payload: row,
   })))
+}
+
+async function saveNotifications(rows) {
+  if (!Array.isArray(rows)) return
+  await clear('notifications')
+  const mapped = rows.map((row) => ({
+    id: row.id,
+    user_id: row.recipientUserId ?? null,
+    association_name: row.associationName ?? null,
+    message: row.message,
+    notice_time: row.time,
+    created_at: row.createdAt ?? null,
+    is_read: Boolean(row.read),
+    notice_type: row.type ?? 'info',
+    document_name: row.documentName ?? null,
+    member_name: row.memberName ?? null,
+    rejected_by: row.rejectedBy ?? null,
+    payload: row,
+  }))
+  try {
+    await insert('notifications', mapped)
+  } catch (error) {
+    const message = String(error?.message ?? error)
+    if (!/notice_type|check constraint/i.test(message)) throw error
+    await insert('notifications', mapped.map((row) => ({ ...row, notice_type: 'info' })))
+  }
 }
 
 async function saveRequests(rows) {
@@ -231,6 +276,7 @@ async function saveRequests(rows) {
     status: doc.status,
     verified_by: doc.verifiedBy ?? null,
     verified_at: doc.verifiedAt ?? null,
+    data_url: doc.dataUrl ?? null,
   }))))
   await insert('qualification_checks', rows.flatMap((row) => (row.qualifications ?? []).map((check) => ({
     id: check.id,
@@ -373,6 +419,7 @@ const savers = {
   barangay_users: saveUsers,
   barangay_associations: saveAssociations,
   barangay_association_members: saveMembers,
+  barangay_association_notifications: saveNotifications,
   barangay_staff_beneficiaries: saveBeneficiaries,
   barangay_assistance_programs: savePrograms,
   barangay_reviewable_items: saveRequests,
@@ -388,6 +435,25 @@ function yes(value) {
   return value === 1 || value === true
 }
 
+function attachmentsFor(memberId, documents) {
+  const files = documents.filter((row) => row.member_id === memberId)
+  const certificate = files.find((row) => row.document_kind === 'barangay_certificate')
+  const governmentId = files.find((row) => row.document_kind === 'government_id')
+  const asAttachment = (row) => row ? {
+    name: row.name,
+    dataUrl: row.data_url,
+    fileSize: row.file_size,
+    uploadedAt: row.uploaded_at,
+    status: row.status,
+    verifiedBy: row.verified_by ?? undefined,
+    verifiedAt: row.verified_at ?? undefined,
+  } : undefined
+  return {
+    barangayCertificate: asAttachment(certificate),
+    governmentId: asAttachment(governmentId),
+  }
+}
+
 function storedRecords(rows) {
   if (!Array.isArray(rows) || rows.length === 0) return null
   const records = rows
@@ -400,6 +466,8 @@ async function loadStores() {
   const users = await rowsOf('users')
   const associations = await rowsOf('associations')
   const members = await rowsOf('association_members')
+  const memberDocuments = await rowsOf('member_documents')
+  const notifications = await rowsOf('notifications')
   const beneficiaries = await rowsOf('beneficiaries')
   const programs = await rowsOf('assistance_programs')
   const requests = await rowsOf('assistance_requests')
@@ -463,6 +531,25 @@ async function loadStores() {
       dateJoined: row.date_joined, familySize: row.family_size, isPwd: yes(row.is_pwd), isSenior: yes(row.is_senior),
       membershipStatus: row.membership_status, vulnerability: row.vulnerability,
       assistanceStatus: row.assistance_status, notes: row.notes ?? undefined,
+      ...attachmentsFor(row.id, memberDocuments),
+    })))
+  }
+  if (notifications.length > 0) {
+    const stored = storedRecords(notifications)
+    if (stored) push('barangay_association_notifications', stored)
+    else push('barangay_association_notifications', notifications.map((row) => ({
+      id: row.id,
+      associationName: row.association_name ?? '',
+      recipientUserId: row.user_id ?? undefined,
+      message: row.message,
+      time: row.notice_time,
+      createdAt: row.created_at ?? row.notice_time,
+      read: yes(row.is_read),
+      type: row.notice_type ?? 'info',
+      documentName: row.document_name ?? undefined,
+      memberName: row.member_name ?? undefined,
+      rejectedBy: row.rejected_by ?? undefined,
+      reason: row.payload?.reason ?? undefined,
     })))
   }
   if (beneficiaries.length > 0) {
@@ -502,6 +589,7 @@ async function loadStores() {
       documents: documents.filter((doc) => doc.request_id === row.id).map((doc) => ({
         id: doc.id, name: doc.name, type: doc.file_type, uploadedAt: doc.uploaded_at, fileSize: doc.file_size,
         status: doc.status, verifiedBy: doc.verified_by ?? undefined, verifiedAt: doc.verified_at ?? undefined,
+        dataUrl: doc.data_url ?? undefined,
       })),
       qualifications: checks.filter((check) => check.request_id === row.id).map((check) => ({
         id: check.id, criterion: check.criterion, description: check.description, status: check.status,
@@ -688,8 +776,58 @@ app.delete('/api/store/:key', async (req, res) => {
   }
 })
 
+// -- ML proxy ------------------------------------------------------------
+//
+// The machine learning module is a separate Python service (see ml-service/),
+// matching the three-tier design: the browser talks only to this application
+// layer, and this layer reaches the ML service and the database. Proxying here
+// rather than calling Python from the browser keeps a single origin, so there
+// is no CORS configuration in production and the client never needs to know
+// where the models are hosted.
+//
+// When Python is down the proxy answers 503 and the client falls back to local
+// rule-based scoring. That failure is reported, never raised.
+
+const mlPort = Number(process.env.ML_PORT || 5050)
+const mlUrl = process.env.ML_URL || `http://127.0.0.1:${mlPort}`
+const ML_TIMEOUT_MS = Number(process.env.ML_TIMEOUT_MS || 20000)
+
+async function callMl(path, body) {
+  const response = await fetch(`${mlUrl}${path}`, {
+    method: body === undefined ? 'GET' : 'POST',
+    headers: body === undefined ? {} : { 'Content-Type': 'application/json' },
+    body: body === undefined ? undefined : JSON.stringify(body),
+    signal: AbortSignal.timeout(ML_TIMEOUT_MS),
+  })
+  const text = await response.text()
+  let payload
+  try {
+    payload = text ? JSON.parse(text) : {}
+  } catch {
+    payload = { ok: false, error: 'ML service returned a malformed response.' }
+  }
+  return { status: response.status, payload }
+}
+
+// The client builds `${ML_BASE}/api/...`, so with the default ML_BASE=/api/ml it
+// requests /api/ml/api/score. Mounting strips that prefix and forwards what is
+// left, so Python sees /api/score. Forwarding the suffix rather than declaring a
+// handful of fixed routes is what keeps VITE_ML_URL pointing straight at the
+// service behaving exactly the same way - both ends of ML_BASE agree on paths.
+app.use('/api/ml', async (req, res) => {
+  const suffix = req.originalUrl.slice('/api/ml'.length) || '/'
+  const isBodyless = req.method === 'GET' || req.method === 'HEAD'
+  try {
+    const { status, payload } = await callMl(suffix, isBodyless ? undefined : (req.body ?? {}))
+    res.status(status).json(payload)
+  } catch (error) {
+    res.status(503).json({ ok: false, error: 'ML service is not running.', detail: error.message })
+  }
+})
+
 app.listen(apiPort, () => {
   console.log(`API listening on http://localhost:${apiPort}`)
+  console.log(`ML service expected at ${mlUrl} (proxied under /api/ml)`)
 })
 
 connectSupabase()

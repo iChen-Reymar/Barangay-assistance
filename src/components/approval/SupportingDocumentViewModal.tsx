@@ -46,9 +46,15 @@ export function SupportingDocumentViewModal({
           </div>
         </div>
 
-        {preview.kind === 'image' ? (
+        {preview.kind === 'image' && doc.dataUrl ? (
+          <img
+            src={doc.dataUrl}
+            alt={doc.name}
+            className="max-h-80 w-full rounded-lg border border-gray-200 bg-gray-50 object-contain"
+          />
+        ) : preview.kind === 'image' ? (
           <div className="flex aspect-video items-center justify-center rounded-lg border border-dashed border-gray-300 bg-gray-100 text-sm text-gray-500">
-            Image preview (demo) — {doc.name}
+            Image preview — {doc.name}
           </div>
         ) : null}
 

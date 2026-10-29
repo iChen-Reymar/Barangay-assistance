@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+﻿import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { CheckCircle } from 'lucide-react'
 import { DashboardNavbar } from '../../components/layout/DashboardNavbar'
@@ -7,7 +7,7 @@ import { getActivePrograms, subscribeProgramStorage } from '../../services/progr
 import { submitAssociationAssistanceRequest } from '../../services/decisionStorage'
 import { getAssociationDetails } from '../../services/memberStorage'
 import type { AssistanceProgram } from '../../data/programsMockData'
-import { useAuth } from '../../context/AuthContext'
+import { useAuth } from '../../context/useAuth'
 import { buildChanges, logAuditEvent } from '../../services/auditStorage'
 import { useAssociationDisplayUser } from '../../hooks/useAssociationDisplayUser'
 
@@ -20,10 +20,7 @@ export default function AssistanceRequestPage() {
   const [submitted, setSubmitted] = useState(false)
   const [program, setProgram] = useState('')
 
-  useEffect(() => {
-    setPrograms(getActivePrograms())
-    return subscribeProgramStorage(() => setPrograms(getActivePrograms()))
-  }, [])
+  useEffect(() => subscribeProgramStorage(() => setPrograms(getActivePrograms())), [])
   const [memberCount, setMemberCount] = useState('')
   const [purpose, setPurpose] = useState('')
   const [requestedAssistance, setRequestedAssistance] = useState('')
@@ -51,8 +48,8 @@ export default function AssistanceRequestPage() {
       entityType: 'assistance_request',
       entityId: submittedRequest.id,
       changes: buildChanges([
-        { key: 'status', label: 'Status', oldValue: '—', newValue: 'PENDING' },
-        { key: 'program', label: 'Program', oldValue: '—', newValue: program },
+        { key: 'status', label: 'Status', oldValue: 'â€”', newValue: 'PENDING' },
+        { key: 'program', label: 'Program', oldValue: 'â€”', newValue: program },
       ]),
     })
     setSubmitted(true)

@@ -1,8 +1,8 @@
-import { useState } from 'react'
+﻿import { useState } from 'react'
 import { AdminHeader } from '../../components/admin/AdminHeader'
 import { PrivacyControlsPanel } from '../../components/admin/PrivacyControlsPanel'
 import { UserProfileSection } from '../../components/profile/UserProfileSection'
-import { useAuth } from '../../context/AuthContext'
+import { useAuth } from '../../context/useAuth'
 import { formatDate } from '../../services/authStorage'
 
 const settingsTabs = [

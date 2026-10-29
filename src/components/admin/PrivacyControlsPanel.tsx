@@ -1,7 +1,7 @@
-import { useEffect, useState } from 'react'
+﻿import { useEffect, useState } from 'react'
 import { Trash2, UserX } from 'lucide-react'
 import { Button } from '../ui/Button'
-import { useAuth } from '../../context/AuthContext'
+import { useAuth } from '../../context/useAuth'
 import { buildChanges, logAuditEvent } from '../../services/auditStorage'
 import { formatDate } from '../../services/authStorage'
 import {
@@ -55,9 +55,9 @@ export function PrivacyControlsPanel() {
     savePrivacySettings(settings)
     setMessage('Privacy and retention settings saved.')
     auditPrivacyAction('Updated privacy and data retention controls.', buildChanges([
-      { key: 'maskIp', label: 'Mask IP in Audit Logs', oldValue: '—', newValue: settings.maskIpInAuditLogs ? 'Enabled' : 'Disabled' },
-      { key: 'retention', label: 'Audit Log Retention', oldValue: '—', newValue: `${settings.auditLogRetentionDays} days` },
-      { key: 'autoPurge', label: 'Auto Purge', oldValue: '—', newValue: settings.autoPurgeEnabled ? 'Enabled' : 'Disabled' },
+      { key: 'maskIp', label: 'Mask IP in Audit Logs', oldValue: 'â€”', newValue: settings.maskIpInAuditLogs ? 'Enabled' : 'Disabled' },
+      { key: 'retention', label: 'Audit Log Retention', oldValue: 'â€”', newValue: `${settings.auditLogRetentionDays} days` },
+      { key: 'autoPurge', label: 'Auto Purge', oldValue: 'â€”', newValue: settings.autoPurgeEnabled ? 'Enabled' : 'Disabled' },
     ]))
   }
 
@@ -68,9 +68,9 @@ export function PrivacyControlsPanel() {
       `Anonymization complete: ${result.rejectedUsersAnonymized} access request(s), ${result.assistanceRecordsAnonymized} assistance record(s), ${result.auditLogsAnonymized} audit log(s) updated.`,
     )
     auditPrivacyAction('Executed data anonymization run.', buildChanges([
-      { key: 'users', label: 'Rejected Users', oldValue: '—', newValue: result.rejectedUsersAnonymized },
-      { key: 'assistance', label: 'Assistance Records', oldValue: '—', newValue: result.assistanceRecordsAnonymized },
-      { key: 'audit', label: 'Audit Logs', oldValue: '—', newValue: result.auditLogsAnonymized },
+      { key: 'users', label: 'Rejected Users', oldValue: 'â€”', newValue: result.rejectedUsersAnonymized },
+      { key: 'assistance', label: 'Assistance Records', oldValue: 'â€”', newValue: result.assistanceRecordsAnonymized },
+      { key: 'audit', label: 'Audit Logs', oldValue: 'â€”', newValue: result.auditLogsAnonymized },
     ]))
   }
 
@@ -81,8 +81,8 @@ export function PrivacyControlsPanel() {
       `Retention purge complete: ${result.auditLogsRemoved} audit log(s) and ${result.accessRecordsRemoved} expired record(s) removed.`,
     )
     auditPrivacyAction('Executed retention purge run.', buildChanges([
-      { key: 'auditRemoved', label: 'Audit Logs Removed', oldValue: '—', newValue: result.auditLogsRemoved },
-      { key: 'recordsRemoved', label: 'Records Removed', oldValue: '—', newValue: result.accessRecordsRemoved },
+      { key: 'auditRemoved', label: 'Audit Logs Removed', oldValue: 'â€”', newValue: result.auditLogsRemoved },
+      { key: 'recordsRemoved', label: 'Records Removed', oldValue: 'â€”', newValue: result.accessRecordsRemoved },
     ]))
   }
 
@@ -164,9 +164,9 @@ export function PrivacyControlsPanel() {
               }
               className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
             >
-              <option value="none">None — no automatic anonymization</option>
-              <option value="partial">Partial — mask identifiers, keep operational metadata</option>
-              <option value="full">Full — maximum redaction for expired records</option>
+              <option value="none">None â€” no automatic anonymization</option>
+              <option value="partial">Partial â€” mask identifiers, keep operational metadata</option>
+              <option value="full">Full â€” maximum redaction for expired records</option>
             </select>
           </div>
         </div>
@@ -229,7 +229,7 @@ export function PrivacyControlsPanel() {
         <dl className="grid gap-3 text-sm sm:grid-cols-2">
           <div>
             <dt className="text-[10px] font-semibold uppercase text-gray-400">Sample Email</dt>
-            <dd className="mt-0.5 font-mono text-gray-900">{summary.maskedAuditPreview.userEmail ?? '—'}</dd>
+            <dd className="mt-0.5 font-mono text-gray-900">{summary.maskedAuditPreview.userEmail ?? 'â€”'}</dd>
           </div>
           <div>
             <dt className="text-[10px] font-semibold uppercase text-gray-400">Sample IP Address</dt>

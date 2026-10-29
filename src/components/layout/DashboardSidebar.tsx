@@ -1,9 +1,9 @@
-import type { LucideIcon } from 'lucide-react'
+﻿import type { LucideIcon } from 'lucide-react'
 import { LogOut, X } from 'lucide-react'
 import { NavLink, useNavigate } from 'react-router-dom'
 import { BarangayLogo } from '../BarangayLogo'
-import { useAuth } from '../../context/AuthContext'
-import { useDashboardLayout } from './DashboardLayoutContext'
+import { useAuth } from '../../context/useAuth'
+import { useDashboardLayout } from './useDashboardLayout'
 
 export interface NavItem {
   to: string

@@ -11,6 +11,17 @@ export type RequestTimelineStep =
   | 'Approved'
   | 'Rejected'
 
+export interface MemberAttachment {
+  name: string
+  dataUrl: string
+  fileSize: string
+  uploadedAt: string
+  status: 'uploaded' | 'verified' | 'rejected'
+  verifiedBy?: string
+  verifiedAt?: string
+  rejectionReason?: string
+}
+
 export interface AssociationMember {
   id: string
   name: string
@@ -25,6 +36,10 @@ export interface AssociationMember {
   vulnerability: VulnerabilityLevel
   assistanceStatus: AssistanceStatus
   notes?: string
+  /** Owning association. Scopes the roster so each head only sees their own. */
+  associationName?: string
+  barangayCertificate?: MemberAttachment
+  governmentId?: MemberAttachment
 }
 
 export interface AssociationDetails {

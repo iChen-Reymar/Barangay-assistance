@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+﻿import { useEffect, useMemo, useState } from 'react'
 import { Building2, Users, UserCheck, Clock, Plus, Pencil, Settings, Eye } from 'lucide-react'
 import { AdminHeader } from '../../components/admin/AdminHeader'
 import { StatCard } from '../../components/ui/StatCard'
@@ -8,7 +8,7 @@ import { AssociationFormModal, type AssociationFormInput } from '../../component
 import { AssociationSettingsModal } from '../../components/admin/AssociationSettingsModal'
 import { AssociationViewModal } from '../../components/admin/AssociationViewModal'
 import { SearchBar } from '../../components/ui/SearchBar'
-import { useAuth } from '../../context/AuthContext'
+import { useAuth } from '../../context/useAuth'
 import { assignAssociationHead, releaseAssociationHead } from '../../services/authStorage'
 import { buildChanges, logAuditEvent } from '../../services/auditStorage'
 import {
@@ -48,10 +48,7 @@ export default function AssociationsPage() {
   const [viewOpen, setViewOpen] = useState(false)
   const [viewingAssociation, setViewingAssociation] = useState<Association | null>(null)
 
-  useEffect(() => {
-    setItems(getAssociations())
-    return subscribeAssociationStorage(() => setItems(getAssociations()))
-  }, [])
+  useEffect(() => subscribeAssociationStorage(() => setItems(getAssociations())), [])
 
   const filtered = useMemo(() => {
     const term = query.trim().toLowerCase()
@@ -165,11 +162,11 @@ export default function AssociationsPage() {
       entityType: 'association',
       entityId: newAssociation.id,
       changes: buildChanges([
-        { key: 'name', label: 'Association Name', oldValue: '—', newValue: input.name },
-        { key: 'type', label: 'Type', oldValue: '—', newValue: input.type },
-        { key: 'members', label: 'Total Members', oldValue: '—', newValue: input.members },
-        { key: 'status', label: 'Status', oldValue: '—', newValue: 'ACTIVE' },
-        { key: 'contactPerson', label: 'Association Head', oldValue: '—', newValue: input.contactPerson },
+        { key: 'name', label: 'Association Name', oldValue: 'â€”', newValue: input.name },
+        { key: 'type', label: 'Type', oldValue: 'â€”', newValue: input.type },
+        { key: 'members', label: 'Total Members', oldValue: 'â€”', newValue: input.members },
+        { key: 'status', label: 'Status', oldValue: 'â€”', newValue: 'ACTIVE' },
+        { key: 'contactPerson', label: 'Association Head', oldValue: 'â€”', newValue: input.contactPerson },
       ]),
     })
     assignHead(headUserId, input.name, input.type)

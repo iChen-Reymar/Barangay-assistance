@@ -1,6 +1,6 @@
-import DashboardLayout from '../components/layout/DashboardLayout'
+﻿import DashboardLayout from '../components/layout/DashboardLayout'
 import { staffNavItems } from '../components/staff/navConfig'
-import { useAuth } from '../context/AuthContext'
+import { useAuth } from '../context/useAuth'
 import { getInitials } from '../utils/userDisplay'
 
 export default function StaffLayout() {

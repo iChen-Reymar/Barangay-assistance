@@ -1,5 +1,5 @@
-import DashboardLayout from '../components/layout/DashboardLayout'
-import { useAuth } from '../context/AuthContext'
+﻿import DashboardLayout from '../components/layout/DashboardLayout'
+import { useAuth } from '../context/useAuth'
 import { navItems } from '../components/admin/navConfig'
 import { getInitials } from '../utils/userDisplay'
 

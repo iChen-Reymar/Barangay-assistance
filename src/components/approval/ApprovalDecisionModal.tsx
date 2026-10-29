@@ -1,4 +1,5 @@
-import { useEffect, useState, type FormEvent } from 'react'
+﻿import { useState, type FormEvent } from 'react'
+import { useResetWhenOpen } from '../../hooks/useResetWhenOpen'
 import { Modal } from '../ui/Modal'
 import { Button } from '../ui/Button'
 import type { DecisionType } from '../../types/approval'
@@ -44,12 +45,11 @@ export function ApprovalDecisionModal({
   const [overrideStatus, setOverrideStatus] = useState<RequestStatus>('APPROVED')
   const [error, setError] = useState('')
 
-  useEffect(() => {
-    if (!open) return
+  useResetWhenOpen(open, decisionType, () => {
     setNotes('')
     setOverrideStatus('APPROVED')
     setError('')
-  }, [open, decisionType])
+  })
 
   const notesRequired = decisionType === 'reject' || decisionType === 'override'
 
@@ -67,7 +67,7 @@ export function ApprovalDecisionModal({
     <Modal
       open={open}
       onClose={onClose}
-      title={`${decisionLabels[decisionType]} — ${itemTitle}`}
+      title={`${decisionLabels[decisionType]} â€” ${itemTitle}`}
       size="lg"
     >
       <form onSubmit={handleSubmit} className="space-y-4">

@@ -1,10 +1,10 @@
-import { useState } from 'react'
+﻿import { useState } from 'react'
 import { Badge } from '../ui/Badge'
 import { Button } from '../ui/Button'
 import { UserProfileDetails } from './UserProfileDetails'
 import { EditProfileModal } from './EditProfileModal'
 import { ChangePasswordModal } from './ChangePasswordModal'
-import { useAuth } from '../../context/AuthContext'
+import { useAuth } from '../../context/useAuth'
 import type { StoredUser } from '../../types/auth'
 import { getInitials, usernameFromEmail } from '../../utils/userDisplay'
 

@@ -1,10 +1,10 @@
-import { useState } from 'react'
+﻿import { useState } from 'react'
 import { Plus } from 'lucide-react'
 import { AdminHeader } from '../../components/admin/AdminHeader'
 import { Badge } from '../../components/ui/Badge'
 import { Button } from '../../components/ui/Button'
 import { Modal } from '../../components/ui/Modal'
-import { useAuth } from '../../context/AuthContext'
+import { useAuth } from '../../context/useAuth'
 import { buildChanges, logAuditEvent } from '../../services/auditStorage'
 import {
   createManagedUser,
@@ -84,8 +84,8 @@ export default function UsersPage() {
     }
     refreshUsers()
     audit(`Added user ${form.firstName.trim()} ${form.lastName.trim()}.`, buildChanges([
-      { key: 'email', label: 'Email', oldValue: '—', newValue: form.email.trim() },
-      { key: 'role', label: 'Role', oldValue: '—', newValue: roleOptions.find((option) => option.value === form.role)?.label ?? form.role },
+      { key: 'email', label: 'Email', oldValue: 'â€”', newValue: form.email.trim() },
+      { key: 'role', label: 'Role', oldValue: 'â€”', newValue: roleOptions.find((option) => option.value === form.role)?.label ?? form.role },
     ]))
     setMessage(`${form.firstName.trim()} ${form.lastName.trim()} can now sign in.`)
     setFormOpen(false)

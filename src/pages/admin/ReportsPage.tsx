@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+﻿import { useEffect, useState } from 'react'
 import {
   Users,
   Shield,
@@ -20,7 +20,7 @@ import {
 import { PAGE_SIZE_DEFAULT, usePagination } from '../../hooks/usePagination'
 import { reportTemplates } from '../../data/mockData'
 import type { ReportFormat, ReportHistoryEntry, ReportTemplate } from '../../data/mockData'
-import { useAuth } from '../../context/AuthContext'
+import { useAuth } from '../../context/useAuth'
 import { logAuditEvent } from '../../services/auditStorage'
 import {
   buildReportPreview,

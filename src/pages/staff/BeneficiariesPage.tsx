@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+﻿import { useEffect, useState } from 'react'
 import { Plus, Eye, Pencil } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import { DashboardNavbar } from '../../components/layout/DashboardNavbar'
@@ -15,7 +15,7 @@ import { Pagination } from '../../components/ui/Pagination'
 import { PAGE_SIZE_DEFAULT, usePagination } from '../../hooks/usePagination'
 import { TableActionsCell } from '../../components/ui/TableActionsCell'
 import { useStaffDisplayUser } from '../../hooks/useStaffDisplayUser'
-import { useAuth } from '../../context/AuthContext'
+import { useAuth } from '../../context/useAuth'
 import { buildChanges, logAuditEvent } from '../../services/auditStorage'
 import type { StaffBeneficiary, VulnerabilityLevel, VerificationStatus } from '../../data/staffMockData'
 import {
@@ -37,7 +37,7 @@ function verificationVariant(status: VerificationStatus) {
 }
 
 function formatCurrency(amount: number) {
-  return `₱ ${amount.toLocaleString('en-PH', { minimumFractionDigits: 2 })}`
+  return `â‚± ${amount.toLocaleString('en-PH', { minimumFractionDigits: 2 })}`
 }
 
 function formToBeneficiary(input: StaffBeneficiaryFormInput, existing: StaffBeneficiary): StaffBeneficiary {

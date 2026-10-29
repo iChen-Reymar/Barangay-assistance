@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+﻿import { useEffect, useMemo, useState } from 'react'
 import { Package, CheckCircle, Wallet, CalendarClock, Plus, Pencil, Settings } from 'lucide-react'
 import { AdminHeader } from '../../components/admin/AdminHeader'
 import { StatCard } from '../../components/ui/StatCard'
@@ -8,7 +8,7 @@ import { ProgramFormModal, type ProgramFormInput } from '../../components/admin/
 import { ProgramSettingsModal } from '../../components/admin/ProgramSettingsModal'
 import { ResponsiveToolbar } from '../../components/layout/ResponsiveToolbar'
 import { ResponsiveTable } from '../../components/ui/ResponsiveTable'
-import { useAuth } from '../../context/AuthContext'
+import { useAuth } from '../../context/useAuth'
 import { buildChanges, logAuditEvent } from '../../services/auditStorage'
 import {
   getPrograms,
@@ -30,8 +30,8 @@ function formatDate(date: Date) {
 }
 
 function formatCurrency(amount?: number) {
-  if (amount === undefined) return '—'
-  return `₱ ${amount.toLocaleString('en-PH', { minimumFractionDigits: 2 })}`
+  if (amount === undefined) return 'â€”'
+  return `â‚± ${amount.toLocaleString('en-PH', { minimumFractionDigits: 2 })}`
 }
 
 function isClosingSoon(program: AssistanceProgram) {
@@ -55,10 +55,7 @@ export default function ProgramsPage() {
   const [editingProgram, setEditingProgram] = useState<AssistanceProgram | null>(null)
   const [settingsProgram, setSettingsProgram] = useState<AssistanceProgram | null>(null)
 
-  useEffect(() => {
-    setItems(getPrograms())
-    return subscribeProgramStorage(() => setItems(getPrograms()))
-  }, [])
+  useEffect(() => subscribeProgramStorage(() => setItems(getPrograms())), [])
 
   const filtered = useMemo(() => {
     return items.filter((row) => {
@@ -152,9 +149,9 @@ export default function ProgramsPage() {
       entityType: 'assistance_program',
       entityId: newProgram.id,
       changes: buildChanges([
-        { key: 'name', label: 'Program Name', oldValue: '—', newValue: input.name },
-        { key: 'category', label: 'Category', oldValue: '—', newValue: input.category },
-        { key: 'status', label: 'Status', oldValue: '—', newValue: 'ACTIVE' },
+        { key: 'name', label: 'Program Name', oldValue: 'â€”', newValue: input.name },
+        { key: 'category', label: 'Category', oldValue: 'â€”', newValue: input.category },
+        { key: 'status', label: 'Status', oldValue: 'â€”', newValue: 'ACTIVE' },
       ]),
     })
   }
@@ -265,7 +262,7 @@ export default function ProgramsPage() {
                 key: 'maxBeneficiaries',
                 header: 'Max Beneficiaries',
                 mobileLabel: 'Capacity',
-                render: (row) => row.maxBeneficiaries ?? '—',
+                render: (row) => row.maxBeneficiaries ?? 'â€”',
               },
               {
                 key: 'period',
@@ -274,7 +271,7 @@ export default function ProgramsPage() {
                 render: (row) => (
                   <span className="text-gray-600">
                     {row.startDate}
-                    {row.endDate ? ` – ${row.endDate}` : ''}
+                    {row.endDate ? ` â€“ ${row.endDate}` : ''}
                   </span>
                 ),
               },

@@ -1,9 +1,14 @@
-import { useEffect, useRef, useState } from 'react'
+﻿import { useEffect, useRef, useState } from 'react'
 import { Bell, ChevronDown, LogOut, Menu, Settings } from 'lucide-react'
 import { Link, useNavigate } from 'react-router-dom'
 import { SearchBar } from '../ui/SearchBar'
-import { useAuth } from '../../context/AuthContext'
-import { useDashboardLayout } from './DashboardLayoutContext'
+import { useAuth } from '../../context/useAuth'
+import {
+  countUnreadAssociationNotifications,
+  resolveAssociationViewer,
+  subscribeAssociationNotifications,
+} from '../../services/associationNotificationStorage'
+import { useDashboardLayout } from './useDashboardLayout'
 
 interface DashboardNavbarProps {
   title: string
@@ -23,10 +28,29 @@ export function DashboardNavbar({
   notificationCount = 0,
 }: DashboardNavbarProps) {
   const { toggleSidebar, settingsPath } = useDashboardLayout()
-  const { logout } = useAuth()
+  const { logout, profile, user } = useAuth()
+  const tracksAssociationNotifications = notificationsPath === '/association/notifications'
+  const viewer = tracksAssociationNotifications
+    ? resolveAssociationViewer({
+        id: profile?.id ?? user?.id,
+        associationName: profile?.associationName,
+      })
+    : { userId: undefined, associationName: '' }
+  const [unreadNotifications, setUnreadNotifications] = useState(0)
   const navigate = useNavigate()
   const [accountOpen, setAccountOpen] = useState(false)
   const accountRef = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    if (!tracksAssociationNotifications || (!viewer.associationName && !viewer.userId)) {
+      setUnreadNotifications(0)
+      return
+    }
+    const refresh = () =>
+      setUnreadNotifications(countUnreadAssociationNotifications(viewer.associationName, viewer.userId))
+    refresh()
+    return subscribeAssociationNotifications(refresh)
+  }, [tracksAssociationNotifications, viewer.associationName, viewer.userId])
 
   useEffect(() => {
     if (!accountOpen) return
@@ -73,9 +97,11 @@ export function DashboardNavbar({
               aria-label="Notifications"
             >
               <Bell className="h-5 w-5" />
-              {notificationCount > 0 && (
+              {(notificationCount || unreadNotifications) > 0 && (
                 <span className="absolute right-1.5 top-1.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-red-500 px-1 text-[10px] font-bold text-white">
-                  {notificationCount > 9 ? '9+' : notificationCount}
+                  {(notificationCount || unreadNotifications) > 9
+                    ? '9+'
+                    : notificationCount || unreadNotifications}
                 </span>
               )}
             </Link>
