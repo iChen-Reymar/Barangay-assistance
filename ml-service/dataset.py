@@ -199,8 +199,18 @@ def label_for(need: float) -> str:
     return "LOW"
 
 
-def build_dataset(n_samples: int = 2400, seed: int = 42) -> list[dict]:
-    """Return n labelled records with hidden keys stripped.
+def build_dataset(
+    n_samples: int = 2400,
+    seed: int = 42,
+    extra_households: list[dict] | None = None,
+) -> list[dict]:
+    """Return n labelled records plus any extra household rows, keys stripped.
+
+    `extra_households` lets real roster rows (see real_data.py) join the pool.
+    They are appended *before* the percentile cut so the class boundaries are
+    computed over the combined distribution - labelling them separately with
+    fixed constants would put the real rows on a different scale to the
+    synthetic ones and quietly bias the evaluation.
 
     Class boundaries are taken from the 60th/27th percentiles of the sampled
     need distribution rather than fixed constants, so the three classes stay
@@ -210,6 +220,7 @@ def build_dataset(n_samples: int = 2400, seed: int = 42) -> list[dict]:
     """
     rng = random.Random(seed)
     households = [sample_household(rng) for _ in range(n_samples)]
+    households.extend(extra_households or [])
     needs = [latent_need(household, rng) for household in households]
     ordered = sorted(needs)
     high_cut = ordered[int(0.60 * (len(ordered) - 1))]
