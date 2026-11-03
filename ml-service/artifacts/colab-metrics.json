@@ -1,0 +1,54 @@
+{
+  "metrics": {
+    "decisionTree": {
+      "accuracy": 0.7856,
+      "precisionMacro": 0.8084,
+      "recallMacro": 0.7898,
+      "f1Macro": 0.7916
+    },
+    "logisticRegression": {
+      "accuracy": 0.8443,
+      "precisionMacro": 0.8458,
+      "recallMacro": 0.8458,
+      "f1Macro": 0.8452
+    },
+    "blended": {
+      "accuracy": 0.8502,
+      "precisionMacro": 0.8519,
+      "recallMacro": 0.8529,
+      "f1Macro": 0.8516,
+      "cvFolds": 5,
+      "cvMean": 0.8436,
+      "cvStd": 0.0083
+    }
+  },
+  "summary": {
+    "samples": 8040,
+    "nSynthetic": 8000,
+    "realRosterRows": 40,
+    "features": [
+      "family_size",
+      "monthly_income",
+      "income_per_capita",
+      "head_age",
+      "employment_score",
+      "housing_score",
+      "has_elderly",
+      "has_pwd",
+      "has_young_children",
+      "has_unemployed_adults",
+      "no_prior_aid",
+      "dependent_load"
+    ],
+    "classDistribution": {
+      "HIGH": 3217,
+      "MEDIUM": 2653,
+      "LOW": 2170
+    },
+    "trainSize": 6030,
+    "testSize": 2010,
+    "targetAccuracy": 0.8,
+    "meetsTarget": true
+  },
+  "trainedAt": "2026-10-29T15:00:38.080911+00:00"
+}

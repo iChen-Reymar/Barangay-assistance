@@ -1,0 +1,325 @@
+{
+  "metrics": {
+    "synthetic": {
+      "accuracy": 0.6612,
+      "precisionMacro": 0.6782,
+      "recallMacro": 0.6688,
+      "f1Macro": 0.6731,
+      "support": {
+        "HIGH": 49,
+        "MEDIUM": 40,
+        "LOW": 32
+      },
+      "perClass": {
+        "HIGH": {
+          "precision": 0.68,
+          "recall": 0.6939,
+          "f1": 0.6869
+        },
+        "MEDIUM": {
+          "precision": 0.4878,
+          "recall": 0.5,
+          "f1": 0.4938
+        },
+        "LOW": {
+          "precision": 0.8667,
+          "recall": 0.8125,
+          "f1": 0.8387
+        }
+      },
+      "confusionMatrix": {
+        "labels": [
+          "HIGH",
+          "MEDIUM",
+          "LOW"
+        ],
+        "rows": [
+          [
+            34,
+            15,
+            0
+          ],
+          [
+            16,
+            20,
+            4
+          ],
+          [
+            0,
+            6,
+            26
+          ]
+        ]
+      }
+    },
+    "decisionTree": {
+      "accuracy": 0.6612,
+      "precisionMacro": 0.6782,
+      "recallMacro": 0.6688,
+      "f1Macro": 0.6731,
+      "support": {
+        "HIGH": 49,
+        "MEDIUM": 40,
+        "LOW": 32
+      },
+      "perClass": {
+        "HIGH": {
+          "precision": 0.68,
+          "recall": 0.6939,
+          "f1": 0.6869
+        },
+        "MEDIUM": {
+          "precision": 0.4878,
+          "recall": 0.5,
+          "f1": 0.4938
+        },
+        "LOW": {
+          "precision": 0.8667,
+          "recall": 0.8125,
+          "f1": 0.8387
+        }
+      },
+      "confusionMatrix": {
+        "labels": [
+          "HIGH",
+          "MEDIUM",
+          "LOW"
+        ],
+        "rows": [
+          [
+            34,
+            15,
+            0
+          ],
+          [
+            16,
+            20,
+            4
+          ],
+          [
+            0,
+            6,
+            26
+          ]
+        ]
+      }
+    },
+    "logisticRegression": {
+      "accuracy": 0.843,
+      "precisionMacro": 0.8507,
+      "recallMacro": 0.8477,
+      "f1Macro": 0.8486,
+      "support": {
+        "HIGH": 49,
+        "MEDIUM": 40,
+        "LOW": 32
+      },
+      "perClass": {
+        "HIGH": {
+          "precision": 0.8723,
+          "recall": 0.8367,
+          "f1": 0.8542
+        },
+        "MEDIUM": {
+          "precision": 0.7442,
+          "recall": 0.8,
+          "f1": 0.7711
+        },
+        "LOW": {
+          "precision": 0.9355,
+          "recall": 0.9062,
+          "f1": 0.9206
+        }
+      },
+      "confusionMatrix": {
+        "labels": [
+          "HIGH",
+          "MEDIUM",
+          "LOW"
+        ],
+        "rows": [
+          [
+            41,
+            8,
+            0
+          ],
+          [
+            6,
+            32,
+            2
+          ],
+          [
+            0,
+            3,
+            29
+          ]
+        ]
+      }
+    },
+    "blended": {
+      "accuracy": 0.8017,
+      "precisionMacro": 0.8176,
+      "recallMacro": 0.8049,
+      "f1Macro": 0.8091,
+      "support": {
+        "HIGH": 49,
+        "MEDIUM": 40,
+        "LOW": 32
+      },
+      "perClass": {
+        "HIGH": {
+          "precision": 0.8478,
+          "recall": 0.7959,
+          "f1": 0.8211
+        },
+        "MEDIUM": {
+          "precision": 0.6739,
+          "recall": 0.775,
+          "f1": 0.7209
+        },
+        "LOW": {
+          "precision": 0.931,
+          "recall": 0.8438,
+          "f1": 0.8852
+        }
+      },
+      "confusionMatrix": {
+        "labels": [
+          "HIGH",
+          "MEDIUM",
+          "LOW"
+        ],
+        "rows": [
+          [
+            39,
+            10,
+            0
+          ],
+          [
+            7,
+            31,
+            2
+          ],
+          [
+            0,
+            5,
+            27
+          ]
+        ]
+      }
+    },
+    "crossValidation": {
+      "folds": 5,
+      "decisionTree": {
+        "folds": [
+          0.6575,
+          0.6301,
+          0.7222,
+          0.625,
+          0.6944
+        ],
+        "mean": 0.6658,
+        "std": 0.0419,
+        "min": 0.625,
+        "max": 0.7222
+      },
+      "logisticRegression": {
+        "folds": [
+          0.7945,
+          0.7945,
+          0.8056,
+          0.8194,
+          0.8889
+        ],
+        "mean": 0.8206,
+        "std": 0.0395,
+        "min": 0.7945,
+        "max": 0.8889
+      },
+      "blended": {
+        "folds": [
+          0.7671,
+          0.7808,
+          0.7361,
+          0.7778,
+          0.7917
+        ],
+        "mean": 0.7707,
+        "std": 0.0212,
+        "min": 0.7361,
+        "max": 0.7917
+      }
+    }
+  },
+  "summary": {
+    "samples": 483,
+    "features": [
+      "family_size",
+      "monthly_income",
+      "income_per_capita",
+      "head_age",
+      "employment_score",
+      "housing_score",
+      "has_elderly",
+      "has_pwd",
+      "has_young_children",
+      "has_unemployed_adults",
+      "no_prior_aid",
+      "dependent_load"
+    ],
+    "classDistribution": {
+      "HIGH": 194,
+      "MEDIUM": 159,
+      "LOW": 130
+    },
+    "realRecordsIncluded": 0,
+    "realRosterRows": 483,
+    "roster": {
+      "members": 483,
+      "associations": {
+        "ERPAT": 40,
+        "Purok 1B Mimbalot Women's Association": 17,
+        "Officers Federation of Purok President": 35,
+        "United Women's Association": 50,
+        "Deus Caritas Uswag Women's Association": 31,
+        "Motor Riders Association": 26,
+        "Senior Citizen Association of Buruun Central": 120,
+        "Kapunungan Sa Panaghiusa Association": 147,
+        "Kawayan Association": 17
+      },
+      "positions": {
+        "PRESIDENT": 9,
+        "VICE PRESIDENT": 9,
+        "TREASURER": 9,
+        "SECRETARY": 9,
+        "AUDITOR": 8,
+        "P.I.O": 13,
+        "MEMBER": 414,
+        "SOCIAL MANAGER": 5,
+        "SGT. AT ARMS": 7
+      },
+      "observedFields": [
+        "name",
+        "position",
+        "association"
+      ],
+      "imputedFields": [
+        "familySize",
+        "monthlyIncome",
+        "age",
+        "employmentStatus",
+        "housingCondition",
+        "vulnerabilityIndicators",
+        "label"
+      ]
+    },
+    "nSynthetic": 0,
+    "trainSize": 362,
+    "testSize": 121,
+    "scoringSamples": 483,
+    "cvFolds": 5,
+    "targetAccuracy": 0.8,
+    "meetsTarget": true
+  },
+  "trainedAt": "2026-11-03T08:54:27.799174+00:00"
+}
