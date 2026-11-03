@@ -9,6 +9,7 @@ import { buildChanges, logAuditEvent } from '../../services/auditStorage'
 import {
   createManagedUser,
   removeUser,
+  updateManagedUser,
   updateUserRole,
 } from '../../services/authStorage'
 import type { StoredUser, UserRole } from '../../types/auth'
@@ -22,6 +23,8 @@ const roleOptions: { value: UserRole; label: string }[] = [
 const fieldClass =
   'w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary'
 
+const defaultPassword = '123123'
+
 function statusVariant(status: StoredUser['status']) {
   if (status === 'approved') return 'success' as const
   if (status === 'rejected') return 'danger' as const
@@ -34,8 +37,16 @@ export default function UsersPage() {
   const actorEmail = profile?.email ?? user?.email
   const [formOpen, setFormOpen] = useState(false)
   const [removeTarget, setRemoveTarget] = useState<StoredUser | null>(null)
+  const [editTarget, setEditTarget] = useState<StoredUser | null>(null)
+  const [saving, setSaving] = useState(false)
   const [message, setMessage] = useState('')
   const [error, setError] = useState('')
+  const [editForm, setEditForm] = useState({
+    firstName: '',
+    lastName: '',
+    email: '',
+    password: '',
+  })
   const [form, setForm] = useState({
     firstName: '',
     lastName: '',
@@ -100,6 +111,52 @@ export default function UsersPage() {
     })
   }
 
+  function openEdit(account: StoredUser) {
+    setError('')
+    setEditTarget(account)
+    setEditForm({
+      firstName: account.firstName,
+      lastName: account.lastName,
+      email: account.email,
+      password: '',
+    })
+  }
+
+  async function saveEdit(password = editForm.password.trim()) {
+    if (!editTarget) return
+    setError('')
+    if (password && password.length < 6) {
+      setError(`Password must be at least 6 characters. The default password is ${defaultPassword}.`)
+      return
+    }
+    setSaving(true)
+    const result = await updateManagedUser(editTarget.id, {
+      firstName: editForm.firstName,
+      lastName: editForm.lastName,
+      email: editForm.email,
+      password,
+    })
+    setSaving(false)
+    if (!result.success) {
+      setError(result.error ?? 'Could not update the user.')
+      return
+    }
+    refreshUsers()
+    const fullName = `${editForm.firstName.trim()} ${editForm.lastName.trim()}`.trim()
+    const passwordNote = password
+      ? password === defaultPassword
+        ? ` The password is now ${defaultPassword}.`
+        : ' The password was changed.'
+      : ''
+    setMessage(`${fullName} was updated.${passwordNote}`)
+    audit(`Updated user ${fullName}.`, buildChanges([
+      { key: 'name', label: 'Name', oldValue: editTarget.fullName, newValue: fullName },
+      { key: 'email', label: 'Email', oldValue: editTarget.email, newValue: editForm.email.trim().toLowerCase() },
+      ...(password ? [{ key: 'password', label: 'Password', oldValue: 'Hidden', newValue: password === defaultPassword ? `Reset to ${defaultPassword}` : 'Changed' }] : []),
+    ]))
+    setEditTarget(null)
+  }
+
   function handleRemove() {
     if (!removeTarget || !user) return
     setError('')
@@ -123,7 +180,7 @@ export default function UsersPage() {
       <main className="flex-1 overflow-y-auto p-4 sm:p-5 md:p-6">
         <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
           <p className="max-w-2xl text-sm text-gray-500">
-            Add people, remove access, or change whether an account is an administrator, barangay staff, or association head.
+            Add people, edit a name or email, change or reset a password, or change whether an account is an administrator, barangay staff, or association head.
           </p>
           <Button onClick={() => { setError(''); setFormOpen(true) }}>
             <Plus className="h-4 w-4" />
@@ -179,14 +236,19 @@ export default function UsersPage() {
                       <Badge variant={statusVariant(account.status)}>{account.status.toUpperCase()}</Badge>
                     </td>
                     <td className="px-4 py-3">
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        disabled={isSelf}
-                        onClick={() => { setError(''); setRemoveTarget(account) }}
-                      >
-                        Remove
-                      </Button>
+                      <div className="flex flex-wrap gap-2">
+                        <Button size="sm" variant="outline" onClick={() => openEdit(account)}>
+                          Edit
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          disabled={isSelf}
+                          onClick={() => { setError(''); setRemoveTarget(account) }}
+                        >
+                          Remove
+                        </Button>
+                      </div>
                     </td>
                   </tr>
                 )
@@ -244,6 +306,51 @@ export default function UsersPage() {
               <input required value={form.associationName} onChange={(event) => setForm({ ...form, associationName: event.target.value })} className={fieldClass} />
             </label>
           ) : null}
+        </form>
+      </Modal>
+
+      <Modal
+        open={editTarget !== null}
+        onClose={() => { if (!saving) setEditTarget(null) }}
+        title="Edit User"
+        footer={
+          <div className="flex flex-wrap justify-end gap-2">
+            <Button variant="outline" disabled={saving} onClick={() => saveEdit(defaultPassword)}>
+              Reset password to {defaultPassword}
+            </Button>
+            <Button variant="outline" disabled={saving} onClick={() => setEditTarget(null)}>Cancel</Button>
+            <Button type="submit" form="edit-user-form" disabled={saving}>Save</Button>
+          </div>
+        }
+      >
+        <form id="edit-user-form" onSubmit={(event) => { event.preventDefault(); void saveEdit() }} className="space-y-3">
+          <div className="grid gap-3 sm:grid-cols-2">
+            <label className="block text-sm">
+              <span className="mb-1 block text-xs font-semibold uppercase text-gray-500">First name</span>
+              <input required value={editForm.firstName} onChange={(event) => setEditForm({ ...editForm, firstName: event.target.value })} className={fieldClass} />
+            </label>
+            <label className="block text-sm">
+              <span className="mb-1 block text-xs font-semibold uppercase text-gray-500">Last name</span>
+              <input value={editForm.lastName} onChange={(event) => setEditForm({ ...editForm, lastName: event.target.value })} className={fieldClass} />
+            </label>
+          </div>
+          <label className="block text-sm">
+            <span className="mb-1 block text-xs font-semibold uppercase text-gray-500">Email</span>
+            <input required type="email" value={editForm.email} onChange={(event) => setEditForm({ ...editForm, email: event.target.value })} className={fieldClass} />
+          </label>
+          <label className="block text-sm">
+            <span className="mb-1 block text-xs font-semibold uppercase text-gray-500">New password</span>
+            <input
+              type="text"
+              value={editForm.password}
+              onChange={(event) => setEditForm({ ...editForm, password: event.target.value })}
+              placeholder="Leave blank to keep the current password"
+              className={fieldClass}
+            />
+            <span className="mt-1 block text-xs text-gray-500">
+              Sign-in requires at least 6 characters, so the default reset password is {defaultPassword}.
+            </span>
+          </label>
         </form>
       </Modal>
 

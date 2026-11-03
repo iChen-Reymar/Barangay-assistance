@@ -165,7 +165,7 @@ export async function getModelInfo(): Promise<ModelInfo | null> {
 }
 
 /**
- * Retrain on the synthetic seed plus whatever real records are supplied.
+ * Retrain on the real association rosters plus the records supplied.
  * Staff trigger this after entering a batch of verified beneficiaries.
  */
 export async function retrainModels(

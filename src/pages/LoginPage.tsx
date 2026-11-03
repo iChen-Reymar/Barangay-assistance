@@ -44,13 +44,14 @@ function LoginForm() {
             )}
 
             <FormField
-              label="Email Address"
+              label="Email or username"
               id="email"
-              type="email"
+              type="text"
               icon={MailIcon}
               value={email}
               onChange={(e) => setEmail(e.target.value)}
-              placeholder="Enter your registered email"
+              placeholder="Enter your email or username"
+              autoComplete="username"
               required
             />
 

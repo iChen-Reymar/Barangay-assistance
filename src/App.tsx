@@ -28,8 +28,6 @@ import ApprovedRequestsPage from './pages/association/ApprovedRequestsPage'
 import NotificationsPage from './pages/association/NotificationsPage'
 import AssociationSettingsPage from './pages/association/SettingsPage'
 import StaffDashboardPage from './pages/staff/DashboardPage'
-import StaffBeneficiariesPage from './pages/staff/BeneficiariesPage'
-import AddBeneficiaryPage from './pages/staff/AddBeneficiaryPage'
 import StaffVulnerabilityAssessmentPage from './pages/staff/VulnerabilityAssessmentPage'
 import StaffAssistanceRequestsPage from './pages/staff/AssistanceRequestsPage'
 import StaffPriorityListPage from './pages/staff/PriorityListPage'
@@ -99,8 +97,6 @@ export default function App() {
           }
         >
           <Route index element={<StaffDashboardPage />} />
-          <Route path="beneficiaries" element={<StaffBeneficiariesPage />} />
-          <Route path="beneficiaries/add" element={<AddBeneficiaryPage />} />
           <Route path="vulnerability-assessment" element={<StaffVulnerabilityAssessmentPage />} />
           <Route path="assistance-requests" element={<StaffAssistanceRequestsPage />} />
           <Route path="priority-list" element={<StaffPriorityListPage />} />

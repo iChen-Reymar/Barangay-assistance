@@ -525,12 +525,17 @@ async function loadStores() {
   }
   if (members.length > 0) {
     const stored = storedRecords(members)
-    if (stored) push('barangay_association_members', stored)
-    else push('barangay_association_members', members.map((row) => ({
+    if (stored) {
+      push('barangay_association_members', stored.map((item, index) => ({
+        ...item,
+        associationName: item.associationName || members[index].association_name || undefined,
+      })))
+    } else push('barangay_association_members', members.map((row) => ({
       id: row.id, name: row.name, age: row.age, contactNumber: row.contact_number, address: row.address,
       dateJoined: row.date_joined, familySize: row.family_size, isPwd: yes(row.is_pwd), isSenior: yes(row.is_senior),
       membershipStatus: row.membership_status, vulnerability: row.vulnerability,
       assistanceStatus: row.assistance_status, notes: row.notes ?? undefined,
+      associationName: row.association_name ?? undefined,
       ...attachmentsFor(row.id, memberDocuments),
     })))
   }
@@ -700,6 +705,254 @@ app.get('/api/bootstrap', async (_req, res) => {
   }
   try {
     res.json({ stores: await loadStores() })
+  } catch (error) {
+    res.status(500).json({ error: error.message })
+  }
+})
+
+function memberAssociation(member) {
+  const payload = member.payload && typeof member.payload === 'object' ? member.payload : {}
+  return String(payload.associationName || member.association_name || '').trim()
+}
+
+function memberIsPresident(member) {
+  const payload = member.payload && typeof member.payload === 'object' ? member.payload : {}
+  const position = String(payload.position || payload.notes || '').toLowerCase()
+  return position.includes('president') && !position.includes('vice')
+}
+
+async function findAuthUser(id, emails) {
+  const byId = await supabase.auth.admin.getUserById(id)
+  if (!byId.error && byId.data?.user) return byId.data.user
+  const wanted = new Set(emails.map((value) => String(value || '').trim().toLowerCase()).filter(Boolean))
+  for (let page = 1; page <= 20; page += 1) {
+    const listed = await supabase.auth.admin.listUsers({ page, perPage: 200 })
+    if (listed.error) throw new Error(listed.error.message)
+    const users = listed.data?.users ?? []
+    const match = users.find((user) => wanted.has(String(user.email || '').toLowerCase()))
+    if (match) return match
+    if (users.length < 200) return null
+  }
+  return null
+}
+
+async function requireAdmin(req, res) {
+  const header = String(req.headers.authorization || '')
+  const token = header.startsWith('Bearer ') ? header.slice(7).trim() : ''
+  if (!token) {
+    res.status(401).json({ error: 'Sign in as an administrator first.' })
+    return false
+  }
+  const { data, error } = await supabase.auth.getUser(token)
+  if (error || !data.user) {
+    res.status(401).json({ error: 'Sign in as an administrator first.' })
+    return false
+  }
+  const { data: admin, error: adminError } = await supabase.from('users').select('role,status').eq('id', data.user.id).maybeSingle()
+  if (adminError || !admin || admin.role !== 'admin' || admin.status !== 'approved') {
+    res.status(403).json({ error: 'Only an administrator can edit users.' })
+    return false
+  }
+  return true
+}
+
+app.patch('/api/users/:id', async (req, res) => {
+  if (!supabase || !usingSecretKey) {
+    res.status(503).json({ error: 'Supabase is not ready to update login accounts.' })
+    return
+  }
+  if (!(await requireAdmin(req, res))) return
+
+  const id = String(req.params.id || '')
+  const firstName = String(req.body?.firstName || '').trim()
+  const lastName = String(req.body?.lastName || '').trim()
+  const email = String(req.body?.email || '').trim().toLowerCase()
+  const password = String(req.body?.password || '')
+  const fullName = `${firstName} ${lastName}`.trim()
+  if (!fullName || !email.includes('@')) {
+    res.status(400).json({ error: 'Name and a valid email are required.' })
+    return
+  }
+  if (password && password.length < 6) {
+    res.status(400).json({ error: 'Password must be at least 6 characters. The default password is 123123.' })
+    return
+  }
+
+  try {
+    const { data: existing, error: existingError } = await supabase.from('users').select('*').eq('id', id).maybeSingle()
+    if (existingError) throw new Error(existingError.message)
+    if (!existing) {
+      res.status(404).json({ error: 'User not found.' })
+      return
+    }
+    const { data: duplicate, error: duplicateError } = await supabase.from('users').select('id').eq('email', email).neq('id', id).maybeSingle()
+    if (duplicateError) throw new Error(duplicateError.message)
+    if (duplicate) {
+      res.status(400).json({ error: 'An account with this email already exists.' })
+      return
+    }
+
+    const previousPayload = existing.payload && typeof existing.payload === 'object' ? existing.payload : {}
+    const nextPayload = {
+      ...previousPayload,
+      firstName,
+      lastName,
+      fullName,
+      email,
+      password: '',
+    }
+    if (email.endsWith('@buruun.local')) nextPayload.username = email.slice(0, email.indexOf('@'))
+
+    const saved = await supabase.from('users').update({
+      email,
+      full_name: fullName,
+      payload: nextPayload,
+    }).eq('id', id)
+    if (saved.error) {
+      res.status(400).json({ error: saved.error.message })
+      return
+    }
+
+    const attributes = {
+      email,
+      email_confirm: true,
+      user_metadata: {
+        ...(typeof previousPayload === 'object' ? {} : {}),
+        full_name: fullName,
+        username: nextPayload.username,
+      },
+    }
+    if (password) attributes.password = password
+    const authUser = await findAuthUser(id, [existing.email, email])
+    const authUpdate = authUser
+      ? await supabase.auth.admin.updateUserById(authUser.id, attributes)
+      : password
+        ? await supabase.auth.admin.createUser({
+          id,
+          email,
+          password,
+          email_confirm: true,
+          user_metadata: attributes.user_metadata,
+        })
+        : { error: null }
+    if (authUpdate.error) {
+      await supabase.from('users').update({
+        email: existing.email,
+        full_name: existing.full_name,
+        payload: previousPayload,
+      }).eq('id', id)
+      res.status(400).json({ error: authUpdate.error.message })
+      return
+    }
+
+    const { data: associations, error: associationError } = await supabase.from('associations').select('id,payload').eq('head_user_id', id)
+    if (associationError) throw new Error(associationError.message)
+    for (const association of associations ?? []) {
+      const payload = {
+        ...(association.payload && typeof association.payload === 'object' ? association.payload : {}),
+        email,
+        headUserId: id,
+      }
+      if (nextPayload.username) payload.username = nextPayload.username
+      await supabase.from('associations').update({ payload }).eq('id', association.id)
+    }
+
+    res.json({
+      ok: true,
+      user: {
+        id,
+        email,
+        fullName,
+        firstName,
+        lastName,
+        passwordChanged: Boolean(password),
+      },
+    })
+  } catch (error) {
+    res.status(500).json({ error: error.message })
+  }
+})
+
+app.post('/api/association-users', async (req, res) => {
+  if (!supabase || !usingSecretKey) {
+    res.status(503).json({ error: 'Supabase is not ready to create login accounts.' })
+    return
+  }
+  const email = String(req.body?.email || '').trim()
+  const password = String(req.body?.password || '')
+  const associationName = String(req.body?.associationName || '').trim()
+  const firstName = String(req.body?.firstName || '').trim()
+  const lastName = String(req.body?.lastName || '').trim()
+  if (!email.includes('@') || password.length < 6 || !associationName) {
+    res.status(400).json({ error: 'Association, email, and a password of at least 6 characters are required.' })
+    return
+  }
+  try {
+    const { data: associations, error: associationError } = await supabase.from('associations').select('*').eq('name', associationName)
+    if (associationError) throw new Error(associationError.message)
+    const association = (associations ?? [])[0]
+    if (!association) {
+      res.status(400).json({ error: 'That association is not in Supabase.' })
+      return
+    }
+    const { data: members, error: memberError } = await supabase.from('association_members').select('name,payload')
+    if (memberError) throw new Error(memberError.message)
+    const president = (members ?? []).find((member) => memberAssociation(member).toLowerCase() === associationName.toLowerCase() && memberIsPresident(member))
+    const fullName = [firstName, lastName].filter(Boolean).join(' ') || president?.name || association.contact_person || associationName
+    const nameParts = fullName.split(/\s+/).filter(Boolean)
+    const created = await supabase.auth.admin.createUser({
+      email,
+      password,
+      email_confirm: true,
+      user_metadata: {
+        full_name: fullName,
+        role: 'association',
+        status: 'approved',
+        association_name: associationName,
+      },
+    })
+    if (created.error || !created.data.user) {
+      res.status(400).json({ error: created.error?.message || 'Could not create the login.' })
+      return
+    }
+    const id = created.data.user.id
+    const now = new Date().toISOString()
+    const account = {
+      id,
+      email,
+      password: '',
+      firstName: firstName || nameParts[0] || '',
+      lastName: lastName || nameParts.slice(1).join(' '),
+      fullName,
+      contactNumber: '',
+      position: 'Association Head',
+      department: 'registered-associations',
+      role: 'association',
+      roleLabel: 'Association Head',
+      status: 'approved',
+      associationName,
+      createdAt: now,
+      approvedAt: now,
+    }
+    const { error: insertError } = await supabase.from('users').insert({
+      id,
+      email,
+      full_name: fullName,
+      role: 'association',
+      status: 'approved',
+      association_name: associationName,
+      payload: account,
+    })
+    if (insertError) {
+      await supabase.auth.admin.deleteUser(id)
+      res.status(400).json({ error: insertError.message })
+      return
+    }
+    if (!association.head_user_id) {
+      const payload = { ...(association.payload || {}), headUserId: id, email }
+      await supabase.from('associations').update({ head_user_id: id, payload }).eq('id', association.id)
+    }
+    res.json({ ok: true, user: account })
   } catch (error) {
     res.status(500).json({ error: error.message })
   }

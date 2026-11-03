@@ -2,6 +2,7 @@ import { Modal } from '../ui/Modal'
 import { Button } from '../ui/Button'
 import { Badge } from '../ui/Badge'
 import type { AssociationMember, MemberAttachment, VulnerabilityLevel } from '../../data/associationMockData'
+import { memberPositionLabel, splitMemberPosition } from '../../data/memberPositions'
 
 interface MemberViewModalProps {
   open: boolean
@@ -20,6 +21,7 @@ export function MemberViewModal({ open, onClose, member, onEdit }: MemberViewMod
   if (!member) return null
 
   const selected = member
+  const roster = splitMemberPosition(selected)
 
   return (
     <Modal open={open} onClose={onClose} title="Member Details" size="lg">
@@ -42,6 +44,10 @@ export function MemberViewModal({ open, onClose, member, onEdit }: MemberViewMod
         </div>
 
         <dl className="grid gap-4 rounded-lg border border-gray-100 bg-gray-50 p-4 text-sm sm:grid-cols-2">
+          <div>
+            <dt className="text-[10px] font-semibold uppercase text-gray-400">Position</dt>
+            <dd className="mt-0.5 text-gray-900">{memberPositionLabel(roster.position)}</dd>
+          </div>
           <div>
             <dt className="text-[10px] font-semibold uppercase text-gray-400">Age</dt>
             <dd className="mt-0.5 text-gray-900">{selected.age}</dd>
@@ -82,10 +88,10 @@ export function MemberViewModal({ open, onClose, member, onEdit }: MemberViewMod
             <dt className="text-[10px] font-semibold uppercase text-gray-400">PWD</dt>
             <dd className="mt-0.5 text-gray-900">{selected.isPwd ? 'Yes' : 'No'}</dd>
           </div>
-          {selected.notes && (
+          {roster.notes && (
             <div className="sm:col-span-2">
               <dt className="text-[10px] font-semibold uppercase text-gray-400">Notes</dt>
-              <dd className="mt-0.5 text-gray-900">{selected.notes}</dd>
+              <dd className="mt-0.5 text-gray-900">{roster.notes}</dd>
             </div>
           )}
         </dl>

@@ -64,9 +64,57 @@ def _sigmoid(value: float) -> float:
     return 1.0 / (1.0 + math.exp(-value))
 
 
-def sample_household(rng: random.Random) -> dict:
-    """Sample one plausible barangay household with its hidden vulnerability drivers."""
-    association = rng.choice(ASSOCIATIONS)
+# Maps an association type onto the sampling branch that already exists below.
+# The returned association name is only a stand-in for those branches; callers
+# that know the real association overwrite it.
+PROFILE_ASSOCIATION = {
+    "senior": "Senior Citizens Group",
+    "pwd": "PWD Group",
+    "farmer": "Farmers Association",
+    "fisher": "Fishermen Association",
+    "driver": "Habal-habal Drivers Association",
+    "youth": "Youth Group",
+    "general": "Women's Association",
+}
+
+
+def sampling_profile(association: str) -> str:
+    """Which household prior fits this association name."""
+    key = (association or "").lower()
+    if "senior" in key:
+        return "senior"
+    if "disabilit" in key or "pwd" in key:
+        return "pwd"
+    if "farm" in key or "agricult" in key or "food producer" in key:
+        return "farmer"
+    if "fish" in key:
+        return "fisher"
+    if "tricycle" in key or "driver" in key or "habal" in key or "rider" in key:
+        return "driver"
+    if "youth" in key:
+        return "youth"
+    return "general"
+
+
+def household_rng(name: str, association: str = "") -> random.Random:
+    """Stable draw for one person, so training and scoring fill the same household."""
+    import hashlib
+
+    token = f"{association.strip().lower()}|{name.strip().lower()}"
+    digest = hashlib.sha256(token.encode("utf-8")).hexdigest()
+    return random.Random(int(digest[:16], 16))
+
+
+def sample_household(rng: random.Random, profile: str | None = None) -> dict:
+    """Sample one plausible barangay household with its hidden vulnerability drivers.
+
+    `profile` forces the association type (senior, farmer, and so on). Without
+    it, the association is drawn at random, which is what the synthetic pool uses.
+    """
+    if profile:
+        association = PROFILE_ASSOCIATION.get(profile, PROFILE_ASSOCIATION["general"])
+    else:
+        association = rng.choice(ASSOCIATIONS)
 
     # Employment first: it drives income, so it is sampled upstream of it.
     if association in ("Senior Citizens Group", "PWD Group"):
@@ -257,6 +305,61 @@ def to_xy(rows: list[dict]) -> tuple[list[list[float]], list[str]]:
     x = [vectorize(row) for row in rows]
     y = [row["label"] for row in rows]
     return x, y
+
+
+def _blank(value) -> bool:
+    if value is None:
+        return True
+    if isinstance(value, str) and not value.strip():
+        return True
+    if isinstance(value, (int, float)) and float(value) == 0.0:
+        return True
+    return False
+
+
+def roster_only(record: dict) -> bool:
+    """True when the row is a name and association with no household measurements.
+
+    The real association rosters, and the temporary association lists, store only
+    name and position. The web app sends those as income 0 and no age, employment,
+    housing, or indicators. A record that already has any of those is left alone.
+    """
+    indicators = record.get("vulnerabilityIndicators") or []
+    if isinstance(indicators, (list, tuple, set)) and len(indicators) > 0:
+        return False
+    if not _blank(record.get("employmentStatus")):
+        return False
+    if not _blank(record.get("housingCondition")):
+        return False
+    if not _blank(record.get("age")):
+        return False
+    if not _blank(record.get("monthlyIncome")):
+        return False
+    return True
+
+
+def impute_unmeasured_household(record: dict) -> tuple[dict, bool]:
+    """Fill a blank roster row with the same prior used while training.
+
+    The filled numbers are an estimate, not a barangay measurement. Measured
+    records are returned unchanged.
+    """
+    if not roster_only(record):
+        return record, False
+    name = str(record.get("name") or "")
+    association = str(record.get("association") or record.get("associationName") or "")
+    drawn = sample_household(household_rng(name, association), profile=sampling_profile(association))
+    filled = dict(record)
+    for key in (
+        "familySize",
+        "monthlyIncome",
+        "age",
+        "employmentStatus",
+        "housingCondition",
+        "vulnerabilityIndicators",
+    ):
+        filled[key] = drawn[key]
+    return filled, True
 
 
 def dataset_summary(rows: list[dict]) -> dict:

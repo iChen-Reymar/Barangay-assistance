@@ -4,7 +4,7 @@ import { DashboardNavbar } from '../../components/layout/DashboardNavbar'
 import { Badge } from '../../components/ui/Badge'
 import { Button } from '../../components/ui/Button'
 import { useStaffDisplayUser } from '../../hooks/useStaffDisplayUser'
-import { getStaffBeneficiaries, subscribeStaffBeneficiaryStorage } from '../../services/staffBeneficiaryStorage'
+import { getStaffBeneficiaries } from '../../services/staffBeneficiaryStorage'
 import { getModelInfo, isMlAvailable, retrainModels, featureLabel, type ModelInfo } from '../../services/mlService'
 
 function variantFor(label: string) {
@@ -39,9 +39,6 @@ export default function StaffModelPerformancePage() {
   const [loading, setLoading] = useState(true)
   const [retraining, setRetraining] = useState(false)
   const [message, setMessage] = useState('')
-  const [realRecordCount, setRealRecordCount] = useState(() => getStaffBeneficiaries().length)
-
-  useEffect(() => subscribeStaffBeneficiaryStorage(() => setRealRecordCount(getStaffBeneficiaries().length)), [])
 
   // Mirror of `available` for code outside render. The focus listener below is
   // installed once, so reading state inside its callback would hand it a stale
@@ -101,7 +98,7 @@ export default function StaffModelPerformancePage() {
     setRetraining(true)
     setMessage('')
     const result = await retrainModels(getStaffBeneficiaries())
-    setMessage(result.ok ? 'Models retrained on the synthetic seed plus your real records.' : result.error ?? 'Retraining failed.')
+    setMessage(result.ok ? 'Models trained and ready to score members.' : result.error ?? 'Retraining failed.')
     if (result.ok) await load()
     setRetraining(false)
   }
@@ -179,7 +176,9 @@ export default function StaffModelPerformancePage() {
                 </p>
                 <p className="mt-1 text-2xl font-bold text-gray-900">{info?.summary?.samples ?? '—'}</p>
                 <p className="mt-1 text-xs text-gray-400">
-                  {info?.summary ? `${info.summary.trainSize} train / ${info.summary.testSize} test` : ''}
+                  {info?.summary
+                    ? `Ready to score. Accuracy checked on ${info.summary.testSize} held-out records.`
+                    : ''}
                 </p>
               </div>
             </div>
@@ -187,8 +186,7 @@ export default function StaffModelPerformancePage() {
             <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-gray-200 bg-white px-5 py-4 shadow-sm">
               <div className="text-sm text-gray-500">
                 Last trained {info?.trainedAt ? new Date(info.trainedAt).toLocaleString() : 'never'}.
-                Your store holds <strong className="text-gray-900">{realRecordCount}</strong> beneficiary record
-                {realRecordCount === 1 ? '' : 's'}.
+                Scoring works now. Household details from a member account are used once that member submits an evaluation.
               </div>
               <Button onClick={() => void handleRetrain()} disabled={retraining}>
                 {retraining ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}

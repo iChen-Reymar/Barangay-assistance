@@ -123,6 +123,37 @@ function toRuleRow(beneficiary: StaffBeneficiary, generatedAt: string): Unranked
   }
 }
 
+function rowsFromScores(
+  beneficiaries: StaffBeneficiary[],
+  scored: Awaited<ReturnType<typeof scoreBeneficiaries>>,
+  generatedAt: string,
+): UnrankedRow[] {
+  if (!scored) return beneficiaries.map((beneficiary) => toRuleRow(beneficiary, generatedAt))
+  const byId = new Map(scored.map((result) => [result.id, result]))
+  return beneficiaries.map((beneficiary) => {
+    const result = byId.get(beneficiary.id)
+    if (!result) return toRuleRow(beneficiary, generatedAt)
+    const classification = result.classification
+    return {
+      name: beneficiary.name.trim(),
+      association: beneficiary.association,
+      score: result.score,
+      classification,
+      program: matchProgram(classification, beneficiary.vulnerabilityIndicators),
+      verification: 'VERIFIED' as const,
+      reason: buildReason(result.score, result.probabilities, result.agreement, result.factors),
+      generatedAt,
+      engine: 'ml' as const,
+      decisionTreePrediction: result.decisionTreePrediction,
+      logisticRegressionPrediction: result.logisticRegressionPrediction,
+      modelAgreement: result.agreement,
+      decisionTreePath: result.decisionTreePath,
+      logisticContributions: result.logisticContributions,
+      factors: result.factors,
+    }
+  })
+}
+
 function dedupeAndRank(rows: UnrankedRow[]): GeneratedAssistanceRow[] {
   const seen = new Set<string>()
   return rows
@@ -149,35 +180,39 @@ export async function generateAssistanceListAsync(): Promise<GeneratedAssistance
   if (!beneficiaries.length) return persist([])
 
   const scored = await scoreBeneficiaries(beneficiaries)
+  return persist(dedupeAndRank(rowsFromScores(beneficiaries, scored, generatedAt)))
+}
 
-  if (!scored) {
-    return persist(dedupeAndRank(beneficiaries.map((b) => toRuleRow(b, generatedAt))))
-  }
+/**
+ * Score association members and store that list.
+ *
+ * Rows already stored are kept only when their name is in `retainNames`, so
+ * staff accounts and other non-members drop out. Matching names are replaced
+ * by the new scores.
+ */
+export async function generateAssistanceListFor(
+  beneficiaries: StaffBeneficiary[],
+  retainNames?: ReadonlySet<string>,
+  programName?: string,
+): Promise<GeneratedAssistanceRow[]> {
+  const named = beneficiaries.filter((beneficiary) => beneficiary.name.trim())
+  if (!named.length) return getGeneratedAssistanceList()
 
-  const byId = new Map(scored.map((result) => [result.id, result]))
-  const rows = beneficiaries.map((beneficiary) => {
-    const result = byId.get(beneficiary.id)
-    if (!result) return toRuleRow(beneficiary, generatedAt)
-    const classification = result.classification
-    return {
-      name: beneficiary.name.trim(),
-      association: beneficiary.association,
-      score: result.score,
-      classification,
-      program: matchProgram(classification, beneficiary.vulnerabilityIndicators),
-      verification: 'VERIFIED' as const,
-      reason: buildReason(result.score, result.probabilities, result.agreement, result.factors),
-      generatedAt,
-      engine: 'ml' as const,
-      decisionTreePrediction: result.decisionTreePrediction,
-      logisticRegressionPrediction: result.logisticRegressionPrediction,
-      modelAgreement: result.agreement,
-      decisionTreePath: result.decisionTreePath,
-      logisticContributions: result.logisticContributions,
-      factors: result.factors,
-    }
-  })
-  return persist(dedupeAndRank(rows))
+  const generatedAt = new Date().toISOString()
+  const scored = await scoreBeneficiaries(named)
+  const fresh = rowsFromScores(named, scored, generatedAt).map((row) =>
+    programName ? { ...row, program: programName } : row,
+  )
+  const keys = new Set(fresh.map((row) => row.name.trim().toLowerCase()))
+  const kept = retainNames
+    ? getGeneratedAssistanceList()
+        .filter((row) => {
+          const key = row.name.trim().toLowerCase()
+          return retainNames.has(key) && !keys.has(key)
+        })
+        .map(({ rank: _rank, ...row }) => row)
+    : []
+  return persist(dedupeAndRank([...kept, ...fresh]))
 }
 
 function buildReason(

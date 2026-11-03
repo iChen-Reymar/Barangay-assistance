@@ -9,6 +9,7 @@ import type {
   MemberStatus,
   VulnerabilityLevel,
 } from '../../data/associationMockData'
+import { memberPositions, splitMemberPosition } from '../../data/memberPositions'
 
 export type MemberFormInput = Omit<AssociationMember, 'id' | 'assistanceStatus'>
 
@@ -31,6 +32,7 @@ const emptyForm: MemberFormInput = {
   isSenior: false,
   membershipStatus: 'ACTIVE',
   vulnerability: 'MEDIUM',
+  position: 'MEMBER',
   notes: '',
 }
 
@@ -81,6 +83,7 @@ export function MemberFormModal({
 
   useResetWhenOpen(open, initialValues, () => {
     if (initialValues) {
+      const roster = splitMemberPosition(initialValues)
       setForm({
         name: initialValues.name,
         age: initialValues.age,
@@ -92,7 +95,8 @@ export function MemberFormModal({
         isSenior: initialValues.isSenior,
         membershipStatus: initialValues.membershipStatus,
         vulnerability: initialValues.vulnerability,
-        notes: initialValues.notes ?? '',
+        position: roster.position,
+        notes: roster.notes ?? '',
         barangayCertificate: initialValues.barangayCertificate,
         governmentId: initialValues.governmentId,
       })
@@ -125,6 +129,7 @@ export function MemberFormModal({
       name: form.name.trim(),
       contactNumber: form.contactNumber.trim(),
       address: form.address.trim(),
+      position: form.position || 'MEMBER',
       notes: form.notes?.trim() || undefined,
     })
     onClose()
@@ -150,6 +155,19 @@ export function MemberFormModal({
               onChange={(e) => setForm((prev) => ({ ...prev, name: e.target.value }))}
               className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
             />
+          </div>
+          <div>
+            <label className="mb-1 block text-xs font-semibold uppercase text-gray-500">Position</label>
+            <select
+              required
+              value={form.position || 'MEMBER'}
+              onChange={(e) => setForm((prev) => ({ ...prev, position: e.target.value }))}
+              className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
+            >
+              {memberPositions.map((item) => (
+                <option key={item.value} value={item.value}>{item.label}</option>
+              ))}
+            </select>
           </div>
           <div>
             <label className="mb-1 block text-xs font-semibold uppercase text-gray-500">Age</label>

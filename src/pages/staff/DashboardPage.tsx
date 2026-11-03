@@ -1,6 +1,5 @@
 import { useEffect, useState } from 'react'
 import { Users, Shield, AlertTriangle, Clock, CheckCircle } from 'lucide-react'
-import { Link } from 'react-router-dom'
 import { AnalyticsCharts } from '../../components/admin/AnalyticsCharts'
 import { DashboardNavbar } from '../../components/layout/DashboardNavbar'
 import { StatCard } from '../../components/ui/StatCard'
@@ -137,12 +136,7 @@ export default function StaffDashboardPage() {
                       <p className="font-medium text-gray-900">{item.name}</p>
                       <p className="text-xs text-gray-500">{item.association}</p>
                     </div>
-                    <div className="flex items-center gap-3">
-                      <Badge variant="danger">HIGH RISK</Badge>
-                      <Link to="/staff/beneficiaries" className="text-sm font-semibold text-primary hover:underline">
-                        View Details
-                      </Link>
-                    </div>
+                    <Badge variant="danger">HIGH RISK</Badge>
                   </li>
                 ))}
               </ul>

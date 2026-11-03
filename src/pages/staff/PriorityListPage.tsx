@@ -7,19 +7,68 @@ import { Button } from '../../components/ui/Button'
 import { Filter } from '../../components/ui/Filter'
 import { Pagination } from '../../components/ui/Pagination'
 import { PAGE_SIZE_DEFAULT, usePagination } from '../../hooks/usePagination'
-import type { VulnerabilityLevel, VerificationStatus } from '../../data/staffMockData'
+import type { AssociationMember, MemberAttachment } from '../../data/associationMockData'
+import type { StaffBeneficiary, VulnerabilityLevel, VerificationStatus } from '../../data/staffMockData'
 import { useStaffDisplayUser } from '../../hooks/useStaffDisplayUser'
 import {
-  generateAssistanceListAsync,
+  generateAssistanceListFor,
   getGeneratedAssistanceList,
   subscribeGeneratedAssistanceList,
   type GeneratedAssistanceRow,
 } from '../../services/aiProcessing'
 import { featureLabel } from '../../services/mlService'
 import { getAssociations, subscribeAssociationStorage } from '../../services/associationStorage'
+import { getAssociationMembers, subscribeMemberStorage } from '../../services/memberStorage'
 import { getPrograms, subscribeProgramStorage } from '../../services/programStorage'
 
-type PriorityItem = GeneratedAssistanceRow
+type PriorityItem = Omit<GeneratedAssistanceRow, 'score'> & { score: number | null }
+
+function sameAssociation(left: string, right: string) {
+  return left.trim().toLowerCase() === right.trim().toLowerCase()
+}
+
+function nameKey(name: string) {
+  return name.trim().toLowerCase()
+}
+
+function documentWasSubmitted(file?: MemberAttachment) {
+  return Boolean(file?.dataUrl?.trim()) && file?.status !== 'rejected'
+}
+
+function memberSubmittedRequirements(member: AssociationMember) {
+  return documentWasSubmitted(member.barangayCertificate) && documentWasSubmitted(member.governmentId)
+}
+
+function memberToBeneficiary(member: AssociationMember): StaffBeneficiary {
+  const indicators: string[] = []
+  if (member.isPwd) indicators.push('PWD Member (Person with Disability)')
+  if (member.isSenior || member.age >= 60) indicators.push('Elderly Member (60+)')
+  return {
+    id: member.id,
+    name: member.name.trim(),
+    association: member.associationName?.trim() || 'Unassigned',
+    familySize: member.familySize > 0 ? member.familySize : 1,
+    monthlyIncome: 0,
+    vulnerability: member.vulnerability,
+    verification: 'VERIFIED',
+    age: member.age > 0 ? member.age : undefined,
+    vulnerabilityIndicators: indicators,
+  }
+}
+
+function unscoredMember(member: AssociationMember, associationName: string): PriorityItem {
+  return {
+    rank: 0,
+    name: member.name.trim(),
+    association: associationName,
+    score: null,
+    classification: member.vulnerability,
+    program: '—',
+    verification: member.membershipStatus === 'ACTIVE' ? 'VERIFIED' : 'PENDING',
+    reason: '',
+    generatedAt: '',
+  }
+}
 
 function vulnerabilityVariant(level: VulnerabilityLevel) {
   if (level === 'HIGH') return 'danger'
@@ -40,7 +89,7 @@ function downloadList(rows: PriorityItem[]) {
       row.rank,
       row.name,
       row.association,
-      row.score,
+      row.score ?? '',
       row.classification,
       row.program,
       row.verification,
@@ -63,53 +112,92 @@ function downloadList(rows: PriorityItem[]) {
 export default function StaffPriorityListPage() {
   const displayUser = useStaffDisplayUser()
   const [source, setSource] = useState<GeneratedAssistanceRow[]>(() => getGeneratedAssistanceList())
+  const [members, setMembers] = useState<AssociationMember[]>(() => getAssociationMembers())
   const [associations, setAssociations] = useState(() => getAssociations())
   const [programs, setPrograms] = useState(() => getPrograms())
   const [generating, setGenerating] = useState(false)
   const [selected, setSelected] = useState<GeneratedAssistanceRow | null>(null)
 
-  // Filters must offer every registered association and program, not only the
-  // ones that happen to appear in a generated list - otherwise the dropdown is
-  // empty until a list has been generated. Rows still contribute their values
-  // so a beneficiary tied to an unregistered association stays filterable.
   const associationOptions = [
     'All Associations',
-    ...new Set([...associations.map((row) => row.name), ...source.map((row) => row.association)]),
+    ...new Set([
+      ...associations.map((row) => row.name),
+      ...members.map((row) => row.associationName?.trim() || ''),
+    ].filter((name) => name && name !== 'Unassigned')),
   ]
-  const programOptions = [
-    'All Programs',
-    ...new Set([...programs.map((row) => row.name), ...source.map((row) => row.program)]),
-  ]
+  const programOptions = ['All Programs', ...new Set(programs.map((row) => row.name).filter(Boolean))]
 
   useEffect(() => subscribeGeneratedAssistanceList(() => setSource(getGeneratedAssistanceList())), [])
+  useEffect(() => subscribeMemberStorage(() => setMembers(getAssociationMembers())), [])
   useEffect(() => subscribeAssociationStorage(() => setAssociations(getAssociations())), [])
   useEffect(() => subscribeProgramStorage(() => setPrograms(getPrograms())), [])
   const [classification, setClassification] = useState('All Classifications')
   const [association, setAssociation] = useState('All Associations')
   const [program, setProgram] = useState('All Programs')
 
+  function membersOnAssociations(associationName: string) {
+    return getAssociationMembers().filter((member) => {
+      const belongsTo = member.associationName?.trim() ?? ''
+      if (!member.name.trim() || !belongsTo || !memberSubmittedRequirements(member)) return false
+      if (associationName === 'All Associations') return true
+      return sameAssociation(belongsTo, associationName)
+    })
+  }
+
   async function handleGenerate() {
     setGenerating(true)
     try {
-      setSource(await generateAssistanceListAsync())
+      const roster = membersOnAssociations(association)
+      if (roster.length === 0) return
+      const eligibleNames = new Set(
+        getAssociationMembers()
+          .filter(memberSubmittedRequirements)
+          .map((member) => nameKey(member.name)),
+      )
+      const chosenProgram = program === 'All Programs' ? undefined : program
+      setSource(await generateAssistanceListFor(roster.map(memberToBeneficiary), eligibleNames, chosenProgram))
     } finally {
       setGenerating(false)
     }
   }
 
+  const rosterForSelection = useMemo(() => {
+    return members.filter((member) => {
+      const belongsTo = member.associationName?.trim() ?? ''
+      if (!member.name.trim() || !belongsTo || !memberSubmittedRequirements(member)) return false
+      if (association === 'All Associations') return true
+      return sameAssociation(belongsTo, association)
+    })
+  }, [association, members])
+
   const generated = useMemo(() => {
-    return source
+    const scoreByName = new Map(source.map((row) => [nameKey(row.name), row]))
+    const rows: PriorityItem[] = rosterForSelection.map((member) => {
+      const scored = scoreByName.get(nameKey(member.name))
+      const associationName = member.associationName?.trim() || 'Unassigned'
+      if (!scored) return unscoredMember(member, associationName)
+      return { ...scored, association: associationName }
+    })
+
+    const applyingProgram = program === 'All Programs' ? null : program
+
+    return rows
+      .map((row) => (applyingProgram ? { ...row, program: applyingProgram } : row))
       .filter((row) => {
         const classificationMatch =
           classification === 'All Classifications' ||
           row.classification === classification.replace(' Risk', '').toUpperCase()
-        const associationMatch = association === 'All Associations' || row.association === association
-        const programMatch = program === 'All Programs' || row.program === program
-        return classificationMatch && associationMatch && programMatch
+        const associationMatch = association === 'All Associations' || sameAssociation(row.association, association)
+        return classificationMatch && associationMatch
       })
-      .sort((a, b) => b.score - a.score)
+      .sort((a, b) => {
+        if (a.score == null && b.score == null) return a.name.localeCompare(b.name)
+        if (a.score == null) return 1
+        if (b.score == null) return -1
+        return b.score - a.score || a.name.localeCompare(b.name)
+      })
       .map((row, index) => ({ ...row, rank: index + 1 }))
-  }, [association, classification, program, source])
+  }, [association, classification, program, rosterForSelection, source])
 
   const pagination = usePagination(generated, PAGE_SIZE_DEFAULT, `${classification}-${association}-${program}`, 'records')
 
@@ -120,11 +208,14 @@ export default function StaffPriorityListPage() {
     {
       key: 'score',
       header: 'Vulnerability Score',
-      render: (r) => (
-        <span className={r.score >= 80 ? 'font-semibold text-red-500' : r.score >= 50 ? 'text-orange-500' : 'text-green-600'}>
-          {r.score} / 100
-        </span>
-      ),
+      render: (r) =>
+        r.score == null ? (
+          <span className="text-sm text-gray-400">Not scored</span>
+        ) : (
+          <span className={r.score >= 80 ? 'font-semibold text-red-500' : r.score >= 50 ? 'text-orange-500' : 'text-green-600'}>
+            {r.score} / 100
+          </span>
+        ),
     },
     {
       key: 'classification',
@@ -141,10 +232,12 @@ export default function StaffPriorityListPage() {
       key: 'scoredBy',
       header: 'Scored By',
       render: (r) =>
-        r.engine === 'ml' ? (
+        r.score == null ? (
+          <span className="text-xs text-gray-400">Not scored</span>
+        ) : r.engine === 'ml' ? (
           <button
             type="button"
-            onClick={() => setSelected(r)}
+            onClick={() => setSelected({ ...r, score: r.score as number })}
             className="flex items-center gap-1.5 text-xs font-medium text-primary hover:underline"
             title="View how the models reached this score"
           >
@@ -171,7 +264,7 @@ export default function StaffPriorityListPage() {
       <main className="flex-1 overflow-y-auto p-4 sm:p-5 md:p-6">
         <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
           <p className="max-w-3xl text-sm text-gray-500">
-            Click Generate Assistance List. The AI module scores verified beneficiaries, matches a program, and ranks the qualified list. Results are viewed only. No one approves or rejects a beneficiary by hand.
+            The list includes only association members who submitted both required documents: a barangay certification and a valid ID. Choose the association and the program, then generate the list to score those members.
           </p>
           <Button onClick={handleGenerate} disabled={generating}>
             {generating ? (
@@ -210,7 +303,13 @@ export default function StaffPriorityListPage() {
             data={pagination.paginatedItems}
             keyExtractor={(r) => `${r.name}-${r.program}`}
             stableRowCount={PAGE_SIZE_DEFAULT}
-            emptyMessage="No generated list yet. Click Generate Assistance List."
+            emptyMessage={
+              rosterForSelection.length === 0
+                ? association === 'All Associations'
+                  ? 'No members have submitted both a barangay certification and a valid ID yet.'
+                  : `No members of ${association} have submitted both a barangay certification and a valid ID yet.`
+                : `No members of ${association === 'All Associations' ? 'these associations' : association} match these filters.`
+            }
           />
           <Pagination
             showing={pagination.showing}

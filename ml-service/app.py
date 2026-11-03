@@ -3,7 +3,7 @@
 Endpoints
     GET  /api/health            liveness + whether a model is loaded
     GET  /api/model             metrics, tree rules, coefficients, importances
-    POST /api/train             retrain on synthetic seed + real records
+    POST /api/train             retrain on the real rosters plus staff records
     POST /api/score             score raw beneficiary records
 
 The service holds its model in memory and mirrors it to disk, so a restart keeps
@@ -20,7 +20,7 @@ import numpy as np
 from flask import Flask, jsonify, request
 from flask_cors import CORS
 
-from dataset import build_dataset, dataset_summary, to_xy
+from dataset import impute_unmeasured_household
 from features import FEATURE_NAMES, human_readable, vectorize
 from models import CLASS_ORDER, TREE_WEIGHT, LOGREG_WEIGHT, VulnerabilityScorer
 from train import train_with_real_records
@@ -148,11 +148,21 @@ def score():
         return jsonify({"ok": False, "error": "No records supplied."}), 400
 
     scorer: VulnerabilityScorer = _state["scorer"]
-    matrix = _records_to_matrix(records)
+    prepared = []
+    imputed_flags = []
+    for record in records:
+        filled, imputed = impute_unmeasured_household(record)
+        prepared.append(filled)
+        imputed_flags.append(imputed)
+    matrix = _records_to_matrix(prepared)
     results = scorer.score(matrix)
 
     payload = []
-    for record, result in zip(records, results):
+    for record, result, imputed in zip(prepared, results, imputed_flags):
+        # Measured evaluation fields are explained as entered. A member who has
+        # not submitted an evaluation yet is still scored; those filled-in
+        # numbers are not reported as if the member wrote them down.
+        factors = [] if imputed else human_readable(record)
         payload.append(
             {
                 "id": record.get("id"),
@@ -166,7 +176,8 @@ def score():
                 "agreement": result["decisionTreePrediction"] == result["logisticRegressionPrediction"],
                 "decisionTreePath": result["decisionTreePath"],
                 "logisticContributions": result["logisticContributions"],
-                "factors": human_readable(record),
+                "factors": factors,
+                "estimatedHousehold": imputed,
             }
         )
 

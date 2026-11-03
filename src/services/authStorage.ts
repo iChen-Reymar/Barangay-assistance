@@ -89,6 +89,62 @@ export function createManagedUser(input: {
   return { success: true }
 }
 
+export async function updateManagedUser(
+  userId: string,
+  input: {
+    firstName: string
+    lastName: string
+    email: string
+    password?: string
+  },
+): Promise<{ success: boolean; error?: string }> {
+  const firstName = input.firstName.trim()
+  const lastName = input.lastName.trim()
+  const email = input.email.trim().toLowerCase()
+  const password = input.password?.trim() ?? ''
+  if (!firstName && !lastName) return { success: false, error: 'Name is required.' }
+  if (!email.includes('@')) return { success: false, error: 'Enter a valid email.' }
+  if (password && password.length < 6) {
+    return { success: false, error: 'Password must be at least 6 characters. The default password is 123123.' }
+  }
+
+  const users = readUsers()
+  const index = users.findIndex((user) => user.id === userId)
+  if (index === -1) return { success: false, error: 'User not found.' }
+  if (users.some((user) => user.id !== userId && user.email.toLowerCase() === email)) {
+    return { success: false, error: 'An account with this email already exists.' }
+  }
+
+  const { data: sessionData } = await supabase.auth.getSession()
+  const token = sessionData.session?.access_token || readAccessToken()
+  if (!token) return { success: false, error: 'Sign in as an administrator first.' }
+
+  const response = await fetch(`/api/users/${userId}`, {
+    method: 'PATCH',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${token}`,
+    },
+    body: JSON.stringify({ firstName, lastName, email, password }),
+  })
+  const body = await response.json().catch(() => ({})) as { error?: string }
+  if (!response.ok) return { success: false, error: body.error || 'Could not update the user.' }
+
+  const current = users[index]
+  const updated: StoredUser = {
+    ...current,
+    firstName,
+    lastName,
+    fullName: `${firstName} ${lastName}`.trim(),
+    email,
+    password: '',
+  }
+  users[index] = updated
+  writeUsers(users)
+  if (getSession()?.id === userId) syncSession(updated)
+  return { success: true }
+}
+
 export function updateUserRole(
   userId: string,
   role: UserRole,
@@ -356,13 +412,20 @@ export async function restoreUsersFromSession() {
   })
 }
 
+function loginEmail(value: string) {
+  const trimmed = value.trim()
+  if (trimmed.includes('@')) return trimmed
+  return `${trimmed.toLowerCase()}@buruun.local`
+}
+
 export async function login(email: string, password: string, rememberMe: boolean): Promise<LoginResult> {
   if (!import.meta.env.VITE_SUPABASE_URL || !import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY) {
     return { success: false, error: 'Supabase is not configured.' }
   }
 
+  const authEmail = loginEmail(email)
   const { data, error } = await supabase.auth.signInWithPassword({
-    email: email.trim(),
+    email: authEmail,
     password,
   })
   if (error || !data.user || !data.session) {
@@ -371,7 +434,7 @@ export async function login(email: string, password: string, rememberMe: boolean
 
   saveAccessToken(data.session.access_token, rememberMe)
   const visible = await fetchVisibleUsers()
-  const signedInEmail = email.trim().toLowerCase()
+  const signedInEmail = authEmail.toLowerCase()
   const fromTable = visible.find((user) => user.email.toLowerCase() === signedInEmail)
     ?? readUsers().find((user) => user.email.toLowerCase() === signedInEmail)
   const userMetadata = data.user.user_metadata as Record<string, unknown>

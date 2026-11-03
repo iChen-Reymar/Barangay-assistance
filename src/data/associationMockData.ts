@@ -35,6 +35,7 @@ export interface AssociationMember {
   membershipStatus: MemberStatus
   vulnerability: VulnerabilityLevel
   assistanceStatus: AssistanceStatus
+  position?: string
   notes?: string
   /** Owning association. Scopes the roster so each head only sees their own. */
   associationName?: string

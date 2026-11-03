@@ -7,6 +7,7 @@ import { useReviewActor } from '../../hooks/useReviewActor'
 import { useStaffDisplayUser } from '../../hooks/useStaffDisplayUser'
 import type { AssociationMember } from '../../data/associationMockData'
 import type { StaffBeneficiary } from '../../data/staffMockData'
+import { getAssociations, subscribeAssociationStorage } from '../../services/associationStorage'
 import { getAssociationMembers, subscribeMemberStorage, verifyMemberAttachment } from '../../services/memberStorage'
 import {
   getStaffBeneficiaries,
@@ -36,29 +37,42 @@ export default function StaffVerifyQualificationPage() {
   const [items, setItems] = useState<ReviewableAssistanceItem[]>(() => getAssistanceItems())
   const [members, setMembers] = useState<AssociationMember[]>(() => getAssociationMembers())
   const [beneficiaries, setBeneficiaries] = useState<StaffBeneficiary[]>(() => getStaffBeneficiaries())
+  const [associationNames, setAssociationNames] = useState<string[]>(() =>
+    getAssociations().map((association) => association.name),
+  )
   const [selectedAssociation, setSelectedAssociation] = useState<string | null>(null)
 
   useEffect(() => {
     const stopItems = subscribeDecisionStorage(() => setItems(getAssistanceItems()))
     const stopMembers = subscribeMemberStorage(() => setMembers(getAssociationMembers()))
     const stopBeneficiaries = subscribeStaffBeneficiaryStorage(() => setBeneficiaries(getStaffBeneficiaries()))
+    const stopAssociations = subscribeAssociationStorage(() =>
+      setAssociationNames(getAssociations().map((association) => association.name)),
+    )
     return () => {
       stopItems()
       stopMembers()
       stopBeneficiaries()
+      stopAssociations()
     }
   }, [])
 
   const groups = useMemo(() => {
     const map = new Map<string, { name: string; requests: ReviewableAssistanceItem[] }>()
-    for (const item of items) {
-      const key = item.association.trim().toLowerCase()
-      const existing = map.get(key)
-      if (existing) existing.requests.push(item)
-      else map.set(key, { name: item.association, requests: [item] })
+    const add = (name: string) => {
+      const trimmed = name.trim()
+      if (!trimmed) return
+      const key = trimmed.toLowerCase()
+      if (!map.has(key)) map.set(key, { name: trimmed, requests: [] })
     }
-    return [...map.values()]
-  }, [items])
+    for (const name of associationNames) add(name)
+    for (const member of members) add(member.associationName ?? '')
+    for (const item of items) {
+      add(item.association)
+      map.get(item.association.trim().toLowerCase())?.requests.push(item)
+    }
+    return [...map.values()].sort((left, right) => left.name.localeCompare(right.name))
+  }, [associationNames, members, items])
 
   const associationRequests = selectedAssociation
     ? items.filter((item) => sameAssociation(item.association, selectedAssociation))
@@ -129,7 +143,7 @@ export default function StaffVerifyQualificationPage() {
               {groups.length === 0 ? (
                 <tr>
                   <td colSpan={5} className="px-4 py-8 text-center text-gray-500">
-                    No requests are waiting for qualification review.
+                    No associations are recorded yet.
                   </td>
                 </tr>
               ) : (
@@ -153,13 +167,19 @@ export default function StaffVerifyQualificationPage() {
                         </button>
                       </td>
                       <td className="px-4 py-3 text-gray-600">
-                        {group.requests.map((request) => request.requestType).join(', ')}
+                        {group.requests.length > 0
+                          ? group.requests.map((request) => request.requestType).join(', ')
+                          : '—'}
                       </td>
                       <td className="px-4 py-3 text-gray-600">{memberCount > 0 ? memberCount : beneficiaryCount}</td>
                       <td className="px-4 py-3">
-                        <Badge variant={summary.pending > 0 ? 'warning' : summary.total === 0 ? 'neutral' : 'success'}>
-                          {`${summary.passed}/${summary.total} passed`}
-                        </Badge>
+                        {summary.total === 0 ? (
+                          <span className="text-sm text-gray-400">—</span>
+                        ) : (
+                          <Badge variant={summary.pending > 0 ? 'warning' : 'success'}>
+                            {`${summary.passed}/${summary.total} passed`}
+                          </Badge>
+                        )}
                       </td>
                       <td className="px-4 py-3">
                         <Button size="sm" variant="outline" onClick={() => setSelectedAssociation(group.name)}>

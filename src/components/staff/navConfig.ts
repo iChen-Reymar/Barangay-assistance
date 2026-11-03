@@ -1,6 +1,5 @@
 import {
   LayoutDashboard,
-  UserCircle,
   Shield,
   ListOrdered,
   ClipboardCheck,
@@ -13,7 +12,6 @@ import {
 
 export const staffNavItems = [
   { to: '/staff', label: 'Dashboard', icon: LayoutDashboard, end: true },
-  { to: '/staff/beneficiaries', label: 'Input Beneficiaries Data', icon: UserCircle },
   { to: '/staff/vulnerability-assessment', label: 'Classify Beneficiaries', icon: Shield },
   { to: '/staff/priority-list', label: 'Generate Assistance Lists', icon: ListOrdered },
   { to: '/staff/model-performance', label: 'ML Model Performance', icon: Activity },

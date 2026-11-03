@@ -1,10 +1,12 @@
-"""Train both models on the synthetic seed plus real records, and report metrics.
+"""Train both models on real records only.
 
-Training pool, in order of how genuine the data is:
+Training pool:
 
   1. real beneficiary records entered by staff  -> keep the staff-assigned label
-  2. the 40-member ERPAT roster (real identity, imputed socioeconomic fields)
-  3. synthetic households drawn from the barangay prior
+  2. real association rosters from the Data Sets sheet (name, position, and
+     association are observed). Blank household fields on those rows are still
+     estimated so the model has numeric features. No generated households and
+     no stand-in Sample Data names are added.
 
 Evaluation is deliberately harder than a single lucky split:
 
@@ -17,8 +19,6 @@ Both models are reported separately, plus the blend the system actually shows.
 
 from __future__ import annotations
 
-import random
-
 import numpy as np
 from sklearn.model_selection import StratifiedKFold, train_test_split
 
@@ -26,7 +26,6 @@ from dataset import build_dataset, dataset_summary, to_xy
 from models import VulnerabilityScorer, evaluate
 
 TARGET_ACCURACY = 0.80  # the capstone's stated minimum for the blended model
-N_SYNTHETIC = 8000
 CV_FOLDS = 5
 
 
@@ -71,17 +70,16 @@ def _cross_validate(x: np.ndarray, y: np.ndarray, seed: int, folds: int = CV_FOL
 def train_with_real_records(
     real_records: list[dict] | None = None,
     seed: int = 42,
-    n_synthetic: int = N_SYNTHETIC,
 ):
-    """Train on synthetic seed data merged with the ERPAT roster and real records."""
+    """Train on the Data Sets rosters plus any staff-labelled beneficiary records."""
     from real_data import roster_households, roster_summary
 
-    # Real roster rows join the pool *before* the percentile cut, so their labels
-    # sit on exactly the same scale as the synthetic ones (see build_dataset).
-    roster_rng = random.Random(seed + 7)
-    roster = roster_households(roster_rng)
-
-    pool = build_dataset(n_samples=n_synthetic, seed=seed, extra_households=roster)
+    roster = roster_households()
+    pool = build_dataset(
+        n_samples=0,
+        seed=seed,
+        extra_households=roster,
+    )
     roster_rows = len(roster)
 
     # Staff-entered records carry their own label - a human classification - so
@@ -102,20 +100,26 @@ def train_with_real_records(
         x, y, test_size=0.25, random_state=seed, stratify=y
     )
 
-    scorer = VulnerabilityScorer.train(x_train, y_train)
+    # Hold this model out of the test rows. Its accuracy is what the performance
+    # page reports. It is not the model that scores members.
+    holdout = VulnerabilityScorer.train(x_train, y_train)
     y_true = y_test.tolist()
 
     metrics = {
-        "synthetic": evaluate(y_true, scorer.tree.predict(x_test).tolist()),
-        "decisionTree": evaluate(y_true, scorer.tree.predict(x_test).tolist()),
-        "logisticRegression": evaluate(y_true, scorer.logreg.predict(x_test).tolist()),
+        "synthetic": evaluate(y_true, holdout.tree.predict(x_test).tolist()),
+        "decisionTree": evaluate(y_true, holdout.tree.predict(x_test).tolist()),
+        "logisticRegression": evaluate(y_true, holdout.logreg.predict(x_test).tolist()),
     }
 
     # The blended prediction is what the system actually shows users, so it is
     # the number worth putting the 80% target against.
-    blended = _blended_predictions(scorer, x_test)
+    blended = _blended_predictions(holdout, x_test)
     metrics["blended"] = evaluate(y_true, blended)
     metrics["crossValidation"] = _cross_validate(x_train, y_train, seed)
+
+    # Score with a model that has seen every training row. Member evaluation
+    # fields are optional until a user submits them from their account.
+    scorer = VulnerabilityScorer.train(x, y)
 
     summary = dataset_summary(pool)
     summary.update(
@@ -123,9 +127,10 @@ def train_with_real_records(
             "realRecordsIncluded": real_added,
             "realRosterRows": roster_rows,
             "roster": roster_summary(),
-            "nSynthetic": n_synthetic,
+            "nSynthetic": 0,
             "trainSize": int(x_train.shape[0]),
             "testSize": int(x_test.shape[0]),
+            "scoringSamples": int(x.shape[0]),
             "cvFolds": CV_FOLDS,
             "targetAccuracy": TARGET_ACCURACY,
             "meetsTarget": metrics["blended"]["accuracy"] >= TARGET_ACCURACY,

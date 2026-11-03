@@ -31,7 +31,7 @@ never be confused. Staff can always generate an assistance list.
 | --- | --- | --- |
 | `GET` | `/api/health` | Liveness, feature list, class order, ensemble weights |
 | `GET` | `/api/model` | Held-out metrics, confusion matrix, tree rules, coefficients, feature importances |
-| `POST` | `/api/train` | Retrain on the synthetic seed plus any real records |
+| `POST` | `/api/train` | Retrain on the real rosters plus any staff-labelled records |
 | `POST` | `/api/score` | Score raw beneficiary records |
 
 ### Scoring
@@ -56,10 +56,8 @@ curl -X POST http://localhost:5050/api/train \
   -d '{"records":[ ...verified beneficiary records with a "vulnerability" label... ]}'
 ```
 
-Real records are appended to the synthetic pool using their stored
-`vulnerability` value as the label, so the models keep learning from actual
-barangay data as it accumulates. The staff UI exposes this as **Retrain Models**
-on the ML Model Performance page.
+Staff records are added using their stored `vulnerability` value as the label.
+The staff UI exposes this as **Retrain Models** on the ML Model Performance page.
 
 ## How it works
 
@@ -73,13 +71,11 @@ on the applicant's sex would embed a demographic bias into an allocation decisio
 which is the opposite of what this system exists to do. It stays on the record for
 administrative use only.
 
-**Training data** (`dataset.py`) — the beneficiary store starts empty, so the
-models are seeded with 2400 synthetic barangay households. Labels come from a
-latent need function built mostly from *observed* fields plus a smaller unobserved
-remainder standing in for what no intake form captures: debt burden, chronic
-illness, a child who dropped out of school. That remainder is what keeps the task
-genuinely non-trivial — the models cannot reach a perfect score, so the reported
-accuracy is an honest measurement rather than a lookup table in disguise.
+**Training data** (`real_data.py`) — only the Data Sets association rosters, plus
+any beneficiary a staff member has already labelled. Generated households and the
+stand-in Sample Data names are not included. A roster row's name, position, and
+association come from the sheet. Age, income, family size, housing, and the
+class label are still estimated, because the sheet leaves those cells blank.
 
 Class boundaries are taken from percentiles of the need distribution rather than
 fixed constants, so the three classes stay balanced.
@@ -94,23 +90,15 @@ If the two models disagree, the more vulnerable reading is used. That is the saf
 direction for a household that needs aid, and the disagreement is surfaced in the
 UI rather than hidden.
 
-**Accuracy** — measured on a held-out 25% test split, stratified by class. As of
-the last training run:
-
-| Model | Accuracy |
-| --- | --- |
-| Decision Tree | 80.7% |
-| Logistic Regression | 85.3% |
-| Blended (what the system reports) | **86.0%** |
-
-The study's target is a minimum of 80% classification accuracy.
+**Accuracy** — measured on a held-out 25% test split, stratified by class. The study's target is a minimum of 80% classification accuracy. Run `python train.py` after a data change; the numbers from the old mixed pool no longer apply.
 
 ## Files
 
 | File | Role |
 | --- | --- |
 | `features.py` | Feature schema and the raw-record encoder |
-| `dataset.py` | Synthetic household generator and labelling |
+| `dataset.py` | Labelling and the estimator used for blank roster fields |
+| `real_data.py` | Data Sets rosters (the training rows) |
 | `models.py` | Both classifiers, blending, and the explanation builders |
 | `train.py` | Training/evaluation entry point, also importable |
 | `app.py` | Flask API, model persistence via joblib |

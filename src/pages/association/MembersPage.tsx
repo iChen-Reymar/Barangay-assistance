@@ -17,6 +17,7 @@ import {
 } from '../../services/memberStorage'
 import { PAGE_SIZE_DEFAULT, usePagination } from '../../hooks/usePagination'
 import { TableActionsCell } from '../../components/ui/TableActionsCell'
+import { memberPositionLabel, splitMemberPosition } from '../../data/memberPositions'
 import { useAssociationDisplayUser } from '../../hooks/useAssociationDisplayUser'
 import { useAuth } from '../../context/useAuth'
 
@@ -102,6 +103,11 @@ export default function MembersPage() {
       header: 'Name',
       primary: true,
       render: (r) => <span className="font-medium text-gray-900">{r.name}</span>,
+    },
+    {
+      key: 'position',
+      header: 'Position',
+      render: (r) => memberPositionLabel(splitMemberPosition(r).position),
     },
     { key: 'age', header: 'Age' },
     {
