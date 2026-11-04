@@ -6,6 +6,27 @@ function escapeCsvValue(value: string | number): string {
   return text
 }
 
+export function downloadSectionedCsv(
+  filename: string,
+  sections: { name: string; headers: string[]; rows: (string | number)[][] }[],
+): void {
+  const lines: string[] = []
+  sections.forEach((section, index) => {
+    if (index > 0) lines.push('')
+    lines.push(escapeCsvValue(section.name))
+    lines.push(section.headers.map(escapeCsvValue).join(','))
+    section.rows.forEach((row) => lines.push(row.map(escapeCsvValue).join(',')))
+    if (section.rows.length === 0) lines.push(escapeCsvValue('No records.'))
+  })
+  const blob = new Blob([`\uFEFF${lines.join('\r\n')}`], { type: 'text/csv;charset=utf-8;' })
+  const url = URL.createObjectURL(blob)
+  const link = document.createElement('a')
+  link.href = url
+  link.download = filename
+  link.click()
+  URL.revokeObjectURL(url)
+}
+
 export function downloadCsv(
   filename: string,
   headers: string[],

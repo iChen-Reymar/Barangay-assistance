@@ -57,28 +57,26 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setAllUsers(getAllUsers())
   }, [])
 
+  const enterDashboard = useCallback(() => {
+    const session = getSession()
+    setUser(session)
+    setPendingRequests(getPendingUsers())
+    setAllUsers(getAllUsers())
+    if (session) {
+      logAuditEvent({
+        user: session.fullName,
+        userEmail: session.email,
+        action: 'Login',
+        actionColor: 'blue',
+        description: `${session.fullName} signed in to the system.`,
+        entityType: 'session',
+        entityId: session.id,
+      })
+    }
+  }, [])
+
   const login = useCallback(
-    async (email: string, password: string, rememberMe: boolean) => {
-      const result = await loginUser(email, password, rememberMe)
-      if (result.success) {
-        const session = getSession()
-        setUser(session)
-        setPendingRequests(getPendingUsers())
-        setAllUsers(getAllUsers())
-        if (session) {
-          logAuditEvent({
-            user: session.fullName,
-            userEmail: session.email,
-            action: 'Login',
-            actionColor: 'blue',
-            description: `${session.fullName} signed in to the system.`,
-            entityType: 'session',
-            entityId: session.id,
-          })
-        }
-      }
-      return result
-    },
+    async (email: string, password: string, rememberMe: boolean) => loginUser(email, password, rememberMe),
     [],
   )
 
@@ -284,6 +282,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       pendingRequests,
       allUsers,
       login,
+      enterDashboard,
       logout,
       submitRequest,
       submitAssociationHeadRequest: submitAssociationHeadRequestHandler,
@@ -293,7 +292,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       changePassword,
       refreshUsers,
     }),
-    [user, profile, pendingRequests, allUsers, login, logout, submitRequest, submitAssociationHeadRequestHandler, approveRequest, rejectRequest, updateProfile, changePassword, refreshUsers],
+    [user, profile, pendingRequests, allUsers, login, enterDashboard, logout, submitRequest, submitAssociationHeadRequestHandler, approveRequest, rejectRequest, updateProfile, changePassword, refreshUsers],
   )
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>

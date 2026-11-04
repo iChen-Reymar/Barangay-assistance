@@ -16,10 +16,11 @@ import { Button } from '../ui/Button'
 import { SupportingDocumentViewModal } from '../approval/SupportingDocumentViewModal'
 import { formatDate } from '../../services/authStorage'
 import { formatDecisionDate } from '../../services/decisionStorage'
-import { getAssociationMembers, subscribeMemberStorage } from '../../services/memberStorage'
+import { getAssociationMembers, subscribeMemberStorage, verifyMemberRecord } from '../../services/memberStorage'
 import {
   getStaffBeneficiaries,
   subscribeStaffBeneficiaryStorage,
+  verifyStaffBeneficiary,
 } from '../../services/staffBeneficiaryStorage'
 import {
   buildDocumentPreview,
@@ -55,6 +56,7 @@ interface MemberQualificationModalProps {
     status: QualificationStatus,
     notes?: string,
   ) => void
+  reviewerName: string
 }
 
 type ReviewPerson =
@@ -275,6 +277,7 @@ export function MemberQualificationModal({
   requests,
   onVerifyDocument,
   onVerifyQualification,
+  reviewerName,
 }: MemberQualificationModalProps) {
   const [members, setMembers] = useState<AssociationMember[]>([])
   const [beneficiaries, setBeneficiaries] = useState<StaffBeneficiary[]>([])
@@ -306,12 +309,17 @@ export function MemberQualificationModal({
 
   useEffect(() => {
     setPerson((current) => {
-      if (!current || current.kind !== 'member') return current
-      const next = members.find((member) => member.id === current.id)
-      if (!next) return null
-      return { kind: 'member', id: next.id, member: next }
+      if (!current) return current
+      if (current.kind === 'member') {
+        const next = members.find((member) => member.id === current.id)
+        if (!next) return null
+        return { kind: 'member', id: next.id, member: next }
+      }
+      const next = beneficiaries.find((row) => row.id === current.id)
+      if (!next) return current
+      return { kind: 'beneficiary', id: next.id, beneficiary: next }
     })
-  }, [members])
+  }, [members, beneficiaries])
 
   if (!association) return null
 
@@ -367,6 +375,7 @@ export function MemberQualificationModal({
             onVerifyDocument={onVerifyDocument}
             onVerifyQualification={onVerifyQualification}
             onViewDocument={openDocument}
+            reviewerName={reviewerName}
           />
         ) : (
           <MemberList
@@ -443,7 +452,7 @@ function MemberList({
                     <span className="block font-medium text-gray-900">{personName(person)}</span>
                     <span className="mt-0.5 block text-xs text-gray-500">
                       {person.kind === 'member'
-                        ? `${person.member.membershipStatus} · ${person.member.assistanceStatus}`
+                        ? `${person.member.membershipStatus} · ${person.member.assistanceStatus}${person.member.staffVerified ? ' · VERIFIED' : ''}`
                         : person.beneficiary.verification}
                     </span>
                   </span>
@@ -468,6 +477,7 @@ function PersonReview({
   onVerifyDocument,
   onVerifyQualification,
   onViewDocument,
+  reviewerName,
 }: {
   person: ReviewPerson
   association: string
@@ -488,17 +498,52 @@ function PersonReview({
     notes?: string,
   ) => void
   onViewDocument: (request: ReviewableAssistanceItem, doc: SupportingDocument) => void
+  reviewerName: string
 }) {
+  const verified = person.kind === 'member'
+    ? person.member.staffVerified === true
+    : person.beneficiary.verification === 'VERIFIED'
+  const verifiedBy = person.kind === 'member' ? person.member.staffVerifiedBy : undefined
+  const verifiedAt = person.kind === 'member' ? person.member.staffVerifiedAt : undefined
+
+  function markVerified() {
+    if (verified) return
+    if (person.kind === 'member') {
+      verifyMemberRecord(person.member.id, reviewerName)
+      return
+    }
+    verifyStaffBeneficiary(person.beneficiary.id)
+  }
+
   return (
     <div className="space-y-6">
-      <button
-        type="button"
-        onClick={onBack}
-        className="inline-flex items-center gap-1 text-sm font-semibold text-primary hover:underline"
-      >
-        <ChevronLeft className="h-4 w-4" />
-        {association} members
-      </button>
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <button
+          type="button"
+          onClick={onBack}
+          className="inline-flex items-center gap-1 text-sm font-semibold text-primary hover:underline"
+        >
+          <ChevronLeft className="h-4 w-4" />
+          {association} members
+        </button>
+        {verified ? (
+          <Badge variant="success">VERIFIED</Badge>
+        ) : (
+          <Button size="sm" onClick={markVerified}>
+            Verified
+          </Button>
+        )}
+      </div>
+      {verified && verifiedBy && verifiedAt ? (
+        <p className="text-xs text-green-700">
+          Verified by {verifiedBy} on {formatDate(verifiedAt)}. Incomplete documents were not required.
+        </p>
+      ) : null}
+      {!verified ? (
+        <p className="text-xs text-gray-500">
+          You can mark this record verified even when some documents are not complete.
+        </p>
+      ) : null}
 
       <section>
         <h3 className="mb-3 flex items-center gap-2 text-sm font-bold text-gray-900">
@@ -558,6 +603,7 @@ function MemberDetails({ member, association }: { member: AssociationMember; ass
       <Field label="Vulnerability" value={member.vulnerability} />
       <Field label="Senior Citizen" value={member.isSenior ? 'Yes' : 'No'} />
       <Field label="PWD" value={member.isPwd ? 'Yes' : 'No'} />
+      <Field label="Verification" value={member.staffVerified ? 'VERIFIED' : 'UNVERIFIED'} />
       {member.notes ? <Field label="Notes" value={member.notes} wide /> : null}
     </dl>
   )

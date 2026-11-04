@@ -53,6 +53,45 @@ export function getAssociationAssistanceItems(associationName: string): Reviewab
   return getAssistanceItems().filter((item) => item.association.trim().toLowerCase() === name)
 }
 
+function sameText(left: string, right: string) {
+  return left.trim().toLowerCase() === right.trim().toLowerCase()
+}
+
+/** Move matching assistance requests to Generated after a list is produced. */
+export function markRequestsGenerated(rows: { association: string; program: string }[]) {
+  if (!rows.length) return
+  const items = readItems()
+  let changed = false
+  const next = items.map((item) => {
+    if (item.source !== 'assistance') return item
+    if (item.status === 'APPROVED' || item.status === 'REJECTED') return item
+    const program = item.program || item.requestType
+    const matched = rows.some(
+      (row) => sameText(row.association, item.association) && sameText(row.program, program),
+    )
+    if (!matched) return item
+    changed = true
+    const decidedAt = new Date().toISOString()
+    return {
+      ...item,
+      status: 'APPROVED' as const,
+      decisions: [
+        {
+          id: crypto.randomUUID(),
+          decision: 'approve' as const,
+          notes: 'The assistance list was generated for this request.',
+          decidedBy: 'Barangay Staff',
+          decidedAt,
+          previousStatus: item.status,
+          newStatus: 'APPROVED',
+        },
+        ...item.decisions,
+      ],
+    }
+  })
+  if (changed) writeItems(next)
+}
+
 export function submitAssociationAssistanceRequest(input: {
   association: string
   program: string

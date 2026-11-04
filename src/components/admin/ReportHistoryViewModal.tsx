@@ -1,12 +1,21 @@
+import { useEffect, useState } from 'react'
 import { Modal } from '../ui/Modal'
 import { Button } from '../ui/Button'
+import type { ReportFormat } from '../../data/mockData'
 import type { ReportPreview } from '../../services/reportHistoryService'
 
 interface ReportHistoryViewModalProps {
   open: boolean
   onClose: () => void
   preview: ReportPreview | null
-  onDownload: () => void
+  onDownload: (format: ReportFormat) => void
+}
+
+const PREVIEW_LIMIT = 8
+
+function cellText(value: string | number | undefined) {
+  const text = String(value ?? '').trim()
+  return text || '—'
 }
 
 export function ReportHistoryViewModal({
@@ -15,39 +24,114 @@ export function ReportHistoryViewModal({
   preview,
   onDownload,
 }: ReportHistoryViewModalProps) {
+  const [sheetIndex, setSheetIndex] = useState(0)
+
+  useEffect(() => {
+    setSheetIndex(0)
+  }, [preview?.entry.id, preview?.entry.name, preview?.title])
+
   if (!preview) return null
 
+  const sheet = preview.sheets[Math.min(sheetIndex, Math.max(preview.sheets.length - 1, 0))]
+  const shown = sheet ? sheet.rows.slice(0, PREVIEW_LIMIT) : []
+  const hiddenCount = sheet ? Math.max(sheet.rows.length - shown.length, 0) : 0
+
   return (
-    <Modal open={open} onClose={onClose} title="Report Preview" size="lg">
-      <div className="space-y-5">
-        <div className="rounded-lg border border-gray-100 bg-gray-50 p-4 text-sm">
-          <p className="font-semibold text-gray-900">{preview.entry.name}</p>
-          <p className="mt-1 text-gray-600">
-            {preview.entry.generatedBy} · {preview.entry.date} · {preview.entry.format}
-          </p>
+    <Modal open={open} onClose={onClose} title={preview.title} size="xl">
+      <div className="space-y-4">
+        <div className="rounded-lg border border-gray-100 bg-gray-50 px-4 py-3 text-sm text-gray-600">
+          <p>{preview.summary.join(' · ')}</p>
+          <p className="mt-1">Review the rows below, then download the full report.</p>
         </div>
 
-        {preview.sections.map((section) => (
-          <section key={section.heading}>
-            <h3 className="text-xs font-bold uppercase tracking-wide text-gray-500">
-              {section.heading}
-            </h3>
-            <ul className="mt-2 max-h-48 space-y-1 overflow-y-auto rounded-lg border border-gray-100 bg-white p-3 text-sm text-gray-700">
-              {section.lines.map((line, index) => (
-                <li key={`${section.heading}-${index}`} className="border-b border-gray-50 pb-1 last:border-0">
-                  {line}
-                </li>
-              ))}
-            </ul>
-          </section>
-        ))}
+        {preview.sheets.length > 1 ? (
+          <div className="flex flex-wrap gap-2">
+            {preview.sheets.map((item, index) => (
+              <button
+                key={item.name}
+                type="button"
+                onClick={() => setSheetIndex(index)}
+                className={`rounded-full px-3 py-1.5 text-sm font-medium ${
+                  index === sheetIndex
+                    ? 'bg-primary text-white'
+                    : 'border border-gray-200 bg-white text-gray-700 hover:bg-gray-50'
+                }`}
+              >
+                {item.name} ({item.rows.length})
+              </button>
+            ))}
+          </div>
+        ) : sheet ? (
+          <h3 className="text-sm font-semibold text-gray-900">
+            {sheet.name} ({sheet.rows.length})
+          </h3>
+        ) : null}
 
-        <div className="flex justify-end gap-3">
+        {sheet && sheet.rows.length === 0 ? (
+          <p className="rounded-lg border border-dashed border-gray-200 px-4 py-8 text-center text-sm text-gray-500">
+            No records yet.
+          </p>
+        ) : null}
+
+        {sheet && shown.length > 0 ? (
+          <>
+            <div className="hidden overflow-x-auto rounded-lg border border-gray-200 md:block">
+              <table className="min-w-full text-left text-sm">
+                <thead className="bg-gray-50 text-xs font-semibold uppercase text-gray-500">
+                  <tr>
+                    {sheet.headers.map((header) => (
+                      <th key={header} className="whitespace-nowrap px-3 py-2">
+                        {header}
+                      </th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {shown.map((row, rowIndex) => (
+                    <tr key={rowIndex} className="border-t border-gray-100 align-top">
+                      {sheet.headers.map((header, columnIndex) => (
+                        <td key={header} className="max-w-[16rem] px-3 py-2 break-words text-gray-700">
+                          {cellText(row[columnIndex])}
+                        </td>
+                      ))}
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+
+            <div className="space-y-3 md:hidden">
+              {shown.map((row, rowIndex) => (
+                <article key={rowIndex} className="rounded-lg border border-gray-200 p-3">
+                  {sheet.headers.map((header, columnIndex) => (
+                    <div key={header} className="grid grid-cols-[7.5rem_minmax(0,1fr)] gap-2 border-b border-gray-50 py-1.5 last:border-0">
+                      <span className="text-xs font-semibold uppercase text-gray-500">{header}</span>
+                      <span className="text-sm break-words text-gray-800">{cellText(row[columnIndex])}</span>
+                    </div>
+                  ))}
+                </article>
+              ))}
+            </div>
+
+            <p className="text-xs text-gray-500">
+              Showing {shown.length} of {sheet.rows.length} records.
+              {hiddenCount > 0 ? ` The downloaded file includes the other ${hiddenCount}.` : ''}
+            </p>
+          </>
+        ) : null}
+
+        <div className="flex flex-col gap-2 border-t border-gray-100 pt-4 sm:flex-row sm:flex-wrap sm:justify-end">
           <Button type="button" variant="outline" onClick={onClose}>
             Close
           </Button>
-          <Button type="button" onClick={onDownload}>
-            Download
+          <Button type="button" onClick={() => onDownload('PDF')}>
+            Download PDF
+          </Button>
+          <Button type="button" variant="outline" onClick={() => onDownload('EXCEL')}>
+            Download Excel
+          </Button>
+          <Button type="button" variant="outline" onClick={() => onDownload('CSV')}>
+            Download CSV
           </Button>
         </div>
       </div>

@@ -5,23 +5,31 @@ import { FormField } from '../components/auth/FormField'
 import { LockIcon, MailIcon } from '../components/auth/fieldIcons'
 import { PublicOnlyRoute } from '../components/auth/ProtectedRoute'
 import { useAuth } from '../context/useAuth'
+import { showToast } from '../components/ui/Toast'
 
 function LoginForm() {
   const navigate = useNavigate()
-  const { login } = useAuth()
+  const { login, enterDashboard } = useAuth()
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [rememberMe, setRememberMe] = useState(true)
   const [error, setError] = useState('')
+  const [signingIn, setSigningIn] = useState(false)
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
+    if (signingIn) return
     setError('')
+    setSigningIn(true)
     const result = await login(email, password, rememberMe)
     if (result.success && result.redirectTo) {
+      showToast('Signed in successfully')
+      await new Promise((resolve) => window.setTimeout(resolve, 700))
+      enterDashboard()
       navigate(result.redirectTo)
       return
     }
+    setSigningIn(false)
     setError(result.error ?? 'Unable to sign in.')
   }
 
@@ -83,9 +91,10 @@ function LoginForm() {
 
             <button
               type="submit"
-              className="w-full rounded-lg bg-primary py-3 text-sm font-bold text-white transition hover:bg-primary-dark"
+              disabled={signingIn}
+              className="w-full rounded-lg bg-primary py-3 text-sm font-bold text-white transition hover:bg-primary-dark disabled:cursor-wait disabled:opacity-80"
             >
-              Sign In
+              {signingIn ? 'Signing in...' : 'Sign In'}
             </button>
           </form>
 

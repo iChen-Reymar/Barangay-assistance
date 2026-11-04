@@ -72,6 +72,21 @@ export function removeAssociationMember(id: string) {
   writeMembers(readMembers().filter((member) => member.id !== id))
 }
 
+export function verifyMemberRecord(memberId: string, reviewerName: string) {
+  const members = readMembers()
+  const index = members.findIndex((member) => member.id === memberId)
+  if (index === -1) return null
+  const next = [...members]
+  next[index] = {
+    ...members[index],
+    staffVerified: true,
+    staffVerifiedBy: reviewerName,
+    staffVerifiedAt: new Date().toISOString(),
+  }
+  writeMembers(next)
+  return next[index]
+}
+
 export function verifyMemberAttachment(
   memberId: string,
   kind: 'barangayCertificate' | 'governmentId',

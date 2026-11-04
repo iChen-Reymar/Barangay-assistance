@@ -45,18 +45,7 @@ export function buildStaffReportPreview(title: string, generatedBy: string): Rep
 }
 
 export function downloadStaffReportPdf(entry: ReportHistoryEntry): void {
-  const preview = buildReportPreview(entry)
-  const text = preview.sections
-    .map((section) => `${section.heading}\n${section.lines.map((line) => `- ${line}`).join('\n')}`)
-    .join('\n\n')
-
-  const blob = new Blob([`\uFEFF${text}`], { type: 'text/plain;charset=utf-8' })
-  const url = URL.createObjectURL(blob)
-  const link = document.createElement('a')
-  link.href = url
-  link.download = entry.name.replace(/\.pdf$/i, '.txt')
-  link.click()
-  URL.revokeObjectURL(url)
+  downloadHistoryReport({ ...entry, format: 'PDF', name: entry.name.replace(/\.(csv|xlsx|txt)$/i, '.pdf') })
 }
 
 export function exportStaffReport(
@@ -66,12 +55,6 @@ export function exportStaffReport(
 ): ReportHistoryEntry | null {
   const entry = createStaffReportEntry(title, generatedBy, format)
   if (!entry) return null
-
-  if (format === 'PDF') {
-    downloadStaffReportPdf(entry)
-  } else {
-    downloadHistoryReport(entry)
-  }
-
+  downloadHistoryReport(entry)
   return entry
 }

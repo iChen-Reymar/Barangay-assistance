@@ -1,24 +1,25 @@
 ﻿import { useEffect, useState } from 'react'
-import { FileText, Download } from 'lucide-react'
+import { FileText } from 'lucide-react'
 import { DashboardNavbar } from '../../components/layout/DashboardNavbar'
+import { ReportExportMenu } from '../../components/admin/ReportExportMenu'
 import { ReportHistoryViewModal } from '../../components/admin/ReportHistoryViewModal'
-import { Button } from '../../components/ui/Button'
 import { staffReports } from '../../data/staffMockData'
+import type { ReportFormat } from '../../data/mockData'
 import { useAuth } from '../../context/useAuth'
 import { useStaffDisplayUser } from '../../hooks/useStaffDisplayUser'
 import { logAuditEvent } from '../../services/auditStorage'
 import {
   buildStaffReportPreview,
-  downloadStaffReportPdf,
   exportStaffReport,
 } from '../../services/staffReportService'
-import { downloadHistoryReport, type ReportPreview } from '../../services/reportHistoryService'
+import type { ReportPreview } from '../../services/reportHistoryService'
 
 export default function StaffReportsPage() {
   const { user, profile } = useAuth()
   const displayUser = useStaffDisplayUser()
   const generatedBy = displayUser.name
   const [viewPreview, setViewPreview] = useState<ReportPreview | null>(null)
+  const [viewTitle, setViewTitle] = useState<string | null>(null)
   const [statusMessage, setStatusMessage] = useState('')
 
   useEffect(() => {
@@ -42,31 +43,20 @@ export default function StaffReportsPage() {
   function handleView(title: string) {
     const preview = buildStaffReportPreview(title, generatedBy)
     if (!preview) return
+    setViewTitle(title)
     setViewPreview(preview)
   }
 
-  function handleExportPdf(title: string) {
-    const entry = exportStaffReport(title, generatedBy, 'PDF')
+  function handleExport(title: string, format: ReportFormat) {
+    const entry = exportStaffReport(title, generatedBy, format)
     if (!entry) return
-    setStatusMessage(`Exported ${entry.name.replace(/\.pdf$/i, '.txt')}.`)
-    logExport(title, 'PDF', entry.name)
+    setStatusMessage(`Exported ${entry.name}.`)
+    logExport(title, format, entry.name)
   }
 
-  function handleExportCsv(title: string) {
-    const entry = exportStaffReport(title, generatedBy, 'CSV')
-    if (!entry) return
-    setStatusMessage(`Exported ${entry.name.replace(/\.pdf$/i, '.csv')}.`)
-    logExport(title, 'CSV', entry.name)
-  }
-
-  function handleDownloadFromModal() {
-    if (!viewPreview) return
-    if (viewPreview.entry.format === 'PDF') {
-      downloadStaffReportPdf(viewPreview.entry)
-    } else {
-      downloadHistoryReport(viewPreview.entry)
-    }
-    setStatusMessage(`Downloaded report for ${viewPreview.entry.name}.`)
+  function handleDownloadFromModal(format: ReportFormat) {
+    if (!viewTitle) return
+    handleExport(viewTitle, format)
   }
 
   return (
@@ -99,18 +89,15 @@ export default function StaffReportsPage() {
               </div>
               <h3 className="font-bold text-gray-900">{report.title}</h3>
               <p className="mt-1 text-sm text-gray-500">{report.description}</p>
-              <div className="mt-4 flex flex-wrap gap-2">
-                <Button variant="outline" size="sm" onClick={() => handleView(report.title)}>
-                  View
-                </Button>
-                <Button variant="outline" size="sm" onClick={() => handleExportPdf(report.title)}>
-                  <Download className="h-3 w-3" />
-                  Export PDF
-                </Button>
-                <Button variant="outline" size="sm" onClick={() => handleExportCsv(report.title)}>
-                  <Download className="h-3 w-3" />
-                  Export CSV
-                </Button>
+              <div className="mt-4 flex flex-col gap-2 sm:flex-row sm:flex-wrap">
+                <button
+                  type="button"
+                  onClick={() => handleView(report.title)}
+                  className="rounded-lg bg-primary px-3 py-2 text-sm font-semibold text-white hover:bg-primary-dark sm:py-1.5"
+                >
+                  View Report
+                </button>
+                <ReportExportMenu onExport={(format) => handleExport(report.title, format)} />
               </div>
             </div>
           ))}
@@ -119,7 +106,10 @@ export default function StaffReportsPage() {
 
       <ReportHistoryViewModal
         open={viewPreview !== null}
-        onClose={() => setViewPreview(null)}
+        onClose={() => {
+          setViewPreview(null)
+          setViewTitle(null)
+        }}
         preview={viewPreview}
         onDownload={handleDownloadFromModal}
       />

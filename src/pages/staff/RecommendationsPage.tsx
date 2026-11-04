@@ -1,5 +1,6 @@
 ﻿import { useEffect, useState } from 'react'
 import { DashboardNavbar } from '../../components/layout/DashboardNavbar'
+import { AiRecommendationBoards } from '../../components/recommendations/AiRecommendationBoards'
 import { ApprovalDecisionModal } from '../../components/approval/ApprovalDecisionModal'
 import { DecisionTimeline } from '../../components/approval/DecisionTimeline'
 import { RequestDetailsModal } from '../../components/approval/RequestDetailsModal'
@@ -91,11 +92,14 @@ export default function StaffRecommendationsPage() {
         userInitials={initials}
       />
       <main className="flex-1 overflow-y-auto p-4 sm:p-5 md:p-6">
-        <h2 className="mb-4 text-base font-bold text-gray-900">
-          AI-Generated Recommendations ({items.length})
-        </h2>
-
-        <div className="space-y-4">
+        <h2 className="mb-4 text-base font-bold text-gray-900">AI recommendations for every association</h2>
+        <AiRecommendationBoards compact emptyMessage="No assistance list has been generated yet." />
+        {items.length > 0 ? (
+          <>
+            <h2 className="mb-4 mt-8 text-base font-bold text-gray-900">
+              Requests to review ({items.length})
+            </h2>
+            <div className="space-y-4">
           {items.map((rec) => (
             <div key={rec.id} className="rounded-lg border border-gray-200 bg-white p-5 shadow-sm">
               <div className="flex flex-wrap items-start justify-between gap-3">
@@ -169,6 +173,8 @@ export default function StaffRecommendationsPage() {
             </div>
           ))}
         </div>
+          </>
+        ) : null}
       </main>
 
       <RequestDetailsModal

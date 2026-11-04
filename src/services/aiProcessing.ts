@@ -1,4 +1,5 @@
 import type { StaffBeneficiary, VulnerabilityLevel } from '../data/staffMockData'
+import { markRequestsGenerated } from './decisionStorage'
 import { getStaffBeneficiaries } from './staffBeneficiaryStorage'
 import {
   scoreBeneficiaries,
@@ -97,6 +98,7 @@ export function subscribeGeneratedAssistanceList(callback: () => void) {
 
 function persist(rows: GeneratedAssistanceRow[]) {
   localStorage.setItem(LIST_KEY, JSON.stringify(rows))
+  markRequestsGenerated(rows)
   window.dispatchEvent(new CustomEvent(UPDATED_EVENT))
   return rows
 }
@@ -113,7 +115,7 @@ function toRuleRow(beneficiary: StaffBeneficiary, generatedAt: string): Unranked
   return {
     name: beneficiary.name.trim(),
     association: beneficiary.association,
-    score,
+    score: Math.round(score),
     classification,
     program: matchProgram(classification, beneficiary.vulnerabilityIndicators),
     verification: 'VERIFIED' as const,
@@ -137,7 +139,7 @@ function rowsFromScores(
     return {
       name: beneficiary.name.trim(),
       association: beneficiary.association,
-      score: result.score,
+      score: Math.round(result.score),
       classification,
       program: matchProgram(classification, beneficiary.vulnerabilityIndicators),
       verification: 'VERIFIED' as const,

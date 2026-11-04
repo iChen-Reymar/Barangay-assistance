@@ -1,4 +1,5 @@
 import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom'
+import { ToastHost } from './components/ui/Toast'
 import { ProtectedRoute } from './components/auth/ProtectedRoute'
 import AdminLayout from './layouts/AdminLayout'
 import AssociationLayout from './layouts/AssociationLayout'
@@ -13,6 +14,7 @@ import AssociationsPage from './pages/admin/AssociationsPage'
 import ProgramsPage from './pages/admin/ProgramsPage'
 import RecommendationsPage from './pages/admin/RecommendationsPage'
 import ReportsPage from './pages/admin/ReportsPage'
+import AdminAidRecordsPage from './pages/admin/AidRecordsPage'
 import AuditLogsPage from './pages/admin/AuditLogsPage'
 import UsersPage from './pages/admin/UsersPage'
 import AccessRequestsPage from './pages/admin/AccessRequestsPage'
@@ -35,6 +37,7 @@ import StaffModelPerformancePage from './pages/staff/ModelPerformancePage'
 import StaffRecommendationsPage from './pages/staff/RecommendationsPage'
 import StaffApprovedRequestsPage from './pages/staff/ApprovedRequestsPage'
 import StaffReportsPage from './pages/staff/ReportsPage'
+import StaffAidRecordsPage from './pages/staff/AidRecordsPage'
 import StaffStatusReportsPage from './pages/staff/StatusReportsPage'
 import StaffVerifyQualificationPage from './pages/staff/VerifyQualificationPage'
 import StaffSettingsPage from './pages/staff/SettingsPage'
@@ -42,6 +45,7 @@ import StaffSettingsPage from './pages/staff/SettingsPage'
 export default function App() {
   return (
     <BrowserRouter>
+      <ToastHost />
       <Routes>
         <Route path="/" element={<LandingPage />} />
         <Route path="/login" element={<LoginPage />} />
@@ -62,6 +66,7 @@ export default function App() {
           <Route path="programs" element={<ProgramsPage />} />
           <Route path="recommendations" element={<RecommendationsPage />} />
           <Route path="reports" element={<ReportsPage />} />
+          <Route path="aid-records" element={<AdminAidRecordsPage />} />
           <Route path="audit-logs" element={<AuditLogsPage />} />
           <Route path="users" element={<UsersPage />} />
           <Route path="access-requests" element={<AccessRequestsPage />} />
@@ -106,6 +111,7 @@ export default function App() {
           <Route path="approved-requests" element={<StaffApprovedRequestsPage />} />
           <Route path="status-reports" element={<StaffStatusReportsPage />} />
           <Route path="reports" element={<StaffReportsPage />} />
+          <Route path="aid-records" element={<StaffAidRecordsPage />} />
           <Route path="settings" element={<StaffSettingsPage />} />
         </Route>
 

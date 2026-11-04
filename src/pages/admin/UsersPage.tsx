@@ -1,10 +1,12 @@
-﻿import { useState } from 'react'
+﻿import { useEffect, useState } from 'react'
 import { Plus } from 'lucide-react'
 import { AdminHeader } from '../../components/admin/AdminHeader'
 import { Badge } from '../../components/ui/Badge'
 import { Button } from '../../components/ui/Button'
 import { Modal } from '../../components/ui/Modal'
 import { useAuth } from '../../context/useAuth'
+import type { Association } from '../../data/mockData'
+import { getAssociations, subscribeAssociationStorage } from '../../services/associationStorage'
 import { buildChanges, logAuditEvent } from '../../services/auditStorage'
 import {
   createManagedUser,
@@ -25,6 +27,13 @@ const fieldClass =
 
 const defaultPassword = '123123'
 
+function associationFor(account: StoredUser, associations: Association[]) {
+  if (account.role !== 'association') return ''
+  const named = account.associationName?.trim()
+  if (named) return named
+  return associations.find((row) => row.headUserId === account.id)?.name?.trim() ?? ''
+}
+
 function statusVariant(status: StoredUser['status']) {
   if (status === 'approved') return 'success' as const
   if (status === 'rejected') return 'danger' as const
@@ -35,6 +44,7 @@ export default function UsersPage() {
   const { user, profile, allUsers, refreshUsers } = useAuth()
   const actorName = profile?.fullName ?? user?.fullName ?? 'Administrator'
   const actorEmail = profile?.email ?? user?.email
+  const [associations, setAssociations] = useState<Association[]>(() => getAssociations())
   const [formOpen, setFormOpen] = useState(false)
   const [removeTarget, setRemoveTarget] = useState<StoredUser | null>(null)
   const [editTarget, setEditTarget] = useState<StoredUser | null>(null)
@@ -56,6 +66,8 @@ export default function UsersPage() {
     role: 'staff' as UserRole,
     associationName: '',
   })
+
+  useEffect(() => subscribeAssociationStorage(() => setAssociations(getAssociations())), [])
 
   function audit(description: string, changes: ReturnType<typeof buildChanges>) {
     logAuditEvent({
@@ -206,6 +218,7 @@ export default function UsersPage() {
                 <th className="px-4 py-3">Name</th>
                 <th className="px-4 py-3">Email</th>
                 <th className="px-4 py-3">Permission</th>
+                <th className="px-4 py-3">Association</th>
                 <th className="px-4 py-3">Status</th>
                 <th className="px-4 py-3">Actions</th>
               </tr>
@@ -231,6 +244,13 @@ export default function UsersPage() {
                           <option key={option.value} value={option.value}>{option.label}</option>
                         ))}
                       </select>
+                    </td>
+                    <td className="px-4 py-3">
+                      {account.role === 'association' ? (
+                        <span className="text-gray-700">{associationFor(account, associations) || 'Not assigned'}</span>
+                      ) : (
+                        <span className="text-gray-300">—</span>
+                      )}
                     </td>
                     <td className="px-4 py-3">
                       <Badge variant={statusVariant(account.status)}>{account.status.toUpperCase()}</Badge>
@@ -303,7 +323,17 @@ export default function UsersPage() {
           {form.role === 'association' ? (
             <label className="block text-sm">
               <span className="mb-1 block text-xs font-semibold uppercase text-gray-500">Association</span>
-              <input required value={form.associationName} onChange={(event) => setForm({ ...form, associationName: event.target.value })} className={fieldClass} />
+              <select
+                required
+                value={form.associationName}
+                onChange={(event) => setForm({ ...form, associationName: event.target.value })}
+                className={fieldClass}
+              >
+                <option value="">Select an association</option>
+                {associations.map((association) => (
+                  <option key={association.id} value={association.name}>{association.name}</option>
+                ))}
+              </select>
             </label>
           ) : null}
         </form>

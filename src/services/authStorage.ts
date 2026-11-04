@@ -1,4 +1,4 @@
-import { supabase } from '../lib/supabase'
+import { clearSupabaseAuthStorage, supabase } from '../lib/supabase'
 import { writeStoreWithoutSync } from './databaseSync'
 import type { ReviewInput } from '../types/approval'
 import {
@@ -284,6 +284,8 @@ export function clearSession() {
   localStorage.removeItem(SESSION_KEY)
   sessionStorage.removeItem(ACCESS_TOKEN_KEY)
   localStorage.removeItem(ACCESS_TOKEN_KEY)
+  clearSupabaseAuthStorage()
+  void supabase.auth.signOut({ scope: 'local' })
 }
 
 function roleFromLabel(value: string | undefined): UserRole | null {
@@ -429,7 +431,12 @@ export async function login(email: string, password: string, rememberMe: boolean
     password,
   })
   if (error || !data.user || !data.session) {
-    return { success: false, error: error?.message || 'Invalid email or password.' }
+    const message = error?.message ?? ''
+    const invalidCredentials = /invalid login credentials|invalid email or password/i.test(message)
+    return {
+      success: false,
+      error: invalidCredentials || !message ? 'Invalid Username or Password' : message,
+    }
   }
 
   saveAccessToken(data.session.access_token, rememberMe)

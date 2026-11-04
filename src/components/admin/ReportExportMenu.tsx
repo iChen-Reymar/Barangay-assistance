@@ -9,7 +9,7 @@ interface ReportExportMenuProps {
 
 const options: { format: ReportFormat; label: string }[] = [
   { format: 'PDF', label: 'PDF Summary' },
-  { format: 'EXCEL', label: 'Excel (.csv)' },
+  { format: 'EXCEL', label: 'Excel (.xlsx)' },
   { format: 'CSV', label: 'CSV' },
 ]
 

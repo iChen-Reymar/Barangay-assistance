@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { AdminHeader } from '../../components/admin/AdminHeader'
+import { AiRecommendationBoards } from '../../components/recommendations/AiRecommendationBoards'
 import { ApprovalDecisionModal } from '../../components/approval/ApprovalDecisionModal'
 import { DecisionTimeline } from '../../components/approval/DecisionTimeline'
 import { RequestDetailsModal } from '../../components/approval/RequestDetailsModal'
@@ -107,7 +108,11 @@ export default function RecommendationsPage() {
         title="View AI-Generated Recommendation"
       />
       <main className="flex-1 overflow-y-auto p-4 sm:p-5 md:p-6">
-        <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+        <h2 className="mb-4 text-base font-bold text-gray-900">AI recommendations for every association</h2>
+        <AiRecommendationBoards compact emptyMessage="No assistance list has been generated yet." />
+        {items.length > 0 || approvedOnly ? (
+        <>
+        <div className="mb-4 mt-8 flex flex-wrap items-center justify-between gap-3">
           <h2 className="text-base font-bold text-gray-900">
             {approvedOnly
               ? `AI-Generated Results (${items.length})`
@@ -212,6 +217,8 @@ export default function RecommendationsPage() {
             </div>
           ))}
         </div>
+        </>
+        ) : null}
       </main>
 
       <RequestDetailsModal

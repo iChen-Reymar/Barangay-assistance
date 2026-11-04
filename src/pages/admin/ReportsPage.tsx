@@ -26,7 +26,6 @@ import {
   buildReportPreview,
   downloadHistoryReport,
   exportReportFromTemplate,
-  generateReportFromTemplate,
   getReportHistory,
   subscribeReportHistory,
   type ReportPreview,
@@ -53,6 +52,7 @@ export default function ReportsPage() {
 
   const [history, setHistory] = useState<ReportHistoryEntry[]>(() => getReportHistory())
   const [viewPreview, setViewPreview] = useState<ReportPreview | null>(null)
+  const [viewTemplate, setViewTemplate] = useState<ReportTemplate | null>(null)
   const [statusMessage, setStatusMessage] = useState('')
 
   useEffect(() => {
@@ -90,11 +90,16 @@ export default function ReportsPage() {
     })
   }
 
-  function handleGenerate(template: ReportTemplate) {
-    const entry = generateReportFromTemplate(template, generatedBy)
-    setViewPreview(buildReportPreview(entry))
-    setStatusMessage(`Generated ${entry.name} and added it to Report History.`)
-    logReportAction(`Generated ${template.title} (${entry.name}).`)
+  function handleViewTemplate(template: ReportTemplate) {
+    setViewTemplate(template)
+    setViewPreview(buildReportPreview({
+      id: `preview-${template.slug}`,
+      name: template.title,
+      generatedBy,
+      date: new Date().toLocaleString('en-PH', { month: 'long', day: 'numeric', year: 'numeric' }),
+      format: 'PDF',
+      reportType: template.reportType,
+    }))
   }
 
   function handleExport(template: ReportTemplate, format: ReportFormat) {
@@ -104,18 +109,25 @@ export default function ReportsPage() {
   }
 
   function handleView(entry: ReportHistoryEntry) {
+    setViewTemplate(null)
     setViewPreview(buildReportPreview(entry))
   }
 
   function handleDownload(entry: ReportHistoryEntry) {
     downloadHistoryReport(entry)
-    setStatusMessage(`Downloaded ${entry.format === 'PDF' ? entry.name : entry.name.replace(/\.(pdf|xlsx)$/i, '.csv')}.`)
+    setStatusMessage(`Downloaded ${entry.name}.`)
   }
 
-  function handleDownloadFromModal() {
+  function handleDownloadFromModal(format: ReportFormat) {
+    if (viewTemplate) {
+      handleExport(viewTemplate, format)
+      return
+    }
     if (!viewPreview) return
-    downloadHistoryReport(viewPreview.entry)
-    setStatusMessage(`Downloaded ${viewPreview.entry.format === 'PDF' ? viewPreview.entry.name : viewPreview.entry.name.replace(/\.(pdf|xlsx)$/i, '.csv')}.`)
+    const extension = format === 'PDF' ? 'pdf' : format === 'EXCEL' ? 'xlsx' : 'csv'
+    const name = viewPreview.entry.name.replace(/\.(pdf|xlsx|csv)$/i, `.${extension}`)
+    downloadHistoryReport({ ...viewPreview.entry, format, name })
+    setStatusMessage(`Downloaded ${name}.`)
   }
 
   return (
@@ -147,13 +159,13 @@ export default function ReportsPage() {
                   </div>
                   <h3 className="font-bold text-gray-900">{report.title}</h3>
                   <p className="mt-1 text-sm text-gray-500">{report.description}</p>
-                  <div className="mt-4 flex flex-wrap gap-2">
+                  <div className="mt-4 flex flex-col gap-2 sm:flex-row sm:flex-wrap">
                     <button
                       type="button"
-                      onClick={() => handleGenerate(report)}
-                      className="rounded-lg border border-gray-200 px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-50"
+                      onClick={() => handleViewTemplate(report)}
+                      className="rounded-lg bg-primary px-3 py-2 text-sm font-semibold text-white hover:bg-primary-dark sm:py-1.5"
                     >
-                      Generate Report
+                      View Report
                     </button>
                     <ReportExportMenu onExport={(format) => handleExport(report, format)} />
                   </div>
@@ -263,7 +275,10 @@ export default function ReportsPage() {
 
       <ReportHistoryViewModal
         open={viewPreview !== null}
-        onClose={() => setViewPreview(null)}
+        onClose={() => {
+          setViewPreview(null)
+          setViewTemplate(null)
+        }}
         preview={viewPreview}
         onDownload={handleDownloadFromModal}
       />

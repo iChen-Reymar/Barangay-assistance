@@ -35,7 +35,8 @@ function documentWasSubmitted(file?: MemberAttachment) {
   return Boolean(file?.dataUrl?.trim()) && file?.status !== 'rejected'
 }
 
-function memberSubmittedRequirements(member: AssociationMember) {
+function memberEligibleForList(member: AssociationMember) {
+  if (member.staffVerified) return true
   return documentWasSubmitted(member.barangayCertificate) && documentWasSubmitted(member.governmentId)
 }
 
@@ -138,7 +139,7 @@ export default function StaffPriorityListPage() {
   function membersOnAssociations(associationName: string) {
     return getAssociationMembers().filter((member) => {
       const belongsTo = member.associationName?.trim() ?? ''
-      if (!member.name.trim() || !belongsTo || !memberSubmittedRequirements(member)) return false
+      if (!member.name.trim() || !belongsTo || !memberEligibleForList(member)) return false
       if (associationName === 'All Associations') return true
       return sameAssociation(belongsTo, associationName)
     })
@@ -151,7 +152,7 @@ export default function StaffPriorityListPage() {
       if (roster.length === 0) return
       const eligibleNames = new Set(
         getAssociationMembers()
-          .filter(memberSubmittedRequirements)
+          .filter(memberEligibleForList)
           .map((member) => nameKey(member.name)),
       )
       const chosenProgram = program === 'All Programs' ? undefined : program
@@ -164,7 +165,7 @@ export default function StaffPriorityListPage() {
   const rosterForSelection = useMemo(() => {
     return members.filter((member) => {
       const belongsTo = member.associationName?.trim() ?? ''
-      if (!member.name.trim() || !belongsTo || !memberSubmittedRequirements(member)) return false
+      if (!member.name.trim() || !belongsTo || !memberEligibleForList(member)) return false
       if (association === 'All Associations') return true
       return sameAssociation(belongsTo, association)
     })

@@ -3,9 +3,11 @@ import { Check } from 'lucide-react'
 import { DashboardNavbar } from '../../components/layout/DashboardNavbar'
 import { Badge } from '../../components/ui/Badge'
 import { useAuth } from '../../context/useAuth'
+import { getGeneratedAssistanceList, subscribeGeneratedAssistanceList } from '../../services/aiProcessing'
 import { getAssociationDetails } from '../../services/memberStorage'
 import {
   getAssociationAssistanceItems,
+  markRequestsGenerated,
   subscribeDecisionStorage,
 } from '../../services/decisionStorage'
 import type { ReviewableAssistanceItem } from '../../types/approval'
@@ -64,9 +66,17 @@ export default function RequestStatusPage() {
   )
 
   useEffect(() => {
-    const refresh = () => setRequests(getAssociationAssistanceItems(associationName))
+    const refresh = () => {
+      markRequestsGenerated(getGeneratedAssistanceList())
+      setRequests(getAssociationAssistanceItems(associationName))
+    }
     refresh()
-    return subscribeDecisionStorage(refresh)
+    const stopDecisions = subscribeDecisionStorage(refresh)
+    const stopGenerated = subscribeGeneratedAssistanceList(refresh)
+    return () => {
+      stopDecisions()
+      stopGenerated()
+    }
   }, [associationName])
 
   return (

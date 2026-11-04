@@ -170,6 +170,25 @@ async function saveMembers(rows) {
   }))
 }
 
+async function saveAidRecords(rows) {
+  if (!Array.isArray(rows)) return
+  await clear('aid_records')
+  await insert('aid_records', rows.map((row) => ({
+    id: row.id,
+    association_name: row.associationName ?? '',
+    member_id: row.memberId ?? null,
+    member_name: row.memberName ?? row.member ?? '',
+    program_name: row.program ?? '',
+    date_received: row.dateReceived ?? '',
+    quantity: row.quantity ?? '',
+    comments: row.comments ?? '',
+    status: row.status ?? 'RECEIVED',
+    submitted_by: row.submittedBy ?? null,
+    submitted_at: row.submittedAt ?? null,
+    payload: row,
+  })))
+}
+
 async function saveBeneficiaries(rows) {
   if (!Array.isArray(rows)) return
   await clear('beneficiaries')
@@ -267,7 +286,7 @@ async function saveRequests(rows) {
     }
   }))
   await insert('request_documents', rows.flatMap((row) => (row.documents ?? []).map((doc) => ({
-    id: doc.id,
+    id: String(doc.id).startsWith(`${row.id}:`) ? doc.id : `${row.id}:${doc.id}`,
     request_id: row.id,
     name: doc.name,
     file_type: doc.type,
@@ -279,7 +298,7 @@ async function saveRequests(rows) {
     data_url: doc.dataUrl ?? null,
   }))))
   await insert('qualification_checks', rows.flatMap((row) => (row.qualifications ?? []).map((check) => ({
-    id: check.id,
+    id: String(check.id).startsWith(`${row.id}:`) ? check.id : `${row.id}:${check.id}`,
     request_id: row.id,
     criterion: check.criterion,
     description: check.description,
@@ -289,7 +308,7 @@ async function saveRequests(rows) {
     notes: check.notes ?? null,
   }))))
   await insert('request_decisions', rows.flatMap((row) => (row.decisions ?? []).map((decision) => ({
-    id: decision.id,
+    id: String(decision.id).startsWith(`${row.id}:`) ? decision.id : `${row.id}:${decision.id}`,
     request_id: row.id,
     decision: decision.decision,
     notes: decision.notes,
@@ -308,7 +327,7 @@ async function saveGenerated(rows) {
     rank_no: row.rank,
     beneficiary_name: row.name,
     association_name: row.association,
-    score: row.score,
+    score: Math.max(0, Math.min(100, Math.round(Number(row.score) || 0))),
     classification: row.classification,
     program_name: row.program,
     verification: row.verification,
@@ -420,6 +439,7 @@ const savers = {
   barangay_associations: saveAssociations,
   barangay_association_members: saveMembers,
   barangay_association_notifications: saveNotifications,
+  barangay_aid_records: saveAidRecords,
   barangay_staff_beneficiaries: saveBeneficiaries,
   barangay_assistance_programs: savePrograms,
   barangay_reviewable_items: saveRequests,
@@ -469,6 +489,13 @@ async function loadStores() {
   const memberDocuments = await rowsOf('member_documents')
   const notifications = await rowsOf('notifications')
   const beneficiaries = await rowsOf('beneficiaries')
+  let aidRecords = []
+  try {
+    aidRecords = await rowsOf('aid_records')
+  } catch (error) {
+    const message = String(error?.message || '')
+    if (!/does not exist|schema cache|Could not find the table|relation/i.test(message)) throw error
+  }
   const programs = await rowsOf('assistance_programs')
   const requests = await rowsOf('assistance_requests')
   const documents = await rowsOf('request_documents')
@@ -555,6 +582,23 @@ async function loadStores() {
       memberName: row.member_name ?? undefined,
       rejectedBy: row.rejected_by ?? undefined,
       reason: row.payload?.reason ?? undefined,
+    })))
+  }
+  if (aidRecords.length > 0) {
+    const stored = storedRecords(aidRecords)
+    if (stored) push('barangay_aid_records', stored)
+    else push('barangay_aid_records', aidRecords.map((row) => ({
+      id: row.id,
+      associationName: row.association_name ?? '',
+      memberId: row.member_id ?? '',
+      memberName: row.member_name ?? '',
+      program: row.program_name ?? '',
+      dateReceived: row.date_received ?? '',
+      quantity: row.quantity ?? '',
+      comments: row.comments ?? '',
+      status: row.status ?? 'RECEIVED',
+      submittedBy: row.submitted_by ?? '',
+      submittedAt: row.submitted_at ?? '',
     })))
   }
   if (beneficiaries.length > 0) {

@@ -25,6 +25,10 @@ function sameAssociation(left: string, right: string) {
   return left.trim().toLowerCase() === right.trim().toLowerCase()
 }
 
+function isOpenRequest(request: ReviewableAssistanceItem) {
+  return request.status !== 'APPROVED' && request.status !== 'REJECTED'
+}
+
 function qualificationSummary(requests: ReviewableAssistanceItem[]) {
   const checks = requests.flatMap((item) => item.qualifications ?? [])
   const passed = checks.filter((check) => check.status === 'passed').length
@@ -68,6 +72,7 @@ export default function StaffVerifyQualificationPage() {
     for (const name of associationNames) add(name)
     for (const member of members) add(member.associationName ?? '')
     for (const item of items) {
+      if (!isOpenRequest(item)) continue
       add(item.association)
       map.get(item.association.trim().toLowerCase())?.requests.push(item)
     }
@@ -75,7 +80,7 @@ export default function StaffVerifyQualificationPage() {
   }, [associationNames, members, items])
 
   const associationRequests = selectedAssociation
-    ? items.filter((item) => sameAssociation(item.association, selectedAssociation))
+    ? items.filter((item) => isOpenRequest(item) && sameAssociation(item.association, selectedAssociation))
     : []
 
   function handleVerifyDocument(
@@ -168,7 +173,7 @@ export default function StaffVerifyQualificationPage() {
                       </td>
                       <td className="px-4 py-3 text-gray-600">
                         {group.requests.length > 0
-                          ? group.requests.map((request) => request.requestType).join(', ')
+                          ? [...new Set(group.requests.map((request) => request.requestType))].join(', ')
                           : '—'}
                       </td>
                       <td className="px-4 py-3 text-gray-600">{memberCount > 0 ? memberCount : beneficiaryCount}</td>
@@ -202,6 +207,7 @@ export default function StaffVerifyQualificationPage() {
         requests={associationRequests}
         onVerifyDocument={handleVerifyDocument}
         onVerifyQualification={handleVerifyQualification}
+        reviewerName={actor.name}
       />
     </>
   )

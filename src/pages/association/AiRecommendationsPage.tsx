@@ -1,16 +1,23 @@
 import { DashboardNavbar } from '../../components/layout/DashboardNavbar'
-import { Badge } from '../../components/ui/Badge'
-import { aiRecommendations, type VulnerabilityLevel } from '../../data/associationMockData'
+import { AiRecommendationBoards } from '../../components/recommendations/AiRecommendationBoards'
+import { useAuth } from '../../context/useAuth'
 import { useAssociationDisplayUser } from '../../hooks/useAssociationDisplayUser'
+import { getAssociations } from '../../services/associationStorage'
 
-function vulnerabilityVariant(level: VulnerabilityLevel) {
-  if (level === 'HIGH') return 'danger'
-  if (level === 'MEDIUM') return 'warning'
-  return 'success'
+function associationNameFor(profileName: string | undefined, userId: string | undefined) {
+  const named = profileName?.trim()
+  if (named) return named
+  if (userId) {
+    const assigned = getAssociations().find((row) => row.headUserId === userId)
+    if (assigned?.name.trim()) return assigned.name.trim()
+  }
+  return ''
 }
 
 export default function AiRecommendationsPage() {
+  const { user, profile } = useAuth()
   const displayUser = useAssociationDisplayUser()
+  const associationName = associationNameFor(profile?.associationName, user?.id)
 
   return (
     <>
@@ -22,28 +29,11 @@ export default function AiRecommendationsPage() {
         notificationsPath="/association/notifications"
       />
       <main className="flex-1 overflow-y-auto p-4 sm:p-5 md:p-6">
-        <div className="space-y-4">
-          {aiRecommendations.map((rec) => (
-            <div key={rec.id} className="rounded-lg border border-gray-200 bg-white p-5 shadow-sm">
-              <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
-                <Badge variant={vulnerabilityVariant(rec.vulnerabilityLevel)}>
-                  {`Vulnerability: ${rec.vulnerabilityLevel}`}
-                </Badge>
-                <Badge variant="info">{rec.status}</Badge>
-              </div>
-
-              <div className="rounded-lg bg-green-50 p-4">
-                <p className="text-xs font-semibold uppercase text-green-700">Recommended Program</p>
-                <p className="mt-1 text-lg font-bold text-green-800">{rec.recommendedProgram}</p>
-              </div>
-
-              <div className="mt-4">
-                <p className="text-xs font-semibold uppercase text-gray-500">Reason</p>
-                <p className="mt-1 text-sm text-gray-600">{rec.reason}</p>
-              </div>
-            </div>
-          ))}
-        </div>
+        <AiRecommendationBoards
+          compact
+          associationName={associationName}
+          emptyMessage="No AI recommendation yet for your association. It appears here after barangay staff generate the assistance list for your request."
+        />
       </main>
     </>
   )

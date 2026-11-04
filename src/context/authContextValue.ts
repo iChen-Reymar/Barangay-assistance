@@ -29,6 +29,8 @@ export interface AuthContextValue {
   pendingRequests: StoredUser[]
   allUsers: StoredUser[]
   login: (email: string, password: string, rememberMe: boolean) => ReturnType<typeof loginUser>
+  /** Applies the session saved by a successful login so the route guard can leave the login page. */
+  enterDashboard: () => void
   logout: () => void
   submitRequest: (input: AccessRequestInput) => ReturnType<typeof submitAccessRequest>
   submitAssociationHeadRequest: (

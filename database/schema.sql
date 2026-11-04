@@ -1,13 +1,26 @@
 -- Barangay Buru-un Assistance Matching System
--- Complete Supabase/PostgreSQL schema for:
---   1. Admin / Barangay Captain
---   2. Barangay Staff
---   3. Association Head
+-- Schema matched to the running application (server/index.mjs).
 --
--- Run this entire file in Supabase SQL Editor.
--- It is safe to run again: tables and compatibility columns use IF NOT EXISTS.
--- Passwords are managed by Supabase Authentication and are never stored here.
+-- Run this entire file in the Supabase SQL Editor. It is safe to run again.
+-- Existing rows in the tables below are kept. Passwords stay in Supabase Auth.
+--
+-- Kept, because the API reads and writes them:
+--   users, associations, association_profiles, association_members,
+--   member_documents, beneficiaries, assistance_programs, assistance_requests,
+--   request_documents, qualification_checks, request_decisions,
+--   generated_assistance_list, priority_list, audit_logs, audit_changes,
+--   report_history, notifications, privacy_settings, aid_records
+--
+-- Removed, because no application code reads or writes them:
+--   app_store                  leftover key/value store from an older build
+--   generated_priority_list    replaced by priority_list
+--   ml_models                  the model file is ml-service/artifacts/vulnerability_model.joblib
 
+drop table if exists public.app_store cascade;
+drop table if exists public.generated_priority_list cascade;
+drop table if exists public.ml_models cascade;
+
+-- Admin: accounts, roles, and access approvals.
 create table if not exists public.users (
   id text primary key,
   email text not null unique,
@@ -19,7 +32,7 @@ create table if not exists public.users (
   payload jsonb not null default '{}'::jsonb
 );
 
--- Admin: create associations and assign an Association Head.
+-- Admin: associations and the assigned Association Head.
 create table if not exists public.associations (
   id text primary key,
   name text not null,
@@ -34,7 +47,7 @@ create table if not exists public.associations (
   payload jsonb not null default '{}'::jsonb
 );
 
--- Association Head: editable profile of the assigned association.
+-- Association Head: the editable profile stored as barangay_association_details.
 create table if not exists public.association_profiles (
   id text primary key,
   name text not null,
@@ -52,7 +65,7 @@ create table if not exists public.association_profiles (
   payload jsonb not null default '{}'::jsonb
 );
 
--- Association Head: add, edit, and remove members.
+-- Association Head: member roster.
 create table if not exists public.association_members (
   id text primary key,
   association_name text,
@@ -74,7 +87,7 @@ create table if not exists public.association_members (
   payload jsonb not null default '{}'::jsonb
 );
 
--- Association Head: barangay certification and valid ID for each member.
+-- Barangay certificate and government ID for each member.
 create table if not exists public.member_documents (
   id text primary key,
   member_id text not null references public.association_members (id) on delete cascade,
@@ -91,7 +104,24 @@ create table if not exists public.member_documents (
   unique (member_id, document_kind)
 );
 
--- Barangay Staff: input, classify, and verify beneficiaries.
+-- Association Head: aid already received by a member of that association.
+create table if not exists public.aid_records (
+  id text primary key,
+  association_name text not null,
+  member_id text,
+  member_name text not null,
+  program_name text not null,
+  date_received text not null,
+  quantity text not null,
+  comments text not null default '',
+  status text not null default 'RECEIVED'
+    check (status in ('RECEIVED', 'PENDING')),
+  submitted_by text,
+  submitted_at text,
+  payload jsonb not null default '{}'::jsonb
+);
+
+-- Barangay Staff: beneficiaries they classify and verify.
 create table if not exists public.beneficiaries (
   id text primary key,
   name text not null,
@@ -105,7 +135,7 @@ create table if not exists public.beneficiaries (
   payload jsonb not null default '{}'::jsonb
 );
 
--- Admin: manage available assistance programs.
+-- Admin: assistance programs.
 create table if not exists public.assistance_programs (
   id text primary key,
   name text not null,
@@ -125,7 +155,7 @@ create table if not exists public.assistance_programs (
   payload jsonb not null default '{}'::jsonb
 );
 
--- Association Head submits requests; Staff verifies; all roles can view results.
+-- Association requests. Staff review them. Every role can view the result.
 create table if not exists public.assistance_requests (
   id text primary key,
   source text not null default 'assistance'
@@ -197,7 +227,7 @@ create table if not exists public.request_decisions (
   payload jsonb not null default '{}'::jsonb
 );
 
--- Barangay Staff generates the ranked list; all three roles can view it.
+-- Staff generates this ranked list. The API replaces the whole list on each run.
 create table if not exists public.generated_assistance_list (
   rank_no integer primary key check (rank_no > 0),
   beneficiary_name text not null,
@@ -227,7 +257,6 @@ create table if not exists public.priority_list (
   payload jsonb not null default '{}'::jsonb
 );
 
--- Admin: audit trail for account, association, request, and settings actions.
 create table if not exists public.audit_logs (
   id text primary key,
   created_at text not null,
@@ -252,7 +281,6 @@ create table if not exists public.audit_changes (
   new_value text not null
 );
 
--- Admin and Barangay Staff: generated/exported report history.
 create table if not exists public.report_history (
   id text primary key,
   name text not null,
@@ -263,19 +291,6 @@ create table if not exists public.report_history (
   payload jsonb not null default '{}'::jsonb
 );
 
--- Association Head: assistance already received by members.
-create table if not exists public.aid_records (
-  id text primary key,
-  member_name text not null,
-  program_name text not null,
-  date_received text not null,
-  quantity text not null,
-  status text not null,
-  association_name text,
-  payload jsonb not null default '{}'::jsonb
-);
-
--- Association Head is notified when staff reject a document.
 create table if not exists public.notifications (
   id text primary key,
   user_id text references public.users (id) on delete set null,
@@ -292,7 +307,6 @@ create table if not exists public.notifications (
   payload jsonb not null default '{}'::jsonb
 );
 
--- Admin: privacy, anonymization, and retention settings.
 create table if not exists public.privacy_settings (
   id text primary key default 'default',
   mask_contact_in_exports boolean not null default true,
@@ -310,37 +324,90 @@ create table if not exists public.privacy_settings (
   payload jsonb not null default '{}'::jsonb
 );
 
--- Compatibility migration for tables created by older versions of this project.
+-- Tables created by an older version keep their old columns. These statements
+-- add every column the API writes, without touching existing rows.
 alter table public.users add column if not exists association_name text;
 alter table public.users add column if not exists payload jsonb not null default '{}'::jsonb;
 alter table public.associations add column if not exists members integer not null default 0;
 alter table public.associations add column if not exists payload jsonb not null default '{}'::jsonb;
 alter table public.association_profiles add column if not exists payload jsonb not null default '{}'::jsonb;
+alter table public.association_members add column if not exists association_name text;
+alter table public.association_members add column if not exists age integer not null default 0;
+alter table public.association_members add column if not exists address text not null default '';
+alter table public.association_members add column if not exists date_joined text not null default '';
+alter table public.association_members add column if not exists family_size integer not null default 0;
+alter table public.association_members add column if not exists is_pwd boolean not null default false;
+alter table public.association_members add column if not exists is_senior boolean not null default false;
+alter table public.association_members add column if not exists assistance_status text not null default 'NONE';
+alter table public.association_members add column if not exists notes text;
 alter table public.association_members add column if not exists payload jsonb not null default '{}'::jsonb;
+alter table public.aid_records add column if not exists association_name text not null default '';
+alter table public.aid_records add column if not exists member_id text;
+alter table public.aid_records add column if not exists member_name text not null default '';
+alter table public.aid_records add column if not exists program_name text not null default '';
+alter table public.aid_records add column if not exists date_received text not null default '';
+alter table public.aid_records add column if not exists quantity text not null default '';
+alter table public.aid_records add column if not exists comments text not null default '';
+alter table public.aid_records add column if not exists status text not null default 'RECEIVED';
+alter table public.aid_records add column if not exists submitted_by text;
+alter table public.aid_records add column if not exists submitted_at text;
+alter table public.aid_records add column if not exists payload jsonb not null default '{}'::jsonb;
 alter table public.beneficiaries add column if not exists payload jsonb not null default '{}'::jsonb;
+alter table public.assistance_programs add column if not exists sponsoring_agency text not null default '';
+alter table public.assistance_programs add column if not exists description text not null default '';
+alter table public.assistance_programs add column if not exists eligibility_criteria text not null default '';
+alter table public.assistance_programs add column if not exists max_beneficiaries integer;
+alter table public.assistance_programs add column if not exists budget_allocation numeric(14, 2);
+alter table public.assistance_programs add column if not exists start_date text not null default '';
+alter table public.assistance_programs add column if not exists end_date text;
+alter table public.assistance_programs add column if not exists date_created text not null default '';
 alter table public.assistance_programs add column if not exists payload jsonb not null default '{}'::jsonb;
+alter table public.assistance_requests add column if not exists request_date text not null default '';
+alter table public.assistance_requests add column if not exists program_name text;
+alter table public.assistance_requests add column if not exists description text;
+alter table public.assistance_requests add column if not exists previous_assistance text;
+alter table public.assistance_requests add column if not exists submitted_by text;
+alter table public.assistance_requests add column if not exists contact_number text;
+alter table public.assistance_requests add column if not exists email text;
+alter table public.assistance_requests add column if not exists address text;
+alter table public.assistance_requests add column if not exists member_count integer;
+alter table public.assistance_requests add column if not exists purpose text;
+alter table public.assistance_requests add column if not exists requested_items text;
+alter table public.assistance_requests add column if not exists supporting_info text;
+alter table public.assistance_requests add column if not exists submitted_at text;
+alter table public.assistance_requests add column if not exists association_type text;
+alter table public.assistance_requests add column if not exists monthly_income text;
+alter table public.assistance_requests add column if not exists vulnerability_score integer;
 alter table public.assistance_requests add column if not exists payload jsonb not null default '{}'::jsonb;
+alter table public.request_documents add column if not exists data_url text;
 alter table public.request_documents add column if not exists payload jsonb not null default '{}'::jsonb;
 alter table public.qualification_checks add column if not exists payload jsonb not null default '{}'::jsonb;
 alter table public.request_decisions add column if not exists payload jsonb not null default '{}'::jsonb;
 alter table public.generated_assistance_list add column if not exists payload jsonb not null default '{}'::jsonb;
 alter table public.priority_list add column if not exists payload jsonb not null default '{}'::jsonb;
+alter table public.audit_logs add column if not exists display_date text not null default '';
+alter table public.audit_logs add column if not exists user_email text;
+alter table public.audit_logs add column if not exists action_color text not null default 'blue';
+alter table public.audit_logs add column if not exists ip_address text not null default '';
+alter table public.audit_logs add column if not exists entity_type text;
+alter table public.audit_logs add column if not exists entity_id text;
 alter table public.audit_logs add column if not exists payload jsonb not null default '{}'::jsonb;
 alter table public.report_history add column if not exists payload jsonb not null default '{}'::jsonb;
-alter table public.aid_records add column if not exists payload jsonb not null default '{}'::jsonb;
-alter table public.notifications add column if not exists payload jsonb not null default '{}'::jsonb;
-alter table public.privacy_settings add column if not exists payload jsonb not null default '{}'::jsonb;
-alter table public.request_documents add column if not exists data_url text;
 alter table public.notifications add column if not exists association_name text;
 alter table public.notifications add column if not exists created_at text;
 alter table public.notifications add column if not exists document_name text;
 alter table public.notifications add column if not exists member_name text;
 alter table public.notifications add column if not exists rejected_by text;
+alter table public.notifications add column if not exists payload jsonb not null default '{}'::jsonb;
+alter table public.privacy_settings add column if not exists payload jsonb not null default '{}'::jsonb;
 
 create index if not exists users_email_idx on public.users (lower(email));
 create index if not exists users_role_status_idx on public.users (role, status);
 create index if not exists associations_head_idx on public.associations (head_user_id);
+create index if not exists associations_name_idx on public.associations (lower(name));
+create index if not exists association_members_owner_idx on public.association_members (lower(association_name));
 create index if not exists beneficiaries_association_idx on public.beneficiaries (association_name);
+create index if not exists aid_records_association_idx on public.aid_records (lower(association_name));
 create index if not exists assistance_requests_status_idx on public.assistance_requests (status);
 create index if not exists assistance_requests_association_idx on public.assistance_requests (association_name);
 create index if not exists notifications_user_idx on public.notifications (user_id, is_read);
@@ -348,8 +415,89 @@ create index if not exists notifications_association_idx on public.notifications
 create index if not exists member_documents_member_idx on public.member_documents (member_id);
 create index if not exists audit_logs_created_idx on public.audit_logs (created_at);
 
--- RLS remains enabled. The local API uses SUPABASE_SECRET_KEY for writes.
--- Authenticated users can read application data; account requests can be inserted publicly.
+-- create table if not exists skips foreign keys on tables that already exist.
+do $$
+begin
+  if not exists (
+    select 1 from pg_constraint c
+      join pg_class r on r.oid = c.conrelid
+      join pg_namespace n on n.oid = r.relnamespace
+     where n.nspname = 'public' and r.relname = 'request_documents' and c.contype = 'f'
+  ) then
+    alter table public.request_documents
+      add constraint request_documents_request_id_fkey
+      foreign key (request_id) references public.assistance_requests (id) on delete cascade;
+  end if;
+
+  if not exists (
+    select 1 from pg_constraint c
+      join pg_class r on r.oid = c.conrelid
+      join pg_namespace n on n.oid = r.relnamespace
+     where n.nspname = 'public' and r.relname = 'qualification_checks' and c.contype = 'f'
+  ) then
+    alter table public.qualification_checks
+      add constraint qualification_checks_request_id_fkey
+      foreign key (request_id) references public.assistance_requests (id) on delete cascade;
+  end if;
+
+  if not exists (
+    select 1 from pg_constraint c
+      join pg_class r on r.oid = c.conrelid
+      join pg_namespace n on n.oid = r.relnamespace
+     where n.nspname = 'public' and r.relname = 'request_decisions' and c.contype = 'f'
+  ) then
+    alter table public.request_decisions
+      add constraint request_decisions_request_id_fkey
+      foreign key (request_id) references public.assistance_requests (id) on delete cascade;
+  end if;
+
+  if not exists (
+    select 1 from pg_constraint c
+      join pg_class r on r.oid = c.conrelid
+      join pg_namespace n on n.oid = r.relnamespace
+     where n.nspname = 'public' and r.relname = 'audit_changes' and c.contype = 'f'
+  ) then
+    alter table public.audit_changes
+      add constraint audit_changes_audit_log_id_fkey
+      foreign key (audit_log_id) references public.audit_logs (id) on delete cascade;
+  end if;
+
+  if not exists (
+    select 1 from pg_constraint c
+      join pg_class r on r.oid = c.conrelid
+      join pg_namespace n on n.oid = r.relnamespace
+     where n.nspname = 'public' and r.relname = 'member_documents' and c.contype = 'f'
+  ) then
+    alter table public.member_documents
+      add constraint member_documents_member_id_fkey
+      foreign key (member_id) references public.association_members (id) on delete cascade;
+  end if;
+
+  if not exists (
+    select 1 from pg_constraint c
+      join pg_class r on r.oid = c.conrelid
+      join pg_namespace n on n.oid = r.relnamespace
+     where n.nspname = 'public' and r.relname = 'associations' and c.contype = 'f'
+  ) then
+    alter table public.associations
+      add constraint associations_head_user_id_fkey
+      foreign key (head_user_id) references public.users (id) on delete set null;
+  end if;
+
+  if not exists (
+    select 1 from pg_constraint c
+      join pg_class r on r.oid = c.conrelid
+      join pg_namespace n on n.oid = r.relnamespace
+     where n.nspname = 'public' and r.relname = 'notifications' and c.contype = 'f'
+  ) then
+    alter table public.notifications
+      add constraint notifications_user_id_fkey
+      foreign key (user_id) references public.users (id) on delete set null;
+  end if;
+end $$;
+
+-- The API writes with the secret key and bypasses these policies.
+-- Signed-in users can read. A public visitor can only submit a pending account.
 do $$
 declare
   table_name text;
@@ -358,8 +506,8 @@ begin
     'users', 'associations', 'association_profiles', 'association_members', 'member_documents',
     'beneficiaries', 'assistance_programs', 'assistance_requests', 'request_documents',
     'qualification_checks', 'request_decisions', 'generated_assistance_list', 'priority_list',
-    'audit_logs', 'audit_changes', 'report_history', 'aid_records', 'notifications',
-    'privacy_settings'
+    'audit_logs', 'audit_changes', 'report_history', 'notifications', 'privacy_settings',
+    'aid_records'
   ]
   loop
     execute format('alter table public.%I enable row level security', table_name);
@@ -381,4 +529,3 @@ create policy public_account_request
     status = 'pending'
     and role in ('staff', 'association')
   );
-

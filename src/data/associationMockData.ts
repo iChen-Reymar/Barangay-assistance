@@ -37,6 +37,10 @@ export interface AssociationMember {
   assistanceStatus: AssistanceStatus
   position?: string
   notes?: string
+  /** Staff marked this member verified even when required documents are incomplete. */
+  staffVerified?: boolean
+  staffVerifiedBy?: string
+  staffVerifiedAt?: string
   /** Owning association. Scopes the roster so each head only sees their own. */
   associationName?: string
   barangayCertificate?: MemberAttachment
