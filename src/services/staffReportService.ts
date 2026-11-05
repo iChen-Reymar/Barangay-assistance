@@ -24,6 +24,7 @@ export function createStaffReportEntry(
   title: string,
   generatedBy: string,
   format: ReportFormat,
+  userId?: string,
 ): ReportHistoryEntry | null {
   const mapping = staffReportMap[title]
   if (!mapping) return null
@@ -32,14 +33,19 @@ export function createStaffReportEntry(
     id: crypto.randomUUID(),
     name: `${mapping.slug}_${formatExportDateStamp()}.${extensionForFormat(format)}`,
     generatedBy,
+    userId: userId || undefined,
     date: formatAuditDate(new Date().toISOString()),
     format,
     reportType: mapping.reportType,
   }
 }
 
-export function buildStaffReportPreview(title: string, generatedBy: string): ReportPreview | null {
-  const entry = createStaffReportEntry(title, generatedBy, 'PDF')
+export function buildStaffReportPreview(
+  title: string,
+  generatedBy: string,
+  userId?: string,
+): ReportPreview | null {
+  const entry = createStaffReportEntry(title, generatedBy, 'PDF', userId)
   if (!entry) return null
   return buildReportPreview(entry)
 }
@@ -52,8 +58,9 @@ export function exportStaffReport(
   title: string,
   generatedBy: string,
   format: ReportFormat,
+  userId?: string,
 ): ReportHistoryEntry | null {
-  const entry = createStaffReportEntry(title, generatedBy, format)
+  const entry = createStaffReportEntry(title, generatedBy, format, userId)
   if (!entry) return null
   downloadHistoryReport(entry)
   return entry

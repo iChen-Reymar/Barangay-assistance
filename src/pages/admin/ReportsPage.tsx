@@ -103,7 +103,7 @@ export default function ReportsPage() {
   }
 
   function handleExport(template: ReportTemplate, format: ReportFormat) {
-    const entry = exportReportFromTemplate(template, generatedBy, format)
+    const entry = exportReportFromTemplate(template, generatedBy, format, user?.id)
     setStatusMessage(`Exported ${entry.name} and saved it to Report History.`)
     logReportAction(`Exported ${template.title} as ${format} (${entry.name}).`)
   }

@@ -212,6 +212,7 @@ export interface ReportHistoryEntry {
   id: string
   name: string
   generatedBy: string
+  userId?: string
   date: string
   format: ReportFormat
   reportType: ReportHistoryType

@@ -12,6 +12,7 @@ export interface PrivacySettings {
   autoPurgeEnabled: boolean
   lastAnonymizationRun?: string
   lastPurgeRun?: string
+  updatedByUserId?: string
 }
 
 export interface PrivacyOperationResult {

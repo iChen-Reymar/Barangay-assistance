@@ -33,7 +33,6 @@ import StaffDashboardPage from './pages/staff/DashboardPage'
 import StaffVulnerabilityAssessmentPage from './pages/staff/VulnerabilityAssessmentPage'
 import StaffAssistanceRequestsPage from './pages/staff/AssistanceRequestsPage'
 import StaffPriorityListPage from './pages/staff/PriorityListPage'
-import StaffModelPerformancePage from './pages/staff/ModelPerformancePage'
 import StaffRecommendationsPage from './pages/staff/RecommendationsPage'
 import StaffApprovedRequestsPage from './pages/staff/ApprovedRequestsPage'
 import StaffReportsPage from './pages/staff/ReportsPage'
@@ -105,7 +104,6 @@ export default function App() {
           <Route path="vulnerability-assessment" element={<StaffVulnerabilityAssessmentPage />} />
           <Route path="assistance-requests" element={<StaffAssistanceRequestsPage />} />
           <Route path="priority-list" element={<StaffPriorityListPage />} />
-          <Route path="model-performance" element={<StaffModelPerformancePage />} />
           <Route path="recommendations" element={<StaffRecommendationsPage />} />
           <Route path="verify-qualification" element={<StaffVerifyQualificationPage />} />
           <Route path="approved-requests" element={<StaffApprovedRequestsPage />} />

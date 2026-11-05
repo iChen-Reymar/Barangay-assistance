@@ -48,12 +48,18 @@ export function getPrivacySettings(): PrivacySettings {
   return readSettings()
 }
 
-export function savePrivacySettings(settings: PrivacySettings) {
-  writeSettings(settings)
-  if (settings.autoPurgeEnabled) {
-    runRetentionPurge(settings)
+function withEditor(settings: PrivacySettings, userId?: string): PrivacySettings {
+  if (!userId) return settings
+  return { ...settings, updatedByUserId: userId }
+}
+
+export function savePrivacySettings(settings: PrivacySettings, userId?: string) {
+  const next = withEditor(settings, userId)
+  writeSettings(next)
+  if (next.autoPurgeEnabled) {
+    runRetentionPurge(next, userId)
   }
-  return settings
+  return next
 }
 
 export function subscribePrivacySettings(callback: () => void) {
@@ -104,6 +110,7 @@ export function applyAuditLogsPrivacy(
 
 export function runAnonymization(
   settings: PrivacySettings = getPrivacySettings(),
+  userId?: string,
 ): PrivacyOperationResult {
   const result: PrivacyOperationResult = {
     rejectedUsersAnonymized: 0,
@@ -127,16 +134,17 @@ export function runAnonymization(
     })
   }
 
-  const updatedSettings: PrivacySettings = {
+  const updatedSettings: PrivacySettings = withEditor({
     ...settings,
     lastAnonymizationRun: new Date().toISOString(),
-  }
+  }, userId)
   writeSettings(updatedSettings)
   return result
 }
 
 export function runRetentionPurge(
   settings: PrivacySettings = getPrivacySettings(),
+  userId?: string,
 ): PrivacyOperationResult {
   const result: PrivacyOperationResult = {
     rejectedUsersAnonymized: 0,
@@ -148,10 +156,10 @@ export function runRetentionPurge(
       purgeRejectedAssistanceOlderThan(settings.assistanceRecordRetentionDays),
   }
 
-  const updatedSettings: PrivacySettings = {
+  const updatedSettings: PrivacySettings = withEditor({
     ...settings,
     lastPurgeRun: new Date().toISOString(),
-  }
+  }, userId)
   writeSettings(updatedSettings)
   return result
 }

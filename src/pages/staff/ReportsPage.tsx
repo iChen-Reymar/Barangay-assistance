@@ -41,14 +41,18 @@ export default function StaffReportsPage() {
   }
 
   function handleView(title: string) {
-    const preview = buildStaffReportPreview(title, generatedBy)
+    const preview = buildStaffReportPreview(title, generatedBy, user?.id)
     if (!preview) return
     setViewTitle(title)
     setViewPreview(preview)
   }
 
   function handleExport(title: string, format: ReportFormat) {
+<<<<<<< HEAD
     const entry = exportStaffReport(title, generatedBy, format)
+=======
+    const entry = exportStaffReport(title, generatedBy, format, user?.id)
+>>>>>>> 8db0b93 (Init)
     if (!entry) return
     setStatusMessage(`Exported ${entry.name}.`)
     logExport(title, format, entry.name)

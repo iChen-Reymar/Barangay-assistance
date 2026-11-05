@@ -285,6 +285,7 @@ create table if not exists public.report_history (
   id text primary key,
   name text not null,
   generated_by text not null,
+  user_id text,
   generated_date text not null,
   format text not null check (format in ('PDF', 'EXCEL', 'CSV')),
   report_type text not null,
@@ -321,6 +322,7 @@ create table if not exists public.privacy_settings (
   auto_purge_enabled boolean not null default false,
   last_anonymization_run text,
   last_purge_run text,
+  updated_by text,
   payload jsonb not null default '{}'::jsonb
 );
 
@@ -392,6 +394,7 @@ alter table public.audit_logs add column if not exists ip_address text not null 
 alter table public.audit_logs add column if not exists entity_type text;
 alter table public.audit_logs add column if not exists entity_id text;
 alter table public.audit_logs add column if not exists payload jsonb not null default '{}'::jsonb;
+alter table public.report_history add column if not exists user_id text;
 alter table public.report_history add column if not exists payload jsonb not null default '{}'::jsonb;
 alter table public.notifications add column if not exists association_name text;
 alter table public.notifications add column if not exists created_at text;
@@ -399,6 +402,10 @@ alter table public.notifications add column if not exists document_name text;
 alter table public.notifications add column if not exists member_name text;
 alter table public.notifications add column if not exists rejected_by text;
 alter table public.notifications add column if not exists payload jsonb not null default '{}'::jsonb;
+<<<<<<< HEAD
+=======
+alter table public.privacy_settings add column if not exists updated_by text;
+>>>>>>> 8db0b93 (Init)
 alter table public.privacy_settings add column if not exists payload jsonb not null default '{}'::jsonb;
 
 create index if not exists users_email_idx on public.users (lower(email));
@@ -414,6 +421,7 @@ create index if not exists notifications_user_idx on public.notifications (user_
 create index if not exists notifications_association_idx on public.notifications (association_name, is_read);
 create index if not exists member_documents_member_idx on public.member_documents (member_id);
 create index if not exists audit_logs_created_idx on public.audit_logs (created_at);
+create index if not exists report_history_user_idx on public.report_history (user_id);
 
 -- create table if not exists skips foreign keys on tables that already exist.
 do $$
@@ -496,6 +504,100 @@ begin
   end if;
 end $$;
 
+<<<<<<< HEAD
+=======
+-- The schema visualizer draws a line only for a foreign key.
+-- These links use the association name and the program name, which is how the
+-- app already relates the rows. Blank text is stored as null so it does not
+-- have to match a parent row.
+alter table public.beneficiaries alter column association_name drop not null;
+alter table public.assistance_requests alter column association_name drop not null;
+alter table public.generated_assistance_list alter column association_name drop not null;
+alter table public.generated_assistance_list alter column program_name drop not null;
+alter table public.priority_list alter column association_name drop not null;
+alter table public.aid_records alter column association_name drop not null;
+alter table public.aid_records alter column program_name drop not null;
+alter table public.association_profiles alter column name drop not null;
+
+update public.users set association_name = null where btrim(association_name) = '';
+update public.association_members set association_name = null where btrim(association_name) = '';
+update public.beneficiaries set association_name = null where btrim(association_name) = '';
+update public.assistance_requests set association_name = null where btrim(association_name) = '';
+update public.assistance_requests set program_name = null where btrim(program_name) = '';
+update public.generated_assistance_list set association_name = null where btrim(association_name) = '';
+update public.generated_assistance_list set program_name = null where btrim(program_name) = '';
+update public.priority_list set association_name = null where btrim(association_name) = '';
+update public.notifications set association_name = null where btrim(association_name) = '';
+update public.notifications set user_id = null where btrim(user_id) = '';
+update public.aid_records set association_name = null where btrim(association_name) = '';
+update public.aid_records set program_name = null where btrim(program_name) = '';
+update public.aid_records set member_id = null where btrim(member_id) = '';
+update public.audit_logs set user_email = null where btrim(user_email) = '';
+update public.association_profiles set name = null where btrim(name) = '';
+update public.report_history set user_id = null where btrim(user_id) = '';
+update public.privacy_settings set updated_by = null where btrim(updated_by) = '';
+
+-- Older report rows stored a name or email in generated_by and had no user id.
+update public.report_history as history
+set user_id = matched.user_id
+from (
+  select history_row.id as history_id, min(account.id) as user_id
+  from public.report_history as history_row
+  join public.users as account
+    on lower(btrim(account.email)) = lower(btrim(history_row.generated_by))
+    or lower(btrim(account.full_name)) = lower(btrim(history_row.generated_by))
+  where history_row.user_id is null
+  group by history_row.id
+  having count(distinct account.id) = 1
+) as matched
+where history.id = matched.history_id;
+
+create unique index if not exists users_email_key on public.users (email);
+create unique index if not exists associations_name_key on public.associations (name);
+create unique index if not exists assistance_programs_name_key on public.assistance_programs (name);
+
+do $$
+declare
+  spec record;
+begin
+  for spec in
+    select * from (values
+      ('users', 'users_association_name_fkey', 'association_name', 'associations', 'name', 'cascade', 'set null'),
+      ('association_profiles', 'association_profiles_name_fkey', 'name', 'associations', 'name', 'cascade', 'cascade'),
+      ('association_members', 'association_members_association_name_fkey', 'association_name', 'associations', 'name', 'cascade', 'set null'),
+      ('beneficiaries', 'beneficiaries_association_name_fkey', 'association_name', 'associations', 'name', 'cascade', 'set null'),
+      ('assistance_requests', 'assistance_requests_association_name_fkey', 'association_name', 'associations', 'name', 'cascade', 'set null'),
+      ('assistance_requests', 'assistance_requests_program_name_fkey', 'program_name', 'assistance_programs', 'name', 'cascade', 'set null'),
+      ('generated_assistance_list', 'generated_assistance_list_association_name_fkey', 'association_name', 'associations', 'name', 'cascade', 'set null'),
+      ('generated_assistance_list', 'generated_assistance_list_program_name_fkey', 'program_name', 'assistance_programs', 'name', 'cascade', 'set null'),
+      ('priority_list', 'priority_list_association_name_fkey', 'association_name', 'associations', 'name', 'cascade', 'set null'),
+      ('notifications', 'notifications_association_name_fkey', 'association_name', 'associations', 'name', 'cascade', 'set null'),
+      ('aid_records', 'aid_records_association_name_fkey', 'association_name', 'associations', 'name', 'cascade', 'set null'),
+      ('aid_records', 'aid_records_program_name_fkey', 'program_name', 'assistance_programs', 'name', 'cascade', 'set null'),
+      ('aid_records', 'aid_records_member_id_fkey', 'member_id', 'association_members', 'id', 'cascade', 'set null'),
+      ('audit_logs', 'audit_logs_user_email_fkey', 'user_email', 'users', 'email', 'cascade', 'set null'),
+      ('report_history', 'report_history_user_id_fkey', 'user_id', 'users', 'id', 'cascade', 'set null'),
+      ('privacy_settings', 'privacy_settings_updated_by_fkey', 'updated_by', 'users', 'id', 'cascade', 'set null')
+    ) as link(child_table, constraint_name, child_column, parent_table, parent_column, on_update, on_delete)
+  loop
+    if not exists (
+      select 1 from pg_constraint where conname = spec.constraint_name
+    ) then
+      execute format(
+        'alter table public.%I add constraint %I foreign key (%I) references public.%I (%I) on update %s on delete %s',
+        spec.child_table,
+        spec.constraint_name,
+        spec.child_column,
+        spec.parent_table,
+        spec.parent_column,
+        spec.on_update,
+        spec.on_delete
+      );
+    end if;
+  end loop;
+end $$;
+
+>>>>>>> 8db0b93 (Init)
 -- The API writes with the secret key and bypasses these policies.
 -- Signed-in users can read. A public visitor can only submit a pending account.
 do $$

@@ -52,7 +52,7 @@ export function PrivacyControlsPanel() {
 
   function handleSave() {
     setError('')
-    savePrivacySettings(settings)
+    savePrivacySettings(settings, user?.id)
     setMessage('Privacy and retention settings saved.')
     auditPrivacyAction('Updated privacy and data retention controls.', buildChanges([
       { key: 'maskIp', label: 'Mask IP in Audit Logs', oldValue: 'â€”', newValue: settings.maskIpInAuditLogs ? 'Enabled' : 'Disabled' },
@@ -63,7 +63,7 @@ export function PrivacyControlsPanel() {
 
   function handleAnonymize() {
     setError('')
-    const result = runAnonymization(settings)
+    const result = runAnonymization(settings, user?.id)
     setMessage(
       `Anonymization complete: ${result.rejectedUsersAnonymized} access request(s), ${result.assistanceRecordsAnonymized} assistance record(s), ${result.auditLogsAnonymized} audit log(s) updated.`,
     )
@@ -76,7 +76,7 @@ export function PrivacyControlsPanel() {
 
   function handlePurge() {
     setError('')
-    const result = runRetentionPurge(settings)
+    const result = runRetentionPurge(settings, user?.id)
     setMessage(
       `Retention purge complete: ${result.auditLogsRemoved} audit log(s) and ${result.accessRecordsRemoved} expired record(s) removed.`,
     )

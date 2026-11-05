@@ -32,9 +32,27 @@ const usingSecretKey = Boolean(process.env.SUPABASE_SECRET_KEY || process.env.SU
 const apiPort = Number(process.env.API_PORT || 3001)
 let supabase = null
 
+function linkedText(value) {
+  if (value == null) return null
+  const text = String(value).trim()
+  return text || null
+}
+
 async function clear(table, column = 'id') {
   const { error } = await supabase.from(table).delete().not(column, 'is', null)
   if (error) throw new Error(error.message)
+}
+
+async function upsertRows(table, rows) {
+  if (!rows.length) {
+    await clear(table)
+    return
+  }
+  const { error } = await supabase.from(table).upsert(rows)
+  if (error) throw new Error(error.message)
+  const ids = rows.map((row) => row.id).filter(Boolean)
+  const { error: deleteError } = await supabase.from(table).delete().not('id', 'in', `(${ids.join(',')})`)
+  if (deleteError) throw new Error(deleteError.message)
 }
 
 function missingColumn(message) {
@@ -115,8 +133,7 @@ async function saveUsers(users) {
 
 async function saveAssociations(rows) {
   if (!Array.isArray(rows)) return
-  await clear('associations')
-  await insert('associations', rows.map((row) => ({
+  await upsertRows('associations', rows.map((row) => ({
     id: row.id,
     name: row.name,
     type: row.type,
@@ -131,11 +148,9 @@ async function saveAssociations(rows) {
 
 async function saveMembers(rows) {
   if (!Array.isArray(rows)) return
-  await clear('member_documents')
-  await clear('association_members')
-  await insert('association_members', rows.map((row) => ({
+  await upsertRows('association_members', rows.map((row) => ({
     id: row.id,
-    association_name: row.associationName ?? null,
+    association_name: linkedText(row.associationName),
     name: row.name,
     age: Number(row.age ?? 0),
     contact_number: row.contactNumber,
@@ -150,6 +165,7 @@ async function saveMembers(rows) {
     notes: row.notes ?? null,
     payload: row,
   })))
+  await clear('member_documents')
   await insert('member_documents', rows.flatMap((row) => {
     const files = [
       ['barangay_certificate', row.barangayCertificate],
@@ -175,10 +191,17 @@ async function saveAidRecords(rows) {
   await clear('aid_records')
   await insert('aid_records', rows.map((row) => ({
     id: row.id,
+<<<<<<< HEAD
     association_name: row.associationName ?? '',
     member_id: row.memberId ?? null,
     member_name: row.memberName ?? row.member ?? '',
     program_name: row.program ?? '',
+=======
+    association_name: linkedText(row.associationName),
+    member_id: linkedText(row.memberId),
+    member_name: row.memberName ?? row.member ?? '',
+    program_name: linkedText(row.program),
+>>>>>>> 8db0b93 (Init)
     date_received: row.dateReceived ?? '',
     quantity: row.quantity ?? '',
     comments: row.comments ?? '',
@@ -195,7 +218,7 @@ async function saveBeneficiaries(rows) {
   await insert('beneficiaries', rows.map((row) => ({
     id: row.id,
     name: row.name,
-    association_name: row.association,
+    association_name: linkedText(row.association),
     family_size: Number(row.familySize ?? 0),
     monthly_income: Number(row.monthlyIncome ?? 0),
     vulnerability: row.vulnerability,
@@ -206,8 +229,7 @@ async function saveBeneficiaries(rows) {
 
 async function savePrograms(rows) {
   if (!Array.isArray(rows)) return
-  await clear('assistance_programs')
-  await insert('assistance_programs', rows.map((row) => ({
+  await upsertRows('assistance_programs', rows.map((row) => ({
     id: row.id,
     name: row.name,
     category: row.category,
@@ -229,8 +251,8 @@ async function saveNotifications(rows) {
   await clear('notifications')
   const mapped = rows.map((row) => ({
     id: row.id,
-    user_id: row.recipientUserId ?? null,
-    association_name: row.associationName ?? null,
+    user_id: linkedText(row.recipientUserId),
+    association_name: linkedText(row.associationName),
     message: row.message,
     notice_time: row.time,
     created_at: row.createdAt ?? null,
@@ -261,13 +283,13 @@ async function saveRequests(rows) {
     return {
       id: row.id,
       source: row.source,
-      association_name: row.association,
+      association_name: linkedText(row.association),
       request_type: row.requestType,
       vulnerability: row.vulnerability,
       request_date: row.date,
       status: row.status,
       score: row.score ?? null,
-      program_name: row.program ?? null,
+      program_name: linkedText(row.program),
       description: row.description ?? null,
       previous_assistance: row.previousAssistance ?? null,
       submitted_by: details.submittedBy ?? null,
@@ -326,10 +348,14 @@ async function saveGenerated(rows) {
   await insert('generated_assistance_list', rows.map((row) => ({
     rank_no: row.rank,
     beneficiary_name: row.name,
+<<<<<<< HEAD
     association_name: row.association,
+=======
+    association_name: linkedText(row.association),
+>>>>>>> 8db0b93 (Init)
     score: Math.max(0, Math.min(100, Math.round(Number(row.score) || 0))),
     classification: row.classification,
-    program_name: row.program,
+    program_name: linkedText(row.program),
     verification: row.verification,
     reason: row.reason,
     generated_at: row.generatedAt,
@@ -343,7 +369,7 @@ async function savePriority(rows) {
   await insert('priority_list', rows.map((row) => ({
     id: row.id,
     rank_no: row.rank,
-    association_name: row.association,
+    association_name: linkedText(row.association),
     score: row.score,
     classification: row.classification,
     recommended: row.recommended,
@@ -363,7 +389,7 @@ async function saveAudit(rows) {
     created_at: row.timestamp,
     display_date: row.date,
     user_name: row.user,
-    user_email: row.userEmail ?? null,
+    user_email: linkedText(row.userEmail),
     action: row.action,
     action_color: row.actionColor,
     description: row.description,
@@ -387,6 +413,7 @@ async function saveReports(rows) {
     id: row.id,
     name: row.name,
     generated_by: row.generatedBy,
+    user_id: linkedText(row.userId),
     generated_date: row.date,
     format: row.format,
     report_type: row.reportType,
@@ -396,10 +423,11 @@ async function saveReports(rows) {
 
 async function saveProfile(profile) {
   await clear('association_profiles')
-  if (!profile || typeof profile !== 'object' || Array.isArray(profile)) return
+  const name = linkedText(profile?.name)
+  if (!profile || typeof profile !== 'object' || Array.isArray(profile) || !name) return
   await insert('association_profiles', [{
     id: profile.id || 'profile',
-    name: profile.name ?? '',
+    name,
     type: profile.type ?? 'Agricultural',
     registration_number: profile.registrationNumber ?? null,
     date_registered: profile.dateRegistered ?? null,
@@ -430,6 +458,7 @@ async function savePrivacy(settings) {
     auto_purge_enabled: Boolean(settings.autoPurgeEnabled),
     last_anonymization_run: settings.lastAnonymizationRun ?? null,
     last_purge_run: settings.lastPurgeRun ?? null,
+    updated_by: linkedText(settings.updatedByUserId),
     payload: settings,
   }])
 }
@@ -684,10 +713,14 @@ async function loadStores() {
   }
   if (reports.length > 0) {
     const stored = storedRecords(reports)
-    if (stored) push('barangay_report_history', stored)
-    else push('barangay_report_history', reports.map((row) => ({
-      id: row.id, name: row.name, generatedBy: row.generated_by, date: row.generated_date,
-      format: row.format, reportType: row.report_type,
+    if (stored) {
+      push('barangay_report_history', reports.map((row, index) => ({
+        ...stored[index],
+        userId: stored[index].userId || row.user_id || undefined,
+      })))
+    } else push('barangay_report_history', reports.map((row) => ({
+      id: row.id, name: row.name, generatedBy: row.generated_by, userId: row.user_id || undefined,
+      date: row.generated_date, format: row.format, reportType: row.report_type,
     })))
   }
   if (profiles[0]) {
@@ -702,8 +735,12 @@ async function loadStores() {
   }
   if (privacyRows[0]) {
     const row = privacyRows[0]
-    if (row.payload && typeof row.payload === 'object') push('barangay_privacy_settings', row.payload)
-    else push('barangay_privacy_settings', {
+    if (row.payload && typeof row.payload === 'object') {
+      push('barangay_privacy_settings', {
+        ...row.payload,
+        updatedByUserId: row.payload.updatedByUserId || row.updated_by || undefined,
+      })
+    } else push('barangay_privacy_settings', {
       maskContactInExports: yes(row.mask_contact_in_exports),
       maskIpInAuditLogs: yes(row.mask_ip_in_audit_logs),
       maskEmailInAuditLogs: yes(row.mask_email_in_audit_logs),
@@ -715,6 +752,7 @@ async function loadStores() {
       autoPurgeEnabled: yes(row.auto_purge_enabled),
       lastAnonymizationRun: row.last_anonymization_run ?? undefined,
       lastPurgeRun: row.last_purge_run ?? undefined,
+      updatedByUserId: row.updated_by || undefined,
     })
   }
   return stores

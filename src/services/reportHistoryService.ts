@@ -68,12 +68,14 @@ function createHistoryEntry(
   template: ReportTemplate,
   generatedBy: string,
   format: ReportFormat,
+  userId?: string,
 ): ReportHistoryEntry {
   const timestamp = new Date().toISOString()
   return {
     id: crypto.randomUUID(),
     name: buildFileName(template, format),
     generatedBy,
+    userId: userId || undefined,
     date: formatAuditDate(timestamp),
     format,
     reportType: template.reportType,
@@ -88,16 +90,18 @@ function prependHistory(entry: ReportHistoryEntry): ReportHistoryEntry {
 export function generateReportFromTemplate(
   template: ReportTemplate,
   generatedBy: string,
+  userId?: string,
 ): ReportHistoryEntry {
-  return prependHistory(createHistoryEntry(template, generatedBy, 'PDF'))
+  return prependHistory(createHistoryEntry(template, generatedBy, 'PDF', userId))
 }
 
 export function exportReportFromTemplate(
   template: ReportTemplate,
   generatedBy: string,
   format: ReportFormat,
+  userId?: string,
 ): ReportHistoryEntry {
-  const entry = prependHistory(createHistoryEntry(template, generatedBy, format))
+  const entry = prependHistory(createHistoryEntry(template, generatedBy, format, userId))
   downloadHistoryReport(entry)
   return entry
 }
