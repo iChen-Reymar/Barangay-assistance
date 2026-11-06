@@ -402,10 +402,7 @@ alter table public.notifications add column if not exists document_name text;
 alter table public.notifications add column if not exists member_name text;
 alter table public.notifications add column if not exists rejected_by text;
 alter table public.notifications add column if not exists payload jsonb not null default '{}'::jsonb;
-<<<<<<< HEAD
-=======
 alter table public.privacy_settings add column if not exists updated_by text;
->>>>>>> 8db0b93 (Init)
 alter table public.privacy_settings add column if not exists payload jsonb not null default '{}'::jsonb;
 
 create index if not exists users_email_idx on public.users (lower(email));
@@ -504,8 +501,6 @@ begin
   end if;
 end $$;
 
-<<<<<<< HEAD
-=======
 -- The schema visualizer draws a line only for a foreign key.
 -- These links use the association name and the program name, which is how the
 -- app already relates the rows. Blank text is stored as null so it does not
@@ -597,7 +592,6 @@ begin
   end loop;
 end $$;
 
->>>>>>> 8db0b93 (Init)
 -- The API writes with the secret key and bypasses these policies.
 -- Signed-in users can read. A public visitor can only submit a pending account.
 do $$

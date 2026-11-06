@@ -191,17 +191,10 @@ async function saveAidRecords(rows) {
   await clear('aid_records')
   await insert('aid_records', rows.map((row) => ({
     id: row.id,
-<<<<<<< HEAD
-    association_name: row.associationName ?? '',
-    member_id: row.memberId ?? null,
-    member_name: row.memberName ?? row.member ?? '',
-    program_name: row.program ?? '',
-=======
     association_name: linkedText(row.associationName),
     member_id: linkedText(row.memberId),
     member_name: row.memberName ?? row.member ?? '',
     program_name: linkedText(row.program),
->>>>>>> 8db0b93 (Init)
     date_received: row.dateReceived ?? '',
     quantity: row.quantity ?? '',
     comments: row.comments ?? '',
@@ -348,11 +341,7 @@ async function saveGenerated(rows) {
   await insert('generated_assistance_list', rows.map((row) => ({
     rank_no: row.rank,
     beneficiary_name: row.name,
-<<<<<<< HEAD
-    association_name: row.association,
-=======
     association_name: linkedText(row.association),
->>>>>>> 8db0b93 (Init)
     score: Math.max(0, Math.min(100, Math.round(Number(row.score) || 0))),
     classification: row.classification,
     program_name: linkedText(row.program),

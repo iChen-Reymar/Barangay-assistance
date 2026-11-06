@@ -48,11 +48,7 @@ export default function StaffReportsPage() {
   }
 
   function handleExport(title: string, format: ReportFormat) {
-<<<<<<< HEAD
-    const entry = exportStaffReport(title, generatedBy, format)
-=======
     const entry = exportStaffReport(title, generatedBy, format, user?.id)
->>>>>>> 8db0b93 (Init)
     if (!entry) return
     setStatusMessage(`Exported ${entry.name}.`)
     logExport(title, format, entry.name)
