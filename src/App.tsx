@@ -35,7 +35,6 @@ import StaffAssistanceRequestsPage from './pages/staff/AssistanceRequestsPage'
 import StaffPriorityListPage from './pages/staff/PriorityListPage'
 import StaffRecommendationsPage from './pages/staff/RecommendationsPage'
 import StaffApprovedRequestsPage from './pages/staff/ApprovedRequestsPage'
-import StaffReportsPage from './pages/staff/ReportsPage'
 import StaffAidRecordsPage from './pages/staff/AidRecordsPage'
 import StaffStatusReportsPage from './pages/staff/StatusReportsPage'
 import StaffVerifyQualificationPage from './pages/staff/VerifyQualificationPage'
@@ -108,7 +107,6 @@ export default function App() {
           <Route path="verify-qualification" element={<StaffVerifyQualificationPage />} />
           <Route path="approved-requests" element={<StaffApprovedRequestsPage />} />
           <Route path="status-reports" element={<StaffStatusReportsPage />} />
-          <Route path="reports" element={<StaffReportsPage />} />
           <Route path="aid-records" element={<StaffAidRecordsPage />} />
           <Route path="settings" element={<StaffSettingsPage />} />
         </Route>
