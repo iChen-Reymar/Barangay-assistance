@@ -1,10 +1,14 @@
-"""Real association rosters from the barangay Data Sets sheet.
+"""Real association rosters from the barangay Data Sets sheet, augmented with a synthetic seed.
 
 Source: Google Sheet Data Sets tab. Each table is one association.
 A row records the member's name, position, and association. Age, family
 size, income, housing, and vulnerability indicators are blank on the
 sheet, so those fields are imputed from the same barangay prior the
 synthetic generator uses. They are not measurements.
+
+Training augments these real roster rows with 8000 synthetic households
+drawn from the same prior, so both models stay stable even though the
+roster households' socioeconomic fields are imputed.
 
 Observed on a roster row : name, position, association
 Imputed on a roster row  : familySize, monthlyIncome, age, employmentStatus,

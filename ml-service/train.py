@@ -1,12 +1,14 @@
-"""Train both models on real records only.
+"""Train both models on real association rosters plus a synthetic seed.
 
 Training pool:
 
   1. real beneficiary records entered by staff  -> keep the staff-assigned label
   2. real association rosters from the Data Sets sheet (name, position, and
      association are observed). Blank household fields on those rows are still
-     estimated so the model has numeric features. No generated households and
-     no stand-in Sample Data names are added.
+     estimated so the model has numeric features.
+  3. synthetic households drawn from the barangay prior (8000 rows) - keeps
+     both models stable even though every roster household's socioeconomic
+     fields are imputed.
 
 Evaluation is deliberately harder than a single lucky split:
 
@@ -19,6 +21,8 @@ Both models are reported separately, plus the blend the system actually shows.
 
 from __future__ import annotations
 
+import random
+
 import numpy as np
 from sklearn.model_selection import StratifiedKFold, train_test_split
 
@@ -26,6 +30,7 @@ from dataset import build_dataset, dataset_summary, to_xy
 from models import VulnerabilityScorer, evaluate
 
 TARGET_ACCURACY = 0.80  # the capstone's stated minimum for the blended model
+N_SYNTHETIC = 8000
 CV_FOLDS = 5
 
 
@@ -76,7 +81,7 @@ def train_with_real_records(
 
     roster = roster_households()
     pool = build_dataset(
-        n_samples=0,
+        n_samples=N_SYNTHETIC,
         seed=seed,
         extra_households=roster,
     )
@@ -127,7 +132,7 @@ def train_with_real_records(
             "realRecordsIncluded": real_added,
             "realRosterRows": roster_rows,
             "roster": roster_summary(),
-            "nSynthetic": 0,
+            "nSynthetic": N_SYNTHETIC,
             "trainSize": int(x_train.shape[0]),
             "testSize": int(x_test.shape[0]),
             "scoringSamples": int(x.shape[0]),
