@@ -2,14 +2,42 @@ import assert from 'node:assert/strict'
 import test from 'node:test'
 
 process.env.NODE_ENV = 'test'
-const { canWriteResource, payloadIdentity, requestWriteError, requestWriteOperation, scopeStoresForActor } = await import('./index.mjs')
+const {
+  canWriteResource,
+  payloadIdentity,
+  requestWriteError,
+  requestWriteOperation,
+  scopeStoresForActor,
+  trustedAuditEntry,
+} = await import('./index.mjs')
 
 test('resource writes follow the role matrix', () => {
   assert.equal(canWriteResource({ role: 'admin' }, 'barangay_privacy_settings'), true)
   assert.equal(canWriteResource({ role: 'staff' }, 'barangay_users'), false)
   assert.equal(canWriteResource({ role: 'staff' }, 'barangay_reviewable_items'), true)
   assert.equal(canWriteResource({ role: 'association' }, 'barangay_association_members'), true)
+  assert.equal(canWriteResource({ role: 'association' }, 'barangay_audit_logs'), true)
   assert.equal(canWriteResource({ role: 'association' }, 'barangay_assistance_programs'), false)
+})
+
+test('audit identity is bound to the authenticated non-admin account', () => {
+  const forged = {
+    id: 'audit-1',
+    user: 'Forged Administrator',
+    userEmail: 'admin@example.com',
+    action: 'SUBMITTED',
+  }
+  const actor = {
+    role: 'association',
+    full_name: 'ERPAT Head',
+    email: 'erpat@example.com',
+  }
+  assert.deepEqual(trustedAuditEntry(forged, actor), {
+    ...forged,
+    user: 'ERPAT Head',
+    userEmail: 'erpat@example.com',
+  })
+  assert.equal(trustedAuditEntry(forged, { role: 'admin' }), forged)
 })
 
 test('record identity must come from stable IDs, not display rank', () => {

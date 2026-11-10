@@ -425,9 +425,19 @@ async function savePriority(rows) {
   })))
 }
 
-async function saveAudit(rows) {
+function trustedAuditEntry(row, actor) {
+  if (!actor || actor.role === 'admin') return row
+  return {
+    ...row,
+    user: actor.full_name,
+    userEmail: actor.email,
+  }
+}
+
+async function saveAudit(rows, actor) {
   if (!Array.isArray(rows)) return
-  await upsertRows('audit_logs', rows.map((row) => ({
+  const trustedRows = rows.map((row) => trustedAuditEntry(row, actor))
+  await upsertRows('audit_logs', trustedRows.map((row) => ({
     id: row.id,
     created_at: row.timestamp,
     display_date: row.date,
@@ -444,7 +454,7 @@ async function saveAudit(rows) {
   const { data: existingChanges, error } = await supabase.from('audit_changes').select('audit_log_id')
   if (error) throw new Error(error.message)
   const logsWithChanges = new Set((existingChanges ?? []).map((row) => row.audit_log_id))
-  await insert('audit_changes', rows.filter((row) => !logsWithChanges.has(row.id)).flatMap((row) => (row.changes ?? []).map((change) => ({
+  await insert('audit_changes', trustedRows.filter((row) => !logsWithChanges.has(row.id)).flatMap((row) => (row.changes ?? []).map((change) => ({
     audit_log_id: row.id,
     field_name: change.field,
     old_value: change.oldValue,
@@ -1421,7 +1431,7 @@ const recordResources = {
   },
   barangay_generated_assistance_list: { table: 'generated_assistance_list', column: 'id', associationColumn: 'association_name', save: (item) => saveGenerated([item]) },
   barangay_priority_list: { table: 'priority_list', column: 'id', associationColumn: 'association_name', save: (item) => savePriority([item]) },
-  barangay_audit_logs: { table: 'audit_logs', column: 'id', save: (item) => saveAudit([item]) },
+  barangay_audit_logs: { table: 'audit_logs', column: 'id', save: (item, context) => saveAudit([item], context?.actor) },
   barangay_report_history: { table: 'report_history', column: 'id', save: (item) => saveReports([item]) },
   barangay_association_details: { table: 'association_profiles', column: 'id', associationColumn: 'name', save: saveProfile },
   barangay_privacy_settings: { table: 'privacy_settings', column: 'id', identity: 'default', save: savePrivacy },
@@ -1429,7 +1439,7 @@ const recordResources = {
 
 const associationWritableResources = new Set([
   'barangay_association_members', 'barangay_association_notifications', 'barangay_aid_records',
-  'barangay_reviewable_items', 'barangay_association_details',
+  'barangay_reviewable_items', 'barangay_association_details', 'barangay_audit_logs',
 ])
 const associationDeletableResources = new Set([
   'barangay_association_members', 'barangay_association_notifications', 'barangay_aid_records',
@@ -1564,7 +1574,7 @@ app.put('/api/records/:key/:id', async (req, res) => {
     }
   }
   try {
-    await resource.save(payload, { requestExists })
+    await resource.save(payload, { actor, requestExists })
     res.json({ ok: true, id })
   } catch (error) {
     res.status(500).json({ error: error.message })
@@ -1711,4 +1721,5 @@ export {
   requestWriteError,
   requestWriteOperation,
   scopeStoresForActor,
+  trustedAuditEntry,
 }
