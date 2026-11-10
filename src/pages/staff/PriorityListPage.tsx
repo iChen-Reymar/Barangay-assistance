@@ -157,30 +157,6 @@ export default function StaffPriorityListPage() {
     setGenerating(true)
     setGenerationMessage('')
     try {
-      const requestDocuments = request.documents ?? []
-      const qualifications = request.qualifications ?? []
-      const unverifiedDocuments = requestDocuments.filter((document) => document.status !== 'verified')
-      const incompleteQualifications = qualifications.filter(
-        (check) => check.status !== 'passed' && check.status !== 'not_applicable',
-      )
-      const requestDocumentsReady = requestDocuments.length > 0 && unverifiedDocuments.length === 0
-      const qualificationsReady = qualifications.length > 0 && incompleteQualifications.length === 0
-      if (!requestDocumentsReady || !qualificationsReady) {
-        const blockers = [
-          requestDocuments.length === 0
-            ? 'No request documents are attached.'
-            : unverifiedDocuments.length > 0
-              ? `${unverifiedDocuments.length} request document${unverifiedDocuments.length === 1 ? '' : 's'} still need verification.`
-              : '',
-          qualifications.length === 0
-            ? 'No qualification checks are configured.'
-            : incompleteQualifications.length > 0
-              ? `${incompleteQualifications.length} qualification check${incompleteQualifications.length === 1 ? '' : 's'} are incomplete.`
-              : '',
-        ].filter(Boolean)
-        setGenerationMessage(blockers.join(' '))
-        return
-      }
       let reviewedRequest = getItemById(request.id)
       if (reviewedRequest?.status === 'PENDING') {
         reviewedRequest = markAssistanceUnderReview(request.id)

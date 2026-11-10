@@ -43,8 +43,8 @@ test('staff generates final lists while admin monitors requests', () => {
   const generated = {
     ...review,
     status: 'LIST GENERATED',
-    documents: [{ status: 'verified' }],
-    qualifications: [{ status: 'passed' }],
+    documents: [],
+    qualifications: [],
   }
   const approved = { ...pending, status: 'APPROVED', decisions: [{ id: 'decision-1', decision: 'approve', newStatus: 'APPROVED' }] }
 

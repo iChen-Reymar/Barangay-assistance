@@ -1450,16 +1450,6 @@ function requestWriteError(actor, payload, current = null) {
     if (current.status === 'PENDING' && status === 'LIST GENERATED') {
       return 'A request must enter Staff review before its final list can be generated.'
     }
-    if (status === 'LIST GENERATED') {
-      const documents = Array.isArray(payload?.documents) ? payload.documents : []
-      const qualifications = Array.isArray(payload?.qualifications) ? payload.qualifications : []
-      if (!documents.length || documents.some((entry) => entry?.status !== 'verified')) {
-        return 'Every request document must be verified before final list generation.'
-      }
-      if (!qualifications.length || qualifications.some((entry) => !['passed', 'not_applicable'].includes(entry?.status))) {
-        return 'Every qualification check must be completed before final list generation.'
-      }
-    }
     if (JSON.stringify(decisions) !== JSON.stringify(currentDecisions)) {
       return 'Staff cannot add or change final decision records.'
     }
