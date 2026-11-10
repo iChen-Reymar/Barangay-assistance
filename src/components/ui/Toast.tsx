@@ -1,30 +1,6 @@
 import { useEffect, useState } from 'react'
 import { Check } from 'lucide-react'
-
-type ToastTone = 'success' | 'error'
-
-type ToastItem = {
-  id: number
-  title?: string
-  message: string
-  tone: ToastTone
-}
-
-type ToastStore = {
-  listeners: Set<(toast: ToastItem) => void>
-  nextId: number
-}
-
-const store: ToastStore = ((globalThis as { __barangayToast?: ToastStore }).__barangayToast ??= {
-  listeners: new Set(),
-  nextId: 1,
-})
-
-export function showToast(message: string, tone: ToastTone = 'success', title?: string) {
-  const toast = { id: store.nextId, title, message, tone }
-  store.nextId += 1
-  store.listeners.forEach((listener) => listener(toast))
-}
+import { toastStore, type ToastItem } from './toastStore'
 
 export function ToastHost() {
   const [toasts, setToasts] = useState<ToastItem[]>([])
@@ -36,9 +12,9 @@ export function ToastHost() {
         setToasts((current) => current.filter((item) => item.id !== toast.id))
       }, 4500)
     }
-    store.listeners.add(listener)
+    toastStore.listeners.add(listener)
     return () => {
-      store.listeners.delete(listener)
+      toastStore.listeners.delete(listener)
     }
   }, [])
 

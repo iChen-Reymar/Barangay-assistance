@@ -13,7 +13,7 @@ interface ProgramSettingsModalProps {
 
 function formatCurrency(amount?: number) {
   if (amount === undefined) return 'â€”'
-  return `â‚± ${amount.toLocaleString('en-PH', { minimumFractionDigits: 2 })}`
+  return `₱ ${amount.toLocaleString('en-PH', { minimumFractionDigits: 2 })}`
 }
 
 export function ProgramSettingsModal({

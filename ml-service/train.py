@@ -12,7 +12,7 @@ Training pool:
 
 Evaluation is deliberately harder than a single lucky split:
 
-  * one untouched hold-out test set (25%, stratified) -> the headline numbers
+  * one untouched hold-out test set (20%, stratified) -> the headline numbers
   * 5-fold stratified cross-validation on the training split -> mean +/- std,
     so a "works" claim is not resting on one favourable draw
 
@@ -24,10 +24,10 @@ from __future__ import annotations
 import random
 
 import numpy as np
-from sklearn.model_selection import StratifiedKFold, train_test_split
+from sklearn.model_selection import GridSearchCV, StratifiedKFold, train_test_split
 
 from dataset import build_dataset, dataset_summary, to_xy
-from models import VulnerabilityScorer, evaluate
+from models import VulnerabilityScorer, build_pipelines, evaluate
 
 TARGET_ACCURACY = 0.80  # the capstone's stated minimum for the blended model
 N_SYNTHETIC = 8000
@@ -38,7 +38,7 @@ def _blended_predictions(scorer: VulnerabilityScorer, x: np.ndarray) -> list[str
     return [item["classification"] for item in scorer.score(x)]
 
 
-def _cross_validate(x: np.ndarray, y: np.ndarray, seed: int, folds: int = CV_FOLDS) -> dict:
+def _cross_validate(x: np.ndarray, y: np.ndarray, seed: int, tree_params: dict, logreg_params: dict, folds: int = CV_FOLDS) -> dict:
     """Stratified k-fold accuracy for each model and the blend, on the training split."""
     splitter = StratifiedKFold(n_splits=folds, shuffle=True, random_state=seed)
     tree_scores: list[float] = []
@@ -46,7 +46,7 @@ def _cross_validate(x: np.ndarray, y: np.ndarray, seed: int, folds: int = CV_FOL
     blended_scores: list[float] = []
 
     for train_idx, val_idx in splitter.split(x, y):
-        fold_scorer = VulnerabilityScorer.train(x[train_idx], y[train_idx])
+        fold_scorer = VulnerabilityScorer.train(x[train_idx], y[train_idx], tree_params, logreg_params)
         x_val, y_val = x[val_idx], y[val_idx]
 
         y_true = y_val.tolist()
@@ -102,12 +102,30 @@ def train_with_real_records(
     y = np.asarray(y)
 
     x_train, x_test, y_train, y_test = train_test_split(
-        x, y, test_size=0.25, random_state=seed, stratify=y
+        x, y, test_size=0.20, random_state=seed, stratify=y
     )
+
+    tree, logreg = build_pipelines()
+    tree_search = GridSearchCV(
+        tree,
+        {"clf__max_depth": [4, 6, 8], "clf__min_samples_leaf": [8, 12, 20]},
+        scoring="f1_macro",
+        cv=5,
+        n_jobs=-1,
+    ).fit(x_train, y_train)
+    logreg_search = GridSearchCV(
+        logreg,
+        {"clf__C": [0.25, 1.0, 4.0]},
+        scoring="f1_macro",
+        cv=5,
+        n_jobs=-1,
+    ).fit(x_train, y_train)
+    tree_params = {key.removeprefix("clf__"): value for key, value in tree_search.best_params_.items()}
+    logreg_params = {key.removeprefix("clf__"): value for key, value in logreg_search.best_params_.items()}
 
     # Hold this model out of the test rows. Its accuracy is what the performance
     # page reports. It is not the model that scores members.
-    holdout = VulnerabilityScorer.train(x_train, y_train)
+    holdout = VulnerabilityScorer.train(x_train, y_train, tree_params, logreg_params)
     y_true = y_test.tolist()
 
     metrics = {
@@ -120,11 +138,11 @@ def train_with_real_records(
     # the number worth putting the 80% target against.
     blended = _blended_predictions(holdout, x_test)
     metrics["blended"] = evaluate(y_true, blended)
-    metrics["crossValidation"] = _cross_validate(x_train, y_train, seed)
+    metrics["crossValidation"] = _cross_validate(x_train, y_train, seed, tree_params, logreg_params)
 
     # Score with a model that has seen every training row. Member evaluation
     # fields are optional until a user submits them from their account.
-    scorer = VulnerabilityScorer.train(x, y)
+    scorer = VulnerabilityScorer.train(x, y, tree_params, logreg_params)
 
     summary = dataset_summary(pool)
     summary.update(
@@ -138,6 +156,10 @@ def train_with_real_records(
             "scoringSamples": int(x.shape[0]),
             "cvFolds": CV_FOLDS,
             "targetAccuracy": TARGET_ACCURACY,
+            "gridSearch": {
+                "decisionTree": {"bestParameters": tree_search.best_params_, "bestF1Macro": round(float(tree_search.best_score_), 4)},
+                "logisticRegression": {"bestParameters": logreg_search.best_params_, "bestF1Macro": round(float(logreg_search.best_score_), 4)},
+            },
             "meetsTarget": metrics["blended"]["accuracy"] >= TARGET_ACCURACY,
         }
     )

@@ -1,6 +1,6 @@
 import { type RequestStatus } from '../data/mockData'
 import { enrichReviewableItem } from '../data/requestDetailsSeed'
-import { notifyDocumentRejected } from './associationNotificationStorage'
+import { notifyDocumentRejected, notifyWorkflowEvent } from './associationNotificationStorage'
 import type {
   DecisionInput,
   DecisionRecord,
@@ -53,45 +53,6 @@ export function getAssociationAssistanceItems(associationName: string): Reviewab
   return getAssistanceItems().filter((item) => item.association.trim().toLowerCase() === name)
 }
 
-function sameText(left: string, right: string) {
-  return left.trim().toLowerCase() === right.trim().toLowerCase()
-}
-
-/** Move matching assistance requests to Generated after a list is produced. */
-export function markRequestsGenerated(rows: { association: string; program: string }[]) {
-  if (!rows.length) return
-  const items = readItems()
-  let changed = false
-  const next = items.map((item) => {
-    if (item.source !== 'assistance') return item
-    if (item.status === 'APPROVED' || item.status === 'REJECTED') return item
-    const program = item.program || item.requestType
-    const matched = rows.some(
-      (row) => sameText(row.association, item.association) && sameText(row.program, program),
-    )
-    if (!matched) return item
-    changed = true
-    const decidedAt = new Date().toISOString()
-    return {
-      ...item,
-      status: 'APPROVED' as const,
-      decisions: [
-        {
-          id: crypto.randomUUID(),
-          decision: 'approve' as const,
-          notes: 'The assistance list was generated for this request.',
-          decidedBy: 'Barangay Staff',
-          decidedAt,
-          previousStatus: item.status,
-          newStatus: 'APPROVED',
-        },
-        ...item.decisions,
-      ],
-    }
-  })
-  if (changed) writeItems(next)
-}
-
 export function submitAssociationAssistanceRequest(input: {
   association: string
   program: string
@@ -102,18 +63,19 @@ export function submitAssociationAssistanceRequest(input: {
   submittedBy: string
   contactNumber?: string
   email?: string
+  documents?: Array<{
+    name: string
+    type: string
+    fileSize: string
+    dataUrl: string
+  }>
 }): ReviewableAssistanceItem {
   const now = new Date()
   initializeDecisionStorage()
   const existing = readItems()
-  const usedNumbers = existing
-    .map((entry) => /^asst-(\d+)$/.exec(entry.id)?.[1])
-    .filter((value): value is string => Boolean(value))
-    .map(Number)
-  const nextNumber = (usedNumbers.length > 0 ? Math.max(...usedNumbers) : 0) + 1
 
   const item: ReviewableAssistanceItem = {
-    id: `asst-${nextNumber}`,
+    id: `REQ-${crypto.randomUUID()}`,
     source: 'assistance',
     association: input.association.trim(),
     requestType: input.program.trim(),
@@ -123,6 +85,12 @@ export function submitAssociationAssistanceRequest(input: {
     status: 'PENDING',
     description: input.purpose.trim(),
     decisions: [],
+    documents: (input.documents ?? []).map((document) => ({
+      id: crypto.randomUUID(),
+      ...document,
+      uploadedAt: now.toISOString(),
+      status: 'uploaded' as const,
+    })),
     details: {
       submittedBy: input.submittedBy.trim(),
       contactNumber: input.contactNumber?.trim() || '—',
@@ -137,6 +105,12 @@ export function submitAssociationAssistanceRequest(input: {
   }
 
   writeItems([item, ...existing])
+  notifyWorkflowEvent({
+    associationName: item.association,
+    requestId: item.id,
+    event: 'submitted',
+    message: `Request ${item.id} was submitted for Staff validation.`,
+  })
   return enrichReviewableItem(item)
 }
 
@@ -146,6 +120,43 @@ export function getRecommendationItems(): ReviewableAssistanceItem[] {
 
 export function getItemById(id: string): ReviewableAssistanceItem | null {
   return getReviewableItems().find((item) => item.id === id) ?? null
+}
+
+export function markAssistanceUnderReview(itemId: string): ReviewableAssistanceItem | null {
+  const items = readItems()
+  const index = items.findIndex((item) => item.id === itemId)
+  if (index === -1) return null
+  const current = items[index]
+  if (current.status !== 'PENDING') return enrichReviewableItem(current)
+  items[index] = { ...current, status: 'UNDER REVIEW' }
+  writeItems(items)
+  notifyWorkflowEvent({
+    associationName: current.association,
+    requestId: current.id,
+    event: 'review',
+    message: `Staff validation started for request ${current.id}.`,
+  })
+  return enrichReviewableItem(items[index])
+}
+
+export function markAssistanceListGenerated(itemId: string): ReviewableAssistanceItem | null {
+  const items = readItems()
+  const index = items.findIndex((item) => item.id === itemId)
+  if (index === -1) return null
+  const current = items[index]
+  if (current.status === 'LIST GENERATED') return enrichReviewableItem(current)
+  if (current.status === 'APPROVED' || current.status === 'REJECTED') return enrichReviewableItem(current)
+
+  items[index] = { ...current, status: 'LIST GENERATED' }
+  writeItems(items)
+  notifyWorkflowEvent({
+    associationName: current.association,
+    requestId: current.id,
+    event: 'generated',
+    message: `The final prioritized beneficiary list for request ${current.id} was generated automatically after Staff validation.`,
+    type: 'success',
+  })
+  return enrichReviewableItem(items[index])
 }
 
 function statusForDecision(input: DecisionInput, currentStatus: RequestStatus): RequestStatus {
@@ -184,6 +195,14 @@ export function submitAssistanceDecision(
   }
 
   writeItems(items)
+  notifyWorkflowEvent({
+    associationName: current.association,
+    requestId: current.id,
+    event: input.decision === 'reject' ? 'rejected' : 'approved',
+    message: `Request ${current.id} was ${input.decision === 'reject' ? 'rejected' : 'approved'} by the Admin.`,
+    type: input.decision === 'reject' ? 'warning' : 'success',
+    reason: input.notes,
+  })
   return enrichReviewableItem(items[index])
 }
 
@@ -216,8 +235,17 @@ export function verifyDocument(
       : doc,
   )
 
-  items[index] = { ...current, documents }
+  const startedReview = current.status === 'PENDING'
+  items[index] = { ...current, status: startedReview ? 'UNDER REVIEW' : current.status, documents }
   writeItems(items)
+  if (startedReview) {
+    notifyWorkflowEvent({
+      associationName: current.association,
+      requestId: current.id,
+      event: 'review',
+      message: `Staff validation started for request ${current.id}.`,
+    })
+  }
   if (status === 'rejected') {
     notifyDocumentRejected({
       associationName: associationName || current.association,
@@ -255,8 +283,17 @@ export function verifyQualification(
       : check,
   )
 
-  items[index] = { ...current, qualifications }
+  const startedReview = current.status === 'PENDING'
+  items[index] = { ...current, status: startedReview ? 'UNDER REVIEW' : current.status, qualifications }
   writeItems(items)
+  if (startedReview) {
+    notifyWorkflowEvent({
+      associationName: current.association,
+      requestId: current.id,
+      event: 'review',
+      message: `Staff validation started for request ${current.id}.`,
+    })
+  }
   return enrichReviewableItem(items[index])
 }
 

@@ -25,9 +25,32 @@ export default function AssistanceRequestPage() {
   const [purpose, setPurpose] = useState('')
   const [requestedAssistance, setRequestedAssistance] = useState('')
   const [supportingInfo, setSupportingInfo] = useState('')
+  const [documents, setDocuments] = useState<File[]>([])
+  const [uploadError, setUploadError] = useState('')
 
-  function handleSubmit(e: React.FormEvent) {
+  async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
+    setUploadError('')
+    if (!documents.length) {
+      setUploadError('Upload at least one request-specific supporting document.')
+      return
+    }
+    const oversized = documents.find((file) => file.size > 5 * 1024 * 1024)
+    if (oversized) {
+      setUploadError(`${oversized.name} exceeds the 5 MB file limit.`)
+      return
+    }
+    const uploadedDocuments = await Promise.all(documents.map(async (file) => ({
+      name: file.name,
+      type: file.type || 'application/octet-stream',
+      fileSize: `${(file.size / 1024).toFixed(1)} KB`,
+      dataUrl: await new Promise<string>((resolve, reject) => {
+        const reader = new FileReader()
+        reader.onload = () => resolve(String(reader.result ?? ''))
+        reader.onerror = () => reject(new Error(`Unable to read ${file.name}.`))
+        reader.readAsDataURL(file)
+      }),
+    })))
     const submittedRequest = submitAssociationAssistanceRequest({
       association: associationName,
       program,
@@ -38,6 +61,7 @@ export default function AssistanceRequestPage() {
       submittedBy: displayUser.name,
       contactNumber: profile?.contactNumber,
       email: profile?.email ?? user?.email,
+      documents: uploadedDocuments,
     })
     logAuditEvent({
       user: displayUser.name,
@@ -58,6 +82,7 @@ export default function AssistanceRequestPage() {
     setPurpose('')
     setRequestedAssistance('')
     setSupportingInfo('')
+    setDocuments([])
   }
 
   return (
@@ -152,6 +177,21 @@ export default function AssistanceRequestPage() {
                   className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
                   placeholder="Additional documents or context supporting this request..."
                 />
+              </div>
+
+              <div>
+                <label className="mb-1 block text-xs font-semibold uppercase text-gray-500">Supporting Documents</label>
+                <input
+                  type="file"
+                  required
+                  multiple
+                  accept=".pdf,.png,.jpg,.jpeg,.doc,.docx"
+                  onChange={(event) => setDocuments(Array.from(event.target.files ?? []))}
+                  className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm file:mr-3 file:rounded file:border-0 file:bg-green-50 file:px-3 file:py-1 file:text-green-800"
+                />
+                <p className="mt-1 text-xs text-gray-500">PDF, image, or Word files; maximum 5 MB each. These files are linked only to this request.</p>
+                {documents.length ? <p className="mt-1 text-xs font-medium text-green-700">{documents.length} file(s) selected</p> : null}
+                {uploadError ? <p className="mt-1 text-xs font-medium text-red-600">{uploadError}</p> : null}
               </div>
 
               <Button type="submit" className="w-full">Submit Request</Button>

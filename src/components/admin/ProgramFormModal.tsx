@@ -198,7 +198,7 @@ export function ProgramFormModal({
           </div>
           <div>
             <label className="mb-1 block text-xs font-semibold uppercase text-gray-500">
-              Budget Allocation (â‚±)
+              Budget Allocation (₱)
             </label>
             <input
               type="number"

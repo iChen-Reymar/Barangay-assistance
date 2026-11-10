@@ -6,7 +6,7 @@ import type { PasswordChangeInput } from '../../types/auth'
 interface ChangePasswordModalProps {
   open: boolean
   onClose: () => void
-  onSave: (input: PasswordChangeInput) => { success: boolean; error?: string }
+  onSave: (input: PasswordChangeInput) => Promise<{ success: boolean; error?: string }>
 }
 
 export function ChangePasswordModal({ open, onClose, onSave }: ChangePasswordModalProps) {
@@ -29,7 +29,7 @@ export function ChangePasswordModal({ open, onClose, onSave }: ChangePasswordMod
     onClose()
   }
 
-  function handleSubmit(e: FormEvent) {
+  async function handleSubmit(e: FormEvent) {
     e.preventDefault()
     setError('')
 
@@ -38,7 +38,7 @@ export function ChangePasswordModal({ open, onClose, onSave }: ChangePasswordMod
       return
     }
 
-    const result = onSave({ currentPassword, newPassword })
+    const result = await onSave({ currentPassword, newPassword })
     if (!result.success) {
       setError(result.error ?? 'Unable to change password.')
       return
@@ -78,7 +78,7 @@ export function ChangePasswordModal({ open, onClose, onSave }: ChangePasswordMod
           <input
             required
             type="password"
-            minLength={6}
+            minLength={8}
             value={newPassword}
             onChange={(e) => setNewPassword(e.target.value)}
             className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
@@ -90,7 +90,7 @@ export function ChangePasswordModal({ open, onClose, onSave }: ChangePasswordMod
           <input
             required
             type="password"
-            minLength={6}
+            minLength={8}
             value={confirmPassword}
             onChange={(e) => setConfirmPassword(e.target.value)}
             className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"

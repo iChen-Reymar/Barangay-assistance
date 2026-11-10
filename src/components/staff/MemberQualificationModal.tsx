@@ -303,21 +303,25 @@ export function MemberQualificationModal({
   }, [open, association])
 
   useEffect(() => {
-    setPerson(null)
-    setDocumentPreview(null)
+    queueMicrotask(() => {
+      setPerson(null)
+      setDocumentPreview(null)
+    })
   }, [association, open])
 
   useEffect(() => {
-    setPerson((current) => {
-      if (!current) return current
-      if (current.kind === 'member') {
-        const next = members.find((member) => member.id === current.id)
-        if (!next) return null
-        return { kind: 'member', id: next.id, member: next }
-      }
-      const next = beneficiaries.find((row) => row.id === current.id)
-      if (!next) return current
-      return { kind: 'beneficiary', id: next.id, beneficiary: next }
+    queueMicrotask(() => {
+      setPerson((current) => {
+        if (!current) return current
+        if (current.kind === 'member') {
+          const next = members.find((member) => member.id === current.id)
+          if (!next) return null
+          return { kind: 'member', id: next.id, member: next }
+        }
+        const next = beneficiaries.find((row) => row.id === current.id)
+        if (!next) return current
+        return { kind: 'beneficiary', id: next.id, beneficiary: next }
+      })
     })
   }, [members, beneficiaries])
 
@@ -826,7 +830,7 @@ function RejectCommentModal({
   const [comment, setComment] = useState('')
 
   useEffect(() => {
-    if (open) setComment('')
+    if (open) queueMicrotask(() => setComment(''))
   }, [open, memberName, documentName])
 
   useEffect(() => {

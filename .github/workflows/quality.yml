@@ -1,0 +1,55 @@
+name: Quality checks
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: pip
+          cache-dependency-path: ml-service/requirements.txt
+
+      - name: Install web dependencies
+        run: npm ci
+
+      - name: Install API dependencies
+        run: npm ci --prefix server
+
+      - name: Install ML dependencies
+        run: python -m pip install -r ml-service/requirements.txt
+
+      - name: Run tests
+        run: npm test
+
+      - name: Run lint
+        run: npm run lint
+
+      - name: Build production web app
+        run: npm run build
+
+      - name: Audit production web dependencies
+        run: npm audit --omit=dev
+
+      - name: Audit production API dependencies
+        run: npm audit --omit=dev --prefix server

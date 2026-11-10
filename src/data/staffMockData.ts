@@ -1,13 +1,15 @@
 export type VulnerabilityLevel = 'HIGH' | 'MEDIUM' | 'LOW'
 export type VerificationStatus = 'VERIFIED' | 'PENDING' | 'UNVERIFIED'
-export type RequestStatus = 'PENDING' | 'UNDER REVIEW' | 'APPROVED' | 'REJECTED'
+export type RequestStatus = 'PENDING' | 'UNDER REVIEW' | 'LIST GENERATED' | 'APPROVED' | 'REJECTED'
 
 export interface StaffBeneficiary {
   id: string
+  memberId?: string
   name: string
   association: string
   familySize: number
   monthlyIncome: number
+  workingHouseholdMembers?: number
   vulnerability: VulnerabilityLevel
   verification: VerificationStatus
   age?: number
@@ -116,7 +118,7 @@ export const staffReports = [
   { title: 'Beneficiary Report', description: 'Summary of registered beneficiaries, household sizes, and verification status.' },
   { title: 'Vulnerability Report', description: 'Risk allocations and at-risk priority classifications.' },
   { title: 'Assistance Report', description: 'Tracking of assistance programs and distribution channels.' },
-  { title: 'Program Status Report', description: 'Overview of active programs, approvals, and disbursement status.' },
+  { title: 'Program Status Report', description: 'Overview of active programs, generated lists, and distribution status.' },
 ]
 
 export const staffProfile = {

@@ -7,6 +7,7 @@ const REQUEST_STATUS_COLORS: Record<RequestStatus, string> = {
   PENDING: '#9ca3af',
   APPROVED: '#22c55e',
   'UNDER REVIEW': '#3b82f6',
+  'LIST GENERATED': '#16a34a',
   REJECTED: '#ef4444',
 }
 
@@ -50,6 +51,7 @@ export function getRequestStatusChartData(): ChartSegment[] {
     PENDING: 0,
     APPROVED: 0,
     'UNDER REVIEW': 0,
+    'LIST GENERATED': 0,
     REJECTED: 0,
   }
 

@@ -10,6 +10,7 @@ const statusStyles: Record<RequestStatus, string> = {
   PENDING: 'bg-gray-100 text-gray-600',
   APPROVED: 'bg-green-50 text-green-700',
   'UNDER REVIEW': 'bg-blue-50 text-blue-600',
+  'LIST GENERATED': 'bg-green-50 text-green-700',
   REJECTED: 'bg-red-50 text-red-600',
 }
 

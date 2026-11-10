@@ -24,7 +24,7 @@ import {
 import { getAssociations, subscribeAssociationStorage } from '../../services/associationStorage'
 
 function formatCurrency(amount: number) {
-  return `â‚± ${amount.toLocaleString('en-PH', { minimumFractionDigits: 2 })}`
+  return `₱ ${amount.toLocaleString('en-PH', { minimumFractionDigits: 2 })}`
 }
 
 function formToBeneficiary(input: BeneficiaryFormInput, existing?: Beneficiary): Beneficiary {

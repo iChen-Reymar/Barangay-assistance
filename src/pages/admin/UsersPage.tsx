@@ -25,8 +25,6 @@ const roleOptions: { value: UserRole; label: string }[] = [
 const fieldClass =
   'w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary'
 
-const defaultPassword = '123123'
-
 function associationFor(account: StoredUser, associations: Association[]) {
   if (account.role !== 'association') return ''
   const named = account.associationName?.trim()
@@ -81,10 +79,10 @@ export default function UsersPage() {
     })
   }
 
-  function handleRoleChange(account: StoredUser, role: UserRole) {
+  async function handleRoleChange(account: StoredUser, role: UserRole) {
     setError('')
     if (role === account.role) return
-    const result = updateUserRole(account.id, role)
+    const result = await updateUserRole(account.id, role)
     if (!result.success) {
       setError(result.error ?? 'Could not change permissions.')
       return
@@ -97,10 +95,12 @@ export default function UsersPage() {
     ]))
   }
 
-  function handleCreate(event: React.FormEvent) {
+  async function handleCreate(event: React.FormEvent) {
     event.preventDefault()
     setError('')
-    const result = createManagedUser(form)
+    setSaving(true)
+    const result = await createManagedUser(form)
+    setSaving(false)
     if (!result.success) {
       setError(result.error ?? 'Could not add the user.')
       return
@@ -137,8 +137,8 @@ export default function UsersPage() {
   async function saveEdit(password = editForm.password.trim()) {
     if (!editTarget) return
     setError('')
-    if (password && password.length < 6) {
-      setError(`Password must be at least 6 characters. The default password is ${defaultPassword}.`)
+    if (password && password.length < 8) {
+      setError('Password must be at least 8 characters.')
       return
     }
     setSaving(true)
@@ -155,24 +155,22 @@ export default function UsersPage() {
     }
     refreshUsers()
     const fullName = `${editForm.firstName.trim()} ${editForm.lastName.trim()}`.trim()
-    const passwordNote = password
-      ? password === defaultPassword
-        ? ` The password is now ${defaultPassword}.`
-        : ' The password was changed.'
-      : ''
+    const passwordNote = password ? ' The password was changed.' : ''
     setMessage(`${fullName} was updated.${passwordNote}`)
     audit(`Updated user ${fullName}.`, buildChanges([
       { key: 'name', label: 'Name', oldValue: editTarget.fullName, newValue: fullName },
       { key: 'email', label: 'Email', oldValue: editTarget.email, newValue: editForm.email.trim().toLowerCase() },
-      ...(password ? [{ key: 'password', label: 'Password', oldValue: 'Hidden', newValue: password === defaultPassword ? `Reset to ${defaultPassword}` : 'Changed' }] : []),
+      ...(password ? [{ key: 'password', label: 'Password', oldValue: 'Hidden', newValue: 'Changed' }] : []),
     ]))
     setEditTarget(null)
   }
 
-  function handleRemove() {
+  async function handleRemove() {
     if (!removeTarget || !user) return
     setError('')
-    const result = removeUser(removeTarget.id, user.id)
+    setSaving(true)
+    const result = await removeUser(removeTarget.id, user.id)
+    setSaving(false)
     if (!result.success) {
       setError(result.error ?? 'Could not remove the user.')
       setRemoveTarget(null)
@@ -285,7 +283,7 @@ export default function UsersPage() {
         footer={
           <div className="flex justify-end gap-2">
             <Button variant="outline" onClick={() => setFormOpen(false)}>Cancel</Button>
-            <Button type="submit" form="add-user-form">Save User</Button>
+            <Button type="submit" form="add-user-form" disabled={saving}>Save User</Button>
           </div>
         }
       >
@@ -306,7 +304,7 @@ export default function UsersPage() {
           </label>
           <label className="block text-sm">
             <span className="mb-1 block text-xs font-semibold uppercase text-gray-500">Password</span>
-            <input required type="password" minLength={6} value={form.password} onChange={(event) => setForm({ ...form, password: event.target.value })} className={fieldClass} />
+            <input required type="password" minLength={8} value={form.password} onChange={(event) => setForm({ ...form, password: event.target.value })} className={fieldClass} />
           </label>
           <label className="block text-sm">
             <span className="mb-1 block text-xs font-semibold uppercase text-gray-500">Contact number</span>
@@ -345,9 +343,6 @@ export default function UsersPage() {
         title="Edit User"
         footer={
           <div className="flex flex-wrap justify-end gap-2">
-            <Button variant="outline" disabled={saving} onClick={() => saveEdit(defaultPassword)}>
-              Reset password to {defaultPassword}
-            </Button>
             <Button variant="outline" disabled={saving} onClick={() => setEditTarget(null)}>Cancel</Button>
             <Button type="submit" form="edit-user-form" disabled={saving}>Save</Button>
           </div>
@@ -371,14 +366,14 @@ export default function UsersPage() {
           <label className="block text-sm">
             <span className="mb-1 block text-xs font-semibold uppercase text-gray-500">New password</span>
             <input
-              type="text"
+              type="password"
               value={editForm.password}
               onChange={(event) => setEditForm({ ...editForm, password: event.target.value })}
               placeholder="Leave blank to keep the current password"
               className={fieldClass}
             />
             <span className="mt-1 block text-xs text-gray-500">
-              Sign-in requires at least 6 characters, so the default reset password is {defaultPassword}.
+              Use at least 8 characters. Passwords are managed by Supabase Auth and are never stored in browser data.
             </span>
           </label>
         </form>

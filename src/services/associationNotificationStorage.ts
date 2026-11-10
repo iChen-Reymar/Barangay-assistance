@@ -11,6 +11,8 @@ export interface AssociationNotification {
   memberName?: string
   rejectedBy?: string
   reason?: string
+  requestId?: string
+  event?: 'submitted' | 'review' | 'generated' | 'approved' | 'rejected'
 }
 
 const STORAGE_KEY = 'barangay_association_notifications'
@@ -184,6 +186,38 @@ export function notifyDocumentRejected(input: {
       )
     }
     return existing
+  }
+  writeAll([notification, ...readAll()])
+  return notification
+}
+
+export function notifyWorkflowEvent(input: {
+  associationName: string
+  requestId: string
+  event: 'submitted' | 'review' | 'generated' | 'approved' | 'rejected'
+  message: string
+  type?: AssociationNotification['type']
+  reason?: string
+}) {
+  const duplicate = readAll().find(
+    (item) => item.requestId === input.requestId && item.event === input.event,
+  )
+  if (duplicate) return duplicate
+  const now = new Date()
+  const notification: AssociationNotification = {
+    id: crypto.randomUUID(),
+    associationName: input.associationName,
+    recipientUserId: headUserIdFor(input.associationName),
+    requestId: input.requestId,
+    event: input.event,
+    message: input.message,
+    reason: input.reason?.trim() || undefined,
+    time: now.toLocaleString('en-US', {
+      month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit',
+    }),
+    createdAt: now.toISOString(),
+    read: false,
+    type: input.type ?? 'info',
   }
   writeAll([notification, ...readAll()])
   return notification

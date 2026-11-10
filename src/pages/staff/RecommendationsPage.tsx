@@ -1,24 +1,21 @@
 ﻿import { useEffect, useState } from 'react'
 import { DashboardNavbar } from '../../components/layout/DashboardNavbar'
 import { AiRecommendationBoards } from '../../components/recommendations/AiRecommendationBoards'
-import { ApprovalDecisionModal } from '../../components/approval/ApprovalDecisionModal'
 import { DecisionTimeline } from '../../components/approval/DecisionTimeline'
 import { RequestDetailsModal } from '../../components/approval/RequestDetailsModal'
 import { VulnerabilityBadge } from '../../components/admin/StatusBadge'
 import { Badge } from '../../components/ui/Badge'
 import { Button } from '../../components/ui/Button'
 import { useReviewActor } from '../../hooks/useReviewActor'
-import { buildChanges, logAuditEvent } from '../../services/auditStorage'
 import {
   formatDecisionDate,
   getRecommendationItems,
   getItemById,
-  submitAssistanceDecision,
   subscribeDecisionStorage,
   verifyDocument,
   verifyQualification,
 } from '../../services/decisionStorage'
-import type { DecisionType, DocumentStatus, QualificationStatus, ReviewableAssistanceItem } from '../../types/approval'
+import type { DocumentStatus, QualificationStatus, ReviewableAssistanceItem } from '../../types/approval'
 import { useAuth } from '../../context/useAuth'
 import { getInitials } from '../../utils/userDisplay'
 
@@ -31,10 +28,6 @@ export default function StaffRecommendationsPage() {
   const [items, setItems] = useState<ReviewableAssistanceItem[]>(() => getRecommendationItems())
   const [expandedId, setExpandedId] = useState<string | null>(null)
   const [detailsItem, setDetailsItem] = useState<ReviewableAssistanceItem | null>(null)
-  const [decisionModal, setDecisionModal] = useState<{
-    type: DecisionType
-    item: ReviewableAssistanceItem
-  } | null>(null)
 
   useEffect(() => subscribeDecisionStorage(() => setItems(getRecommendationItems())), [])
 
@@ -54,33 +47,6 @@ export default function StaffRecommendationsPage() {
     verifyQualification(detailsItem.id, checkId, status, { name: actor.name, email: actor.email }, notes)
     refreshItems()
     setDetailsItem(getItemById(detailsItem.id))
-  }
-
-  function handleDecision(notes: string, overrideStatus?: ReviewableAssistanceItem['status']) {
-    if (!decisionModal) return
-    const result = submitAssistanceDecision(decisionModal.item.id, {
-      decision: decisionModal.type,
-      notes,
-      reviewedBy: actor.name,
-      reviewedByEmail: actor.email,
-      overrideStatus,
-    })
-    if (result) {
-      logAuditEvent({
-        user: actor.name,
-        userEmail: actor.email,
-        action: 'Approval',
-        actionColor: decisionModal.type === 'reject' ? 'red' : 'green',
-        description: `${decisionModal.type} decision for ${result.association}.`,
-        entityType: 'assistance_request',
-        entityId: result.id,
-        changes: buildChanges([
-          { key: 'decision', label: 'Decision', oldValue: decisionModal.item.status, newValue: result.status },
-          { key: 'notes', label: 'Notes', oldValue: 'â€”', newValue: notes || 'â€”' },
-          { key: 'timestamp', label: 'Timestamp', oldValue: 'â€”', newValue: new Date().toISOString() },
-        ]),
-      })
-    }
   }
 
   return (
@@ -114,7 +80,7 @@ export default function StaffRecommendationsPage() {
                   <VulnerabilityBadge level={rec.vulnerability as 'HIGH' | 'MEDIUM' | 'LOW'} />
                   <Badge
                     variant={
-                      rec.status === 'APPROVED'
+                      rec.status === 'APPROVED' || rec.status === 'LIST GENERATED'
                         ? 'success'
                         : rec.status === 'REJECTED'
                           ? 'danger'
@@ -186,15 +152,6 @@ export default function StaffRecommendationsPage() {
         onVerifyQualification={handleVerifyQualification}
       />
 
-      <ApprovalDecisionModal
-        open={!!decisionModal}
-        onClose={() => setDecisionModal(null)}
-        decisionType={decisionModal?.type ?? 'approve'}
-        itemTitle={decisionModal?.item.association ?? ''}
-        itemSubtitle={decisionModal?.item.program}
-        currentStatus={decisionModal?.item.status}
-        onSubmit={handleDecision}
-      />
     </>
   )
 }

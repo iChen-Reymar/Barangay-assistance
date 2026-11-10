@@ -114,7 +114,7 @@ function vulnerabilitySheet(): ReportSheet {
 
 function requestRows(approvedOnly: boolean): (string | number)[][] {
   return getAssistanceItems()
-    .filter((item) => (approvedOnly ? item.status === 'APPROVED' : true))
+    .filter((item) => (approvedOnly ? item.status === 'LIST GENERATED' || item.status === 'APPROVED' : true))
     .map((item) => {
       const decision = item.decisions[0]
       return [
@@ -239,7 +239,7 @@ export function datasetForReport(entry: ReportHistoryEntry): ReportDataset {
     beneficiary: () => withSummary('Beneficiary Report', [beneficiarySheet()]),
     vulnerability: () => withSummary('Vulnerability Report', [vulnerabilitySheet()]),
     assistance: () => withSummary('Assistance Report', [requestSheet('Requests', false), programSheet(), aidReceivedSheet()]),
-    approved: () => withSummary('Approved Assistance Report', [requestSheet('Approved', true)]),
+    approved: () => withSummary('Generated Assistance List Report', [requestSheet('Generated Lists', true)]),
     ai_scoring: () => withSummary('AI Assessment Report', [aiSheet()]),
     audit: () => withSummary('Audit Log Report', [auditSheet()]),
   }

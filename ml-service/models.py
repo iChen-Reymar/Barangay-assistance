@@ -27,7 +27,7 @@ from sklearn.metrics import (
     recall_score,
 )
 from sklearn.pipeline import Pipeline
-from sklearn.preprocessing import StandardScaler
+from sklearn.preprocessing import MinMaxScaler
 from sklearn.tree import DecisionTreeClassifier
 from sklearn.linear_model import LogisticRegression
 
@@ -45,31 +45,32 @@ LOGREG_WEIGHT = 0.5
 _CLASS_POINTS = {"HIGH": 100.0, "MEDIUM": 55.0, "LOW": 15.0}
 
 
-def build_pipelines() -> tuple[Pipeline, Pipeline]:
+def build_pipelines(tree_params: dict | None = None, logreg_params: dict | None = None) -> tuple[Pipeline, Pipeline]:
     """Decision tree pipeline and logistic regression pipeline."""
+    tree_options = {"max_depth": TREE_DEPTH, "min_samples_leaf": TREE_MIN_SAMPLES_LEAF, **(tree_params or {})}
     tree = Pipeline(
         steps=[
             (
                 "clf",
                 DecisionTreeClassifier(
                     criterion="gini",
-                    max_depth=TREE_DEPTH,
-                    min_samples_leaf=TREE_MIN_SAMPLES_LEAF,
                     class_weight="balanced",
                     random_state=42,
+                    **tree_options,
                 ),
             )
         ]
     )
     logreg = Pipeline(
         steps=[
-            ("scale", StandardScaler()),
+            ("scale", MinMaxScaler()),
             (
                 "clf",
                 LogisticRegression(
                     max_iter=2000,
                     class_weight="balanced",
                     random_state=42,
+                    **(logreg_params or {}),
                 ),
             ),
         ]
@@ -120,8 +121,8 @@ class VulnerabilityScorer:
     # -- training ---------------------------------------------------------
 
     @classmethod
-    def train(cls, x_train: np.ndarray, y_train: np.ndarray) -> "VulnerabilityScorer":
-        tree, logreg = build_pipelines()
+    def train(cls, x_train: np.ndarray, y_train: np.ndarray, tree_params: dict | None = None, logreg_params: dict | None = None) -> "VulnerabilityScorer":
+        tree, logreg = build_pipelines(tree_params, logreg_params)
         tree.fit(x_train, y_train)
         logreg.fit(x_train, y_train)
         return cls(tree, logreg)

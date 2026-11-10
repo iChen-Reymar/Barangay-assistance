@@ -2,35 +2,27 @@ import { useEffect, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { AdminHeader } from '../../components/admin/AdminHeader'
 import { AiRecommendationBoards } from '../../components/recommendations/AiRecommendationBoards'
-import { ApprovalDecisionModal } from '../../components/approval/ApprovalDecisionModal'
 import { DecisionTimeline } from '../../components/approval/DecisionTimeline'
 import { RequestDetailsModal } from '../../components/approval/RequestDetailsModal'
 import { VulnerabilityBadge } from '../../components/admin/StatusBadge'
 import { Button } from '../../components/ui/Button'
 import { Badge } from '../../components/ui/Badge'
-import { useReviewActor } from '../../hooks/useReviewActor'
-import { buildChanges, logAuditEvent } from '../../services/auditStorage'
 import {
   formatDecisionDate,
   getRecommendationItems,
   getReviewableItems,
-  getItemById,
-  submitAssistanceDecision,
   subscribeDecisionStorage,
-  verifyDocument,
-  verifyQualification,
 } from '../../services/decisionStorage'
-import type { DecisionType, DocumentStatus, QualificationStatus, ReviewableAssistanceItem } from '../../types/approval'
+import type { ReviewableAssistanceItem } from '../../types/approval'
 
 function loadRecommendationItems(approvedOnly: boolean) {
   if (approvedOnly) {
-    return getReviewableItems().filter((item) => item.status === 'APPROVED')
+    return getReviewableItems().filter((item) => item.status === 'LIST GENERATED' || item.status === 'APPROVED')
   }
   return getRecommendationItems()
 }
 
 export default function RecommendationsPage() {
-  const actor = useReviewActor()
   const [searchParams, setSearchParams] = useSearchParams()
   const approvedOnly = searchParams.get('status') === 'approved'
   const [items, setItems] = useState<ReviewableAssistanceItem[]>(() =>
@@ -38,10 +30,6 @@ export default function RecommendationsPage() {
   )
   const [expandedId, setExpandedId] = useState<string | null>(null)
   const [detailsItem, setDetailsItem] = useState<ReviewableAssistanceItem | null>(null)
-  const [decisionModal, setDecisionModal] = useState<{
-    type: DecisionType
-    item: ReviewableAssistanceItem
-  } | null>(null)
 
   // Switching the filter re-reads the list before paint instead of in an
   // effect, which would render once holding the previous filter's rows and
@@ -56,51 +44,6 @@ export default function RecommendationsPage() {
     () => subscribeDecisionStorage(() => setItems(loadRecommendationItems(approvedOnly))),
     [approvedOnly],
   )
-
-  function refreshItems() {
-    setItems(loadRecommendationItems(approvedOnly))
-  }
-
-  function handleVerifyDocument(documentId: string, status: DocumentStatus) {
-    if (!detailsItem) return
-    verifyDocument(detailsItem.id, documentId, status, { name: actor.name, email: actor.email })
-    refreshItems()
-    setDetailsItem(getItemById(detailsItem.id))
-  }
-
-  function handleVerifyQualification(checkId: string, status: QualificationStatus, notes?: string) {
-    if (!detailsItem) return
-    verifyQualification(detailsItem.id, checkId, status, { name: actor.name, email: actor.email }, notes)
-    refreshItems()
-    setDetailsItem(getItemById(detailsItem.id))
-  }
-
-  function handleDecision(notes: string, overrideStatus?: ReviewableAssistanceItem['status']) {
-    if (!decisionModal) return
-    const result = submitAssistanceDecision(decisionModal.item.id, {
-      decision: decisionModal.type,
-      notes,
-      reviewedBy: actor.name,
-      reviewedByEmail: actor.email,
-      overrideStatus,
-    })
-    if (result) {
-      logAuditEvent({
-        user: actor.name,
-        userEmail: actor.email,
-        action: 'Approval',
-        actionColor: decisionModal.type === 'reject' ? 'red' : 'green',
-        description: `${decisionModal.type} decision for ${result.association}.`,
-        entityType: 'assistance_request',
-        entityId: result.id,
-        changes: buildChanges([
-          { key: 'decision', label: 'Decision', oldValue: decisionModal.item.status, newValue: result.status },
-          { key: 'notes', label: 'Notes', oldValue: '—', newValue: notes || '—' },
-          { key: 'timestamp', label: 'Timestamp', oldValue: '—', newValue: new Date().toISOString() },
-        ]),
-      })
-    }
-  }
 
   return (
     <>
@@ -131,7 +74,7 @@ export default function RecommendationsPage() {
               onClick={() => setSearchParams({ status: 'approved' })}
               className={`rounded-md px-3 py-1.5 font-medium ${approvedOnly ? 'bg-primary text-white' : 'text-gray-600'}`}
             >
-              Approved
+              Final Lists
             </button>
           </div>
         </div>
@@ -158,7 +101,7 @@ export default function RecommendationsPage() {
                   <VulnerabilityBadge level={rec.vulnerability as 'HIGH' | 'MEDIUM' | 'LOW'} />
                   <Badge
                     variant={
-                      rec.status === 'APPROVED'
+                      rec.status === 'APPROVED' || rec.status === 'LIST GENERATED'
                         ? 'success'
                         : rec.status === 'REJECTED'
                           ? 'danger'
@@ -225,19 +168,6 @@ export default function RecommendationsPage() {
         open={!!detailsItem}
         onClose={() => setDetailsItem(null)}
         item={detailsItem}
-        canVerify
-        onVerifyDocument={handleVerifyDocument}
-        onVerifyQualification={handleVerifyQualification}
-      />
-
-      <ApprovalDecisionModal
-        open={!!decisionModal}
-        onClose={() => setDecisionModal(null)}
-        decisionType={decisionModal?.type ?? 'approve'}
-        itemTitle={decisionModal?.item.association ?? ''}
-        itemSubtitle={decisionModal?.item.program}
-        currentStatus={decisionModal?.item.status}
-        onSubmit={handleDecision}
       />
     </>
   )

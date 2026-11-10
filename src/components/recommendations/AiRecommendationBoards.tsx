@@ -51,9 +51,10 @@ export function AiRecommendationBoards({
   }, [])
 
   const groups = useMemo(() => {
+    const linkedRows = rows.filter((row) => row.requestId && requests.some((request) => request.id === row.requestId))
     const visible = associationName === undefined
-      ? rows
-      : rows.filter((row) => associationName.trim() !== '' && same(row.association, associationName))
+      ? linkedRows
+      : linkedRows.filter((row) => associationName.trim() !== '' && same(row.association, associationName))
     const grouped = new Map<string, { association: string; program: string; members: GeneratedAssistanceRow[] }>()
     for (const row of visible) {
       const association = row.association.trim() || 'Unassigned'
@@ -66,10 +67,13 @@ export function AiRecommendationBoards({
 
     return [...grouped.values()]
       .map((group) => {
+        const requestIds = new Set(group.members.map((member) => member.requestId).filter(Boolean))
         const related = requests.filter(
           (request) =>
-            same(request.association, group.association) &&
-            (same(request.requestType, group.program) || same(request.program ?? '', group.program)),
+            requestIds.has(request.id) || (
+              same(request.association, group.association) &&
+              (same(request.requestType, group.program) || same(request.program ?? '', group.program))
+            ),
         )
         const members = [...group.members].sort((left, right) => left.rank - right.rank || right.score - left.score)
         return { ...group, members, requests: related }

@@ -163,7 +163,7 @@ export function reportTypeLabel(type: ReportHistoryType): string {
     case 'assistance':
       return 'Assistance'
     case 'approved':
-      return 'Approved Assistance'
+      return 'Generated Assistance Lists'
     case 'ai_scoring':
       return 'AI Assessment'
     case 'audit':

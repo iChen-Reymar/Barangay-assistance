@@ -1,5 +1,6 @@
 ﻿import { useEffect, useState } from 'react'
 import { Check } from 'lucide-react'
+import { Link } from 'react-router-dom'
 import { DashboardNavbar } from '../../components/layout/DashboardNavbar'
 import { Badge } from '../../components/ui/Badge'
 import { useAuth } from '../../context/useAuth'
@@ -7,42 +8,45 @@ import { getGeneratedAssistanceList, subscribeGeneratedAssistanceList } from '..
 import { getAssociationDetails } from '../../services/memberStorage'
 import {
   getAssociationAssistanceItems,
-  markRequestsGenerated,
   subscribeDecisionStorage,
 } from '../../services/decisionStorage'
 import type { ReviewableAssistanceItem } from '../../types/approval'
 import type { RequestStatus } from '../../data/mockData'
 import { useAssociationDisplayUser } from '../../hooks/useAssociationDisplayUser'
 
-const reviewSteps = ['Submitted', 'AI Processing', 'Generated'] as const
-
-function timelineFor(status: RequestStatus) {
+function timelineFor(status: RequestStatus, generated: boolean) {
   if (status === 'REJECTED') {
     return {
-      steps: ['Submitted', 'AI Processing', 'Not Qualified'],
-      currentStep: 'Not Qualified',
-      completedSteps: 3,
-      badge: 'NOT QUALIFIED',
+      steps: ['Submitted', 'Staff Validation', ...(generated ? ['AI List Generated'] : []), 'Rejected'],
+      currentStep: 'Rejected',
+      completedSteps: generated ? 4 : 3,
+      badge: 'REJECTED',
     }
   }
   if (status === 'APPROVED') {
     return {
-      steps: [...reviewSteps],
-      currentStep: 'Generated',
-      completedSteps: reviewSteps.length,
-      badge: 'AI GENERATED',
+      steps: ['Submitted', 'Staff Validation', ...(generated ? ['AI List Generated'] : []), 'Approved'],
+      currentStep: 'Approved',
+      completedSteps: generated ? 4 : 3,
+      badge: 'APPROVED',
     }
   }
-  if (status === 'UNDER REVIEW') {
+  if (status === 'LIST GENERATED' || generated) {
     return {
-      steps: [...reviewSteps],
-      currentStep: 'AI Processing',
-      completedSteps: 2,
-      badge: 'UNDER REVIEW',
+      steps: ['Submitted', 'Staff Validation', 'Final List Generated'],
+      currentStep: 'Final List Generated',
+      completedSteps: 3,
+      badge: 'LIST GENERATED',
     }
+  }
+  if (status === 'UNDER REVIEW') return {
+    steps: ['Submitted', 'Staff Validation', 'Final List Generated'],
+    currentStep: 'Staff Validation',
+    completedSteps: 1,
+    badge: 'UNDER REVIEW',
   }
   return {
-    steps: [...reviewSteps],
+    steps: ['Submitted', 'Staff Validation', 'Final List Generated'],
     currentStep: 'Submitted',
     completedSteps: 1,
     badge: 'PENDING',
@@ -50,7 +54,7 @@ function timelineFor(status: RequestStatus) {
 }
 
 function badgeVariant(status: RequestStatus) {
-  if (status === 'APPROVED') return 'success' as const
+  if (status === 'APPROVED' || status === 'LIST GENERATED') return 'success' as const
   if (status === 'REJECTED') return 'danger' as const
   if (status === 'UNDER REVIEW') return 'info' as const
   return 'warning' as const
@@ -64,15 +68,16 @@ export default function RequestStatusPage() {
   const [requests, setRequests] = useState<ReviewableAssistanceItem[]>(() =>
     getAssociationAssistanceItems(associationName),
   )
+  const [generatedRows, setGeneratedRows] = useState(() => getGeneratedAssistanceList())
 
   useEffect(() => {
-    const refresh = () => {
-      markRequestsGenerated(getGeneratedAssistanceList())
+    const refreshLocal = () => {
+      setGeneratedRows(getGeneratedAssistanceList())
       setRequests(getAssociationAssistanceItems(associationName))
     }
-    refresh()
-    const stopDecisions = subscribeDecisionStorage(refresh)
-    const stopGenerated = subscribeGeneratedAssistanceList(refresh)
+    refreshLocal()
+    const stopDecisions = subscribeDecisionStorage(refreshLocal)
+    const stopGenerated = subscribeGeneratedAssistanceList(refreshLocal)
     return () => {
       stopDecisions()
       stopGenerated()
@@ -96,22 +101,41 @@ export default function RequestStatusPage() {
         ) : (
           <div className="space-y-6">
             {requests.map((request) => {
-              const timeline = timelineFor(request.status)
+              const generatedCount = generatedRows.filter((row) => row.requestId === request.id).length
+              const timeline = timelineFor(request.status, generatedCount > 0)
+              const finalDecision = request.decisions.find((decision) =>
+                decision.newStatus === 'APPROVED' || decision.newStatus === 'REJECTED',
+              )
               return (
                 <div key={request.id} className="rounded-lg border border-gray-200 bg-white p-5 shadow-sm">
                   <div className="mb-6 flex flex-wrap items-start justify-between gap-3">
                     <div>
                       <h2 className="text-lg font-bold text-gray-900">{request.requestType}</h2>
                       <p className="text-sm text-gray-500">Submitted: {request.date}</p>
+                      {generatedCount > 0 ? (
+                        <div className="mt-1 flex flex-wrap items-center gap-2 text-xs font-medium text-green-700">
+                           <span>{generatedCount} household{generatedCount === 1 ? '' : 's'} in the final prioritized list</span>
+                          <Link to="/association/ai-recommendations" className="underline hover:text-green-900">
+                             View final list
+                          </Link>
+                        </div>
+                      ) : null}
                     </div>
                     <Badge variant={badgeVariant(request.status)}>{timeline.badge}</Badge>
                   </div>
+
+                  {finalDecision ? (
+                    <div className={`mb-6 rounded-lg border px-4 py-3 text-sm ${request.status === 'REJECTED' ? 'border-red-100 bg-red-50 text-red-800' : 'border-green-100 bg-green-50 text-green-800'}`}>
+                      <p className="font-semibold">Final decision by {finalDecision.decidedBy}</p>
+                      <p className="mt-1">{finalDecision.notes || 'No additional decision notes were provided.'}</p>
+                    </div>
+                  ) : null}
 
                   <div className="relative ml-4 border-l-2 border-gray-200 pl-6">
                     {timeline.steps.map((step, index) => {
                       const isCompleted = index < timeline.completedSteps
                       const isCurrent = step === timeline.currentStep
-                      const isRejected = step === 'Not Qualified'
+                      const isRejected = step === 'Rejected'
 
                       return (
                         <div key={step} className="relative pb-6 last:pb-0">

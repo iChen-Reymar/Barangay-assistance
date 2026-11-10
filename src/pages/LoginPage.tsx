@@ -5,7 +5,8 @@ import { FormField } from '../components/auth/FormField'
 import { LockIcon, MailIcon } from '../components/auth/fieldIcons'
 import { PublicOnlyRoute } from '../components/auth/ProtectedRoute'
 import { useAuth } from '../context/useAuth'
-import { showToast } from '../components/ui/Toast'
+import { showToast } from '../components/ui/toastStore'
+import { pullFromDatabase } from '../services/databaseSync'
 
 function LoginForm() {
   const navigate = useNavigate()
@@ -23,6 +24,7 @@ function LoginForm() {
     setSigningIn(true)
     const result = await login(email, password, rememberMe)
     if (result.success && result.redirectTo) {
+      await pullFromDatabase()
       showToast('Signed in successfully')
       await new Promise((resolve) => window.setTimeout(resolve, 700))
       enterDashboard()

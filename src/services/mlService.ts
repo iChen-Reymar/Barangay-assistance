@@ -12,6 +12,7 @@
  */
 
 import type { StaffBeneficiary, VulnerabilityLevel } from '../data/staffMockData'
+import { supabase } from '../lib/supabase'
 
 /**
  * Where the ML endpoints live.
@@ -25,6 +26,14 @@ import type { StaffBeneficiary, VulnerabilityLevel } from '../data/staffMockData
  * models in isolation.
  */
 const ML_BASE = (import.meta.env.VITE_ML_URL as string | undefined) || '/api/ml'
+
+async function mlHeaders(includeJson = false) {
+  const { data } = await supabase.auth.getSession()
+  const headers: Record<string, string> = {}
+  if (includeJson) headers['Content-Type'] = 'application/json'
+  if (data.session?.access_token) headers.Authorization = `Bearer ${data.session.access_token}`
+  return headers
+}
 
 /** Points each class contributes to the blended score. Mirrors models.py. */
 export const CLASS_POINTS: Record<VulnerabilityLevel, number> = {
@@ -73,6 +82,21 @@ export interface MlScoreResponse {
   error?: string
 }
 
+/** Only measured model inputs and the pseudonymous record ID leave the web app. */
+function modelRecord(beneficiary: StaffBeneficiary) {
+  return {
+    id: beneficiary.id,
+    familySize: beneficiary.familySize,
+    monthlyIncome: beneficiary.monthlyIncome,
+    workingHouseholdMembers: beneficiary.workingHouseholdMembers,
+    age: beneficiary.age,
+    employmentStatus: beneficiary.employmentStatus,
+    housingCondition: beneficiary.housingCondition,
+    vulnerabilityIndicators: beneficiary.vulnerabilityIndicators ?? [],
+    vulnerability: beneficiary.vulnerability,
+  }
+}
+
 export interface ModelMetrics {
   accuracy: number
   precisionMacro: number
@@ -108,7 +132,7 @@ export async function isMlAvailable(timeoutMs = 1500): Promise<boolean> {
   try {
     const controller = new AbortController()
     const timer = window.setTimeout(() => controller.abort(), timeoutMs)
-    const response = await fetch(`${ML_BASE}/api/health`, { signal: controller.signal })
+    const response = await fetch(`${ML_BASE}/api/health`, { headers: await mlHeaders(), signal: controller.signal })
     window.clearTimeout(timer)
     return response.ok
   } catch {
@@ -122,7 +146,7 @@ async function postJson<T>(path: string, body: unknown, timeoutMs = 20000): Prom
   try {
     const response = await fetch(`${ML_BASE}${path}`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: await mlHeaders(true),
       body: JSON.stringify(body),
       signal: controller.signal,
     })
@@ -142,7 +166,7 @@ export async function scoreBeneficiaries(
 ): Promise<MlScoreResult[] | null> {
   if (!beneficiaries.length) return []
   try {
-    const response = await postJson<MlScoreResponse>('/api/score', { records: beneficiaries })
+    const response = await postJson<MlScoreResponse>('/api/score', { records: beneficiaries.map(modelRecord) })
     if (!response.ok || !Array.isArray(response.results) || !response.results.length) return null
     return response.results
   } catch {
@@ -155,7 +179,7 @@ export async function getModelInfo(): Promise<ModelInfo | null> {
   try {
     const controller = new AbortController()
     const timer = window.setTimeout(() => controller.abort(), 5000)
-    const response = await fetch(`${ML_BASE}/api/model`, { signal: controller.signal })
+    const response = await fetch(`${ML_BASE}/api/model`, { headers: await mlHeaders(), signal: controller.signal })
     window.clearTimeout(timer)
     if (!response.ok) return null
     return (await response.json()) as ModelInfo
@@ -166,7 +190,7 @@ export async function getModelInfo(): Promise<ModelInfo | null> {
 
 /**
  * Retrain on the real association rosters plus the records supplied.
- * Staff trigger this after entering a batch of verified beneficiaries.
+ * An administrator triggers this after staff verify a batch of beneficiaries.
  */
 export async function retrainModels(
   beneficiaries: StaffBeneficiary[],
@@ -174,7 +198,7 @@ export async function retrainModels(
   try {
     const response = await postJson<{ ok: boolean; metrics?: Record<string, ModelMetrics>; error?: string }>(
       '/api/train',
-      { records: beneficiaries },
+      { records: beneficiaries.map(modelRecord) },
       90000,
     )
     return { ok: response.ok, metrics: response.metrics?.blended, error: response.error }
@@ -188,9 +212,17 @@ export const FEATURE_LABELS: Record<string, string> = {
   family_size: 'Family size',
   monthly_income: 'Monthly income',
   income_per_capita: 'Income per family member',
+  working_household_members: 'Working household members',
+  income_per_worker: 'Income per working household member',
   head_age: 'Age of household head',
-  employment_score: 'Employment status',
-  housing_score: 'Housing condition',
+  employment_employed: 'Employment: employed',
+  employment_self_employed: 'Employment: self-employed',
+  employment_seasonal_worker: 'Employment: seasonal worker',
+  employment_unemployed: 'Employment: unemployed',
+  housing_concrete: 'Housing: concrete',
+  housing_light_materials: 'Housing: light materials',
+  housing_temporary: 'Housing: temporary',
+  housing_makeshift_salvaged: 'Housing: makeshift or salvaged',
   has_elderly: 'Elderly member present',
   has_pwd: 'PWD member present',
   has_young_children: 'Child under 5 present',

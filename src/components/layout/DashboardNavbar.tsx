@@ -17,6 +17,8 @@ interface DashboardNavbarProps {
   userInitials: string
   notificationsPath?: string
   notificationCount?: number
+  searchValue?: string
+  onSearchChange?: (value: string) => void
 }
 
 export function DashboardNavbar({
@@ -26,6 +28,8 @@ export function DashboardNavbar({
   userInitials,
   notificationsPath,
   notificationCount = 0,
+  searchValue,
+  onSearchChange,
 }: DashboardNavbarProps) {
   const { toggleSidebar, settingsPath } = useDashboardLayout()
   const { logout, profile, user } = useAuth()
@@ -43,7 +47,6 @@ export function DashboardNavbar({
 
   useEffect(() => {
     if (!tracksAssociationNotifications || (!viewer.associationName && !viewer.userId)) {
-      setUnreadNotifications(0)
       return
     }
     const refresh = () =>
@@ -85,9 +88,11 @@ export function DashboardNavbar({
           {title}
         </h1>
 
-        <div className="hidden max-w-md flex-1 md:block">
-          <SearchBar placeholder={searchPlaceholder} />
-        </div>
+        {onSearchChange ? (
+          <div className="hidden max-w-md flex-1 md:block">
+            <SearchBar placeholder={searchPlaceholder} value={searchValue} onChange={onSearchChange} />
+          </div>
+        ) : null}
 
         <div className="ml-auto flex shrink-0 items-center gap-1 sm:gap-2 md:gap-3">
           {notificationsPath && (
@@ -157,9 +162,11 @@ export function DashboardNavbar({
         </div>
       </div>
 
-      <div className="border-t border-gray-100 px-3 pb-3 md:hidden">
-        <SearchBar placeholder={searchPlaceholder} />
-      </div>
+      {onSearchChange ? (
+        <div className="border-t border-gray-100 px-3 pb-3 md:hidden">
+          <SearchBar placeholder={searchPlaceholder} value={searchValue} onChange={onSearchChange} />
+        </div>
+      ) : null}
     </header>
   )
 }

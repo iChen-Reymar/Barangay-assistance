@@ -30,6 +30,12 @@ const supabaseUrl = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL ||
 const supabaseKey = process.env.SUPABASE_SECRET_KEY || process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.VITE_SUPABASE_PUBLISHABLE_KEY || ''
 const usingSecretKey = Boolean(process.env.SUPABASE_SECRET_KEY || process.env.SUPABASE_SERVICE_ROLE_KEY)
 const apiPort = Number(process.env.API_PORT || 3001)
+const allowedOrigins = new Set(
+  (process.env.APP_ORIGINS || 'http://localhost:5173,http://127.0.0.1:5173')
+    .split(',')
+    .map((value) => value.trim())
+    .filter(Boolean),
+)
 let supabase = null
 
 function linkedText(value) {
@@ -44,15 +50,9 @@ async function clear(table, column = 'id') {
 }
 
 async function upsertRows(table, rows) {
-  if (!rows.length) {
-    await clear(table)
-    return
-  }
+  if (!rows.length) return
   const { error } = await supabase.from(table).upsert(rows)
   if (error) throw new Error(error.message)
-  const ids = rows.map((row) => row.id).filter(Boolean)
-  const { error: deleteError } = await supabase.from(table).delete().not('id', 'in', `(${ids.join(',')})`)
-  if (deleteError) throw new Error(deleteError.message)
 }
 
 function missingColumn(message) {
@@ -77,6 +77,21 @@ async function insert(table, rows) {
     })
   }
   throw new Error(`Could not save ${table}.`)
+}
+
+async function reconcileChildRows(table, parentColumn, parentId, rows) {
+  const { data: existing, error: readError } = await supabase
+    .from(table)
+    .select('id')
+    .eq(parentColumn, parentId)
+  if (readError) throw new Error(readError.message)
+  const nextIds = new Set(rows.map((row) => String(row.id)))
+  const staleIds = (existing ?? []).map((row) => String(row.id)).filter((id) => !nextIds.has(id))
+  if (staleIds.length) {
+    const { error: deleteError } = await supabase.from(table).delete().in('id', staleIds)
+    if (deleteError) throw new Error(deleteError.message)
+  }
+  await upsertRows(table, rows)
 }
 
 async function rowsOf(table, column) {
@@ -165,13 +180,12 @@ async function saveMembers(rows) {
     notes: row.notes ?? null,
     payload: row,
   })))
-  await clear('member_documents')
-  await insert('member_documents', rows.flatMap((row) => {
+  for (const row of rows) {
     const files = [
       ['barangay_certificate', row.barangayCertificate],
       ['government_id', row.governmentId],
     ]
-    return files.flatMap(([kind, file]) => (file ? [{
+    const documents = files.flatMap(([kind, file]) => (file ? [{
       id: `${row.id}:${kind}`,
       member_id: row.id,
       document_kind: kind,
@@ -183,13 +197,13 @@ async function saveMembers(rows) {
       verified_by: file.verifiedBy ?? null,
       verified_at: file.verifiedAt ?? null,
     }] : []))
-  }))
+    await reconcileChildRows('member_documents', 'member_id', row.id, documents)
+  }
 }
 
 async function saveAidRecords(rows) {
   if (!Array.isArray(rows)) return
-  await clear('aid_records')
-  await insert('aid_records', rows.map((row) => ({
+  await upsertRows('aid_records', rows.map((row) => ({
     id: row.id,
     association_name: linkedText(row.associationName),
     member_id: linkedText(row.memberId),
@@ -207,9 +221,9 @@ async function saveAidRecords(rows) {
 
 async function saveBeneficiaries(rows) {
   if (!Array.isArray(rows)) return
-  await clear('beneficiaries')
-  await insert('beneficiaries', rows.map((row) => ({
+  await upsertRows('beneficiaries', rows.map((row) => ({
     id: row.id,
+    member_id: row.memberId || null,
     name: row.name,
     association_name: linkedText(row.association),
     family_size: Number(row.familySize ?? 0),
@@ -241,7 +255,6 @@ async function savePrograms(rows) {
 
 async function saveNotifications(rows) {
   if (!Array.isArray(rows)) return
-  await clear('notifications')
   const mapped = rows.map((row) => ({
     id: row.id,
     user_id: linkedText(row.recipientUserId),
@@ -257,21 +270,17 @@ async function saveNotifications(rows) {
     payload: row,
   }))
   try {
-    await insert('notifications', mapped)
+    await upsertRows('notifications', mapped)
   } catch (error) {
     const message = String(error?.message ?? error)
     if (!/notice_type|check constraint/i.test(message)) throw error
-    await insert('notifications', mapped.map((row) => ({ ...row, notice_type: 'info' })))
+    await upsertRows('notifications', mapped.map((row) => ({ ...row, notice_type: 'info' })))
   }
 }
 
 async function saveRequests(rows) {
   if (!Array.isArray(rows)) return
-  await clear('request_documents')
-  await clear('qualification_checks')
-  await clear('request_decisions')
-  await clear('assistance_requests')
-  await insert('assistance_requests', rows.map((row) => {
+  await upsertRows('assistance_requests', rows.map((row) => {
     const details = row.details ?? {}
     return {
       id: row.id,
@@ -300,45 +309,52 @@ async function saveRequests(rows) {
       payload: row,
     }
   }))
-  await insert('request_documents', rows.flatMap((row) => (row.documents ?? []).map((doc) => ({
-    id: String(doc.id).startsWith(`${row.id}:`) ? doc.id : `${row.id}:${doc.id}`,
-    request_id: row.id,
-    name: doc.name,
-    file_type: doc.type,
-    uploaded_at: doc.uploadedAt,
-    file_size: doc.fileSize,
-    status: doc.status,
-    verified_by: doc.verifiedBy ?? null,
-    verified_at: doc.verifiedAt ?? null,
-    data_url: doc.dataUrl ?? null,
-  }))))
-  await insert('qualification_checks', rows.flatMap((row) => (row.qualifications ?? []).map((check) => ({
-    id: String(check.id).startsWith(`${row.id}:`) ? check.id : `${row.id}:${check.id}`,
-    request_id: row.id,
-    criterion: check.criterion,
-    description: check.description,
-    status: check.status,
-    verified_by: check.verifiedBy ?? null,
-    verified_at: check.verifiedAt ?? null,
-    notes: check.notes ?? null,
-  }))))
-  await insert('request_decisions', rows.flatMap((row) => (row.decisions ?? []).map((decision) => ({
-    id: String(decision.id).startsWith(`${row.id}:`) ? decision.id : `${row.id}:${decision.id}`,
-    request_id: row.id,
-    decision: decision.decision,
-    notes: decision.notes,
-    decided_by: decision.decidedBy,
-    decided_by_email: decision.decidedByEmail ?? null,
-    decided_at: decision.decidedAt,
-    previous_status: decision.previousStatus,
-    new_status: decision.newStatus,
-  }))))
+  for (const row of rows) {
+    const documents = (row.documents ?? []).map((doc) => ({
+      id: String(doc.id).startsWith(`${row.id}:`) ? doc.id : `${row.id}:${doc.id}`,
+      request_id: row.id,
+      name: doc.name,
+      file_type: doc.type,
+      uploaded_at: doc.uploadedAt,
+      file_size: doc.fileSize,
+      status: doc.status,
+      verified_by: doc.verifiedBy ?? null,
+      verified_at: doc.verifiedAt ?? null,
+      data_url: doc.dataUrl ?? null,
+    }))
+    const checks = (row.qualifications ?? []).map((check) => ({
+      id: String(check.id).startsWith(`${row.id}:`) ? check.id : `${row.id}:${check.id}`,
+      request_id: row.id,
+      criterion: check.criterion,
+      description: check.description,
+      status: check.status,
+      verified_by: check.verifiedBy ?? null,
+      verified_at: check.verifiedAt ?? null,
+      notes: check.notes ?? null,
+    }))
+    const decisions = (row.decisions ?? []).map((decision) => ({
+      id: String(decision.id).startsWith(`${row.id}:`) ? decision.id : `${row.id}:${decision.id}`,
+      request_id: row.id,
+      decision: decision.decision,
+      notes: decision.notes,
+      decided_by: decision.decidedBy,
+      decided_by_email: decision.decidedByEmail ?? null,
+      decided_at: decision.decidedAt,
+      previous_status: decision.previousStatus,
+      new_status: decision.newStatus,
+    }))
+    await reconcileChildRows('request_documents', 'request_id', row.id, documents)
+    await reconcileChildRows('qualification_checks', 'request_id', row.id, checks)
+    await reconcileChildRows('request_decisions', 'request_id', row.id, decisions)
+  }
 }
 
 async function saveGenerated(rows) {
   if (!Array.isArray(rows)) return
-  await clear('generated_assistance_list', 'rank_no')
-  await insert('generated_assistance_list', rows.map((row) => ({
+  await upsertRows('generated_assistance_list', rows.map((row) => ({
+    id: row.id,
+    beneficiary_id: row.beneficiaryId || row.id,
+    request_id: row.requestId || null,
     rank_no: row.rank,
     beneficiary_name: row.name,
     association_name: linkedText(row.association),
@@ -354,8 +370,7 @@ async function saveGenerated(rows) {
 
 async function savePriority(rows) {
   if (!Array.isArray(rows)) return
-  await clear('priority_list')
-  await insert('priority_list', rows.map((row) => ({
+  await upsertRows('priority_list', rows.map((row) => ({
     id: row.id,
     rank_no: row.rank,
     association_name: linkedText(row.association),
@@ -371,9 +386,7 @@ async function savePriority(rows) {
 
 async function saveAudit(rows) {
   if (!Array.isArray(rows)) return
-  await clear('audit_changes', 'id')
-  await clear('audit_logs')
-  await insert('audit_logs', rows.map((row) => ({
+  await upsertRows('audit_logs', rows.map((row) => ({
     id: row.id,
     created_at: row.timestamp,
     display_date: row.date,
@@ -387,7 +400,10 @@ async function saveAudit(rows) {
     entity_id: row.entityId ?? null,
     payload: row,
   })))
-  await insert('audit_changes', rows.flatMap((row) => (row.changes ?? []).map((change) => ({
+  const { data: existingChanges, error } = await supabase.from('audit_changes').select('audit_log_id')
+  if (error) throw new Error(error.message)
+  const logsWithChanges = new Set((existingChanges ?? []).map((row) => row.audit_log_id))
+  await insert('audit_changes', rows.filter((row) => !logsWithChanges.has(row.id)).flatMap((row) => (row.changes ?? []).map((change) => ({
     audit_log_id: row.id,
     field_name: change.field,
     old_value: change.oldValue,
@@ -397,8 +413,7 @@ async function saveAudit(rows) {
 
 async function saveReports(rows) {
   if (!Array.isArray(rows)) return
-  await clear('report_history')
-  await insert('report_history', rows.map((row) => ({
+  await upsertRows('report_history', rows.map((row) => ({
     id: row.id,
     name: row.name,
     generated_by: row.generatedBy,
@@ -411,10 +426,9 @@ async function saveReports(rows) {
 }
 
 async function saveProfile(profile) {
-  await clear('association_profiles')
   const name = linkedText(profile?.name)
   if (!profile || typeof profile !== 'object' || Array.isArray(profile) || !name) return
-  await insert('association_profiles', [{
+  await upsertRows('association_profiles', [{
     id: profile.id || 'profile',
     name,
     type: profile.type ?? 'Agricultural',
@@ -432,9 +446,8 @@ async function saveProfile(profile) {
 }
 
 async function savePrivacy(settings) {
-  await clear('privacy_settings')
   if (!settings || typeof settings !== 'object' || Array.isArray(settings)) return
-  await insert('privacy_settings', [{
+  await upsertRows('privacy_settings', [{
     id: 'default',
     mask_contact_in_exports: Boolean(settings.maskContactInExports),
     mask_ip_in_audit_logs: Boolean(settings.maskIpInAuditLogs),
@@ -500,7 +513,7 @@ function storedRecords(rows) {
   return records.length === rows.length ? records : null
 }
 
-async function loadStores() {
+async function loadStores(actor) {
   const users = await rowsOf('users')
   const associations = await rowsOf('associations')
   const members = await rowsOf('association_members')
@@ -524,7 +537,11 @@ async function loadStores() {
   const audits = await rowsOf('audit_logs')
   const changes = await rowsOf('audit_changes')
   const reports = await rowsOf('report_history')
-  const profiles = await rowsOf('association_profiles')
+  let profiles = await rowsOf('association_profiles')
+  if (actor?.role === 'association') {
+    const association = String(actor.association_name || '').trim().toLowerCase()
+    profiles = profiles.filter((row) => String(row.name || '').trim().toLowerCase() === association)
+  }
   const privacyRows = (await rowsOf('privacy_settings')).filter((row) => row.id === 'default')
 
   const stores = []
@@ -621,9 +638,12 @@ async function loadStores() {
   }
   if (beneficiaries.length > 0) {
     const stored = storedRecords(beneficiaries)
-    if (stored) push('barangay_staff_beneficiaries', stored)
+    if (stored) push('barangay_staff_beneficiaries', stored.map((item, index) => ({
+      ...item,
+      memberId: item.memberId || beneficiaries[index].member_id || undefined,
+    })))
     else push('barangay_staff_beneficiaries', beneficiaries.map((row) => ({
-      id: row.id, name: row.name, association: row.association_name, familySize: row.family_size,
+      id: row.id, memberId: row.member_id || undefined, name: row.name, association: row.association_name, familySize: row.family_size,
       monthlyIncome: Number(row.monthly_income), vulnerability: row.vulnerability, verification: row.verification,
     })))
   }
@@ -671,8 +691,14 @@ async function loadStores() {
   }
   if (generated.length > 0) {
     const stored = storedRecords(generated)
-    if (stored) push('barangay_generated_assistance_list', stored)
+    if (stored) push('barangay_generated_assistance_list', stored.map((item, index) => ({
+      ...item,
+      id: item.id || generated[index].id,
+      beneficiaryId: item.beneficiaryId || generated[index].beneficiary_id || generated[index].id,
+      requestId: item.requestId || generated[index].request_id || undefined,
+    })))
     else push('barangay_generated_assistance_list', generated.map((row) => ({
+      id: row.id, beneficiaryId: row.beneficiary_id || row.id, requestId: row.request_id || undefined,
       rank: row.rank_no, name: row.beneficiary_name, association: row.association_name, score: row.score,
       classification: row.classification, program: row.program_name, verification: row.verification,
       reason: row.reason, generatedAt: row.generated_at,
@@ -762,20 +788,122 @@ async function connectSupabase() {
 }
 
 const app = express()
-app.use(cors())
+app.disable('x-powered-by')
+app.use((_req, res, next) => {
+  res.setHeader('X-Content-Type-Options', 'nosniff')
+  res.setHeader('X-Frame-Options', 'DENY')
+  res.setHeader('Referrer-Policy', 'same-origin')
+  res.setHeader('Permissions-Policy', 'camera=(), microphone=(), geolocation=()')
+  next()
+})
+app.use(cors({
+  origin(origin, callback) {
+    if (!origin || allowedOrigins.has(origin)) callback(null, true)
+    else callback(new Error('Origin is not allowed.'))
+  },
+  methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE'],
+  allowedHeaders: ['Content-Type', 'Authorization'],
+}))
 app.use(express.json({ limit: '8mb' }))
+
+const accessRequestAttempts = new Map()
+function limitAccessRequests(req, res, next) {
+  const now = Date.now()
+  const windowMs = 15 * 60 * 1000
+  const key = String(req.ip || req.socket.remoteAddress || 'unknown')
+  const recent = (accessRequestAttempts.get(key) || []).filter((time) => now - time < windowMs)
+  if (recent.length >= 5) {
+    res.status(429).json({ error: 'Too many access requests. Try again later.' })
+    return
+  }
+  recent.push(now)
+  accessRequestAttempts.set(key, recent)
+  next()
+}
 
 app.get('/api/health', (_req, res) => {
   res.json({ ok: Boolean(supabase), database: 'supabase', writes: usingSecretKey })
 })
 
-app.get('/api/bootstrap', async (_req, res) => {
+async function authenticate(req, res) {
+  if (!supabase) {
+    res.status(503).json({ error: 'Supabase is not connected.' })
+    return null
+  }
+  const header = String(req.headers.authorization || '')
+  const token = header.startsWith('Bearer ') ? header.slice(7).trim() : ''
+  if (!token) {
+    res.status(401).json({ error: 'Sign in to continue.' })
+    return null
+  }
+  const { data, error } = await supabase.auth.getUser(token)
+  if (error || !data.user) {
+    res.status(401).json({ error: 'Your session is invalid or expired.' })
+    return null
+  }
+  const { data: profile, error: profileError } = await supabase
+    .from('users')
+    .select('id,email,full_name,role,status,association_name')
+    .eq('id', data.user.id)
+    .maybeSingle()
+  if (profileError || !profile || profile.status !== 'approved') {
+    res.status(403).json({ error: 'Your account is not approved.' })
+    return null
+  }
+  return profile
+}
+
+async function requireRole(req, res, roles) {
+  const actor = await authenticate(req, res)
+  if (!actor) return null
+  if (!roles.includes(actor.role)) {
+    res.status(403).json({ error: 'You do not have permission to perform this action.' })
+    return null
+  }
+  return actor
+}
+
+function scopeStoresForActor(stores, actor) {
+  if (actor.role === 'admin') return stores
+  if (actor.role === 'staff') {
+    const hidden = new Set(['barangay_users', 'barangay_privacy_settings'])
+    return stores.filter((row) => !hidden.has(row.key))
+  }
+
+  const association = String(actor.association_name || '').trim().toLowerCase()
+  const allowed = new Set([
+    'barangay_users', 'barangay_associations', 'barangay_association_members',
+    'barangay_association_notifications', 'barangay_aid_records', 'barangay_assistance_programs',
+    'barangay_reviewable_items', 'barangay_generated_assistance_list', 'barangay_priority_list',
+    'barangay_association_details',
+  ])
+  return stores.flatMap((row) => {
+    if (!allowed.has(row.key)) return []
+    let value
+    try { value = JSON.parse(row.payload) } catch { return [] }
+    if (row.key === 'barangay_users') {
+      value = Array.isArray(value) ? value.filter((item) => item.id === actor.id) : []
+    } else if (Array.isArray(value) && row.key !== 'barangay_assistance_programs') {
+      value = value.filter((item) => {
+        const itemAssociation = String(item.associationName || item.association || item.name || '').trim().toLowerCase()
+        return itemAssociation === association || item.recipientUserId === actor.id || item.headUserId === actor.id
+      })
+    } else if (row.key === 'barangay_association_details') {
+      if (String(value?.name || '').trim().toLowerCase() !== association) return []
+    }
+    return [{ ...row, payload: JSON.stringify(value) }]
+  })
+}
+
+app.get('/api/bootstrap', async (req, res) => {
+  const actor = await authenticate(req, res)
+  if (!actor) return
   if (!supabase) {
     res.status(503).json({ error: 'Supabase is not connected.' })
     return
   }
   try {
-    res.json({ stores: await loadStores() })
+    res.json({ stores: scopeStoresForActor(await loadStores(actor), actor) })
   } catch (error) {
     res.status(500).json({ error: error.message })
   }
@@ -808,24 +936,136 @@ async function findAuthUser(id, emails) {
 }
 
 async function requireAdmin(req, res) {
-  const header = String(req.headers.authorization || '')
-  const token = header.startsWith('Bearer ') ? header.slice(7).trim() : ''
-  if (!token) {
-    res.status(401).json({ error: 'Sign in as an administrator first.' })
-    return false
-  }
-  const { data, error } = await supabase.auth.getUser(token)
-  if (error || !data.user) {
-    res.status(401).json({ error: 'Sign in as an administrator first.' })
-    return false
-  }
-  const { data: admin, error: adminError } = await supabase.from('users').select('role,status').eq('id', data.user.id).maybeSingle()
-  if (adminError || !admin || admin.role !== 'admin' || admin.status !== 'approved') {
-    res.status(403).json({ error: 'Only an administrator can edit users.' })
-    return false
-  }
-  return true
+  return Boolean(await requireRole(req, res, ['admin']))
 }
+
+app.post('/api/users', async (req, res) => {
+  if (!supabase || !usingSecretKey) {
+    res.status(503).json({ error: 'Supabase is not ready to create login accounts.' })
+    return
+  }
+  if (!(await requireAdmin(req, res))) return
+  const firstName = String(req.body?.firstName || '').trim()
+  const lastName = String(req.body?.lastName || '').trim()
+  const email = String(req.body?.email || '').trim().toLowerCase()
+  const password = String(req.body?.password || '')
+  const contactNumber = String(req.body?.contactNumber || '').trim()
+  const role = String(req.body?.role || '')
+  const associationName = String(req.body?.associationName || '').trim()
+  if (!firstName || !lastName || !email.includes('@') || password.length < 8) {
+    res.status(400).json({ error: 'Name, valid email, and a password of at least 8 characters are required.' })
+    return
+  }
+  if (!['admin', 'staff', 'association'].includes(role)) {
+    res.status(400).json({ error: 'Select a valid account role.' })
+    return
+  }
+  if (role === 'association' && !associationName) {
+    res.status(400).json({ error: 'Select an association for the Association Head.' })
+    return
+  }
+  const fullName = `${firstName} ${lastName}`
+  const roleLabel = role === 'admin' ? 'Administrator' : role === 'association' ? 'Association Head' : 'Barangay Staff'
+  const now = new Date().toISOString()
+  const created = await supabase.auth.admin.createUser({
+    email,
+    password,
+    email_confirm: true,
+    user_metadata: { full_name: fullName, role, status: 'approved', association_name: associationName || null },
+  })
+  if (created.error || !created.data.user) {
+    res.status(400).json({ error: created.error?.message || 'Could not create the login.' })
+    return
+  }
+  const account = {
+    id: created.data.user.id,
+    email,
+    password: '',
+    firstName,
+    lastName,
+    fullName,
+    contactNumber,
+    position: roleLabel,
+    department: role === 'association' ? 'registered-associations' : 'barangay-hall',
+    role,
+    roleLabel,
+    status: 'approved',
+    associationName: associationName || undefined,
+    createdAt: now,
+    approvedAt: now,
+  }
+  try {
+    await saveUserRow(account)
+    res.status(201).json({ ok: true, user: account })
+  } catch (error) {
+    await supabase.auth.admin.deleteUser(created.data.user.id)
+    res.status(400).json({ error: error.message })
+  }
+})
+
+app.patch('/api/users/:id/role', async (req, res) => {
+  if (!(await requireAdmin(req, res))) return
+  const id = String(req.params.id || '')
+  const role = String(req.body?.role || '')
+  if (!['admin', 'staff', 'association'].includes(role)) {
+    res.status(400).json({ error: 'Select a valid account role.' })
+    return
+  }
+  const { data: current, error: currentError } = await supabase.from('users').select('role,status').eq('id', id).maybeSingle()
+  if (currentError || !current) {
+    res.status(404).json({ error: 'User not found.' })
+    return
+  }
+  if (current.role === 'admin' && current.status === 'approved' && role !== 'admin') {
+    const { count } = await supabase.from('users').select('id', { count: 'exact', head: true }).eq('role', 'admin').eq('status', 'approved')
+    if ((count ?? 0) <= 1) {
+      res.status(400).json({ error: 'At least one approved administrator must remain.' })
+      return
+    }
+  }
+  const roleLabel = role === 'admin' ? 'Administrator' : role === 'association' ? 'Association Head' : 'Barangay Staff'
+  const { data: row } = await supabase.from('users').select('payload').eq('id', id).maybeSingle()
+  const payload = { ...(row?.payload || {}), roleLabel, position: roleLabel }
+  const { error } = await supabase.from('users').update({ role, payload }).eq('id', id)
+  if (error) {
+    res.status(400).json({ error: error.message })
+    return
+  }
+  res.json({ ok: true })
+})
+
+app.delete('/api/users/:id', async (req, res) => {
+  const actor = await requireRole(req, res, ['admin'])
+  if (!actor) return
+  const id = String(req.params.id || '')
+  if (id === actor.id) {
+    res.status(400).json({ error: 'You cannot remove the account you are signed in with.' })
+    return
+  }
+  const { data: current } = await supabase.from('users').select('role,status').eq('id', id).maybeSingle()
+  if (!current) {
+    res.status(404).json({ error: 'User not found.' })
+    return
+  }
+  if (current.role === 'admin' && current.status === 'approved') {
+    const { count } = await supabase.from('users').select('id', { count: 'exact', head: true }).eq('role', 'admin').eq('status', 'approved')
+    if ((count ?? 0) <= 1) {
+      res.status(400).json({ error: 'At least one approved administrator must remain.' })
+      return
+    }
+  }
+  const authDelete = await supabase.auth.admin.deleteUser(id)
+  if (authDelete.error) {
+    res.status(400).json({ error: authDelete.error.message })
+    return
+  }
+  const deleted = await supabase.from('users').delete().eq('id', id)
+  if (deleted.error) {
+    res.status(400).json({ error: deleted.error.message })
+    return
+  }
+  res.json({ ok: true })
+})
 
 app.patch('/api/users/:id', async (req, res) => {
   if (!supabase || !usingSecretKey) {
@@ -844,8 +1084,8 @@ app.patch('/api/users/:id', async (req, res) => {
     res.status(400).json({ error: 'Name and a valid email are required.' })
     return
   }
-  if (password && password.length < 6) {
-    res.status(400).json({ error: 'Password must be at least 6 characters. The default password is 123123.' })
+  if (password && password.length < 8) {
+    res.status(400).json({ error: 'Password must be at least 8 characters.' })
     return
   }
 
@@ -949,13 +1189,14 @@ app.post('/api/association-users', async (req, res) => {
     res.status(503).json({ error: 'Supabase is not ready to create login accounts.' })
     return
   }
+  if (!(await requireAdmin(req, res))) return
   const email = String(req.body?.email || '').trim()
   const password = String(req.body?.password || '')
   const associationName = String(req.body?.associationName || '').trim()
   const firstName = String(req.body?.firstName || '').trim()
   const lastName = String(req.body?.lastName || '').trim()
-  if (!email.includes('@') || password.length < 6 || !associationName) {
-    res.status(400).json({ error: 'Association, email, and a password of at least 6 characters are required.' })
+  if (!email.includes('@') || password.length < 8 || !associationName) {
+    res.status(400).json({ error: 'Association, email, and a password of at least 8 characters are required.' })
     return
   }
   try {
@@ -1029,75 +1270,253 @@ app.post('/api/association-users', async (req, res) => {
   }
 })
 
-app.post('/api/access-requests', async (req, res) => {
-  if (!supabase) {
-    res.status(503).json({ error: 'Supabase is not connected.' })
+app.post('/api/access-requests', limitAccessRequests, async (req, res) => {
+  if (!supabase || !usingSecretKey) {
+    res.status(503).json({ error: 'Account registration is not available.' })
     return
   }
-  const user = req.body ?? {}
-  if (!user.email || !user.fullName || !user.role) {
-    res.status(400).json({ error: 'Name, email, and role are required.' })
+  const requested = req.body ?? {}
+  const role = requested.role === 'association' ? 'association' : requested.role === 'staff' ? 'staff' : null
+  const email = String(requested.email || '').trim().toLowerCase()
+  const fullName = String(requested.fullName || '').trim()
+  const password = String(requested.password || '')
+  if (!role || !email.includes('@') || !fullName || password.length < 8) {
+    res.status(400).json({ error: 'Name, valid email, role, and a password of at least 8 characters are required.' })
     return
+  }
+  const created = await supabase.auth.admin.createUser({
+    email,
+    password,
+    email_confirm: true,
+    user_metadata: { role, full_name: fullName, status: 'pending' },
+  })
+  if (created.error || !created.data.user) {
+    res.status(400).json({ error: created.error?.message || 'Could not create the access request.' })
+    return
+  }
+  const user = {
+    ...requested,
+    id: created.data.user.id,
+    email,
+    fullName,
+    password: '',
+    role,
+    status: 'pending',
+    createdAt: new Date().toISOString(),
   }
   try {
     await saveUserRow(user)
   } catch (error) {
-    const blocked = error.message.includes('row-level security')
-    res.status(blocked ? 403 : 500).json({
-      error: blocked
-        ? 'Supabase blocked the save. In the SQL Editor, run the access policy at the bottom of database/schema.sql, then submit again.'
-        : error.message,
-    })
+    await supabase.auth.admin.deleteUser(created.data.user.id)
+    res.status(500).json({ error: error.message })
     return
   }
-  res.json({ ok: true })
+  res.status(201).json({ ok: true, user })
 })
 
-app.put('/api/store/:key', async (req, res) => {
-  if (!supabase) {
-    res.status(503).json({ error: 'Supabase is not connected.' })
+const recordResources = {
+  barangay_users: { table: 'users', column: 'id', save: (item) => saveUsers([item]) },
+  barangay_associations: { table: 'associations', column: 'id', save: (item) => saveAssociations([item]) },
+  barangay_association_members: { table: 'association_members', column: 'id', associationColumn: 'association_name', save: (item) => saveMembers([item]) },
+  barangay_association_notifications: { table: 'notifications', column: 'id', associationColumn: 'association_name', save: (item) => saveNotifications([item]) },
+  barangay_aid_records: { table: 'aid_records', column: 'id', associationColumn: 'association_name', save: (item) => saveAidRecords([item]) },
+  barangay_staff_beneficiaries: { table: 'beneficiaries', column: 'id', associationColumn: 'association_name', save: (item) => saveBeneficiaries([item]) },
+  barangay_assistance_programs: { table: 'assistance_programs', column: 'id', save: (item) => savePrograms([item]) },
+  barangay_reviewable_items: { table: 'assistance_requests', column: 'id', associationColumn: 'association_name', save: (item) => saveRequests([item]) },
+  barangay_generated_assistance_list: { table: 'generated_assistance_list', column: 'id', associationColumn: 'association_name', save: (item) => saveGenerated([item]) },
+  barangay_priority_list: { table: 'priority_list', column: 'id', associationColumn: 'association_name', save: (item) => savePriority([item]) },
+  barangay_audit_logs: { table: 'audit_logs', column: 'id', save: (item) => saveAudit([item]) },
+  barangay_report_history: { table: 'report_history', column: 'id', save: (item) => saveReports([item]) },
+  barangay_association_details: { table: 'association_profiles', column: 'id', associationColumn: 'name', save: saveProfile },
+  barangay_privacy_settings: { table: 'privacy_settings', column: 'id', identity: 'default', save: savePrivacy },
+}
+
+const associationWritableResources = new Set([
+  'barangay_association_members', 'barangay_association_notifications', 'barangay_aid_records',
+  'barangay_reviewable_items', 'barangay_association_details',
+])
+const associationDeletableResources = new Set([
+  'barangay_association_members', 'barangay_association_notifications', 'barangay_aid_records',
+])
+const staffBlockedResources = new Set(['barangay_users', 'barangay_associations', 'barangay_privacy_settings'])
+
+function canWriteResource(actor, key) {
+  if (actor.role === 'admin') return true
+  if (actor.role === 'staff') return !staffBlockedResources.has(key)
+  return associationWritableResources.has(key)
+}
+
+function requestWriteError(actor, payload, current = null) {
+  const status = String(payload?.status || '')
+  const decisions = Array.isArray(payload?.decisions) ? payload.decisions : []
+  const currentDecisions = Array.isArray(current?.payload?.decisions) ? current.payload.decisions : []
+
+  if (actor.role === 'admin') {
+    return 'Admin accounts monitor assistance requests and cannot alter generated beneficiary rankings.'
+  }
+  if (actor.role === 'association') {
+    if (current) return 'Association Heads cannot modify a request after it has been submitted.'
+    if (payload?.source !== 'assistance' || status !== 'PENDING' || decisions.length > 0) {
+      return 'Association Heads can submit only new pending assistance requests without decisions.'
+    }
+    if ((payload.documents ?? []).some((entry) => entry?.status !== 'uploaded') ||
+        (payload.qualifications ?? []).some((entry) => entry?.status !== 'pending')) {
+      return 'Submitted evidence and qualifications must remain pending until Staff validation.'
+    }
+    return null
+  }
+  if (actor.role === 'staff') {
+    if (!current) return 'Staff cannot create assistance requests.'
+    if (current.status === 'LIST GENERATED' || current.status === 'APPROVED' || current.status === 'REJECTED') {
+      return 'Finalized assistance lists cannot be modified.'
+    }
+    if (status !== 'PENDING' && status !== 'UNDER REVIEW' && status !== 'LIST GENERATED') {
+      return 'Staff can validate requests and generate lists but cannot manually approve or reject beneficiaries.'
+    }
+    if (current.status === 'PENDING' && status === 'LIST GENERATED') {
+      return 'A request must enter Staff review before its final list can be generated.'
+    }
+    if (status === 'LIST GENERATED') {
+      const documents = Array.isArray(payload?.documents) ? payload.documents : []
+      const qualifications = Array.isArray(payload?.qualifications) ? payload.qualifications : []
+      if (!documents.length || documents.some((entry) => entry?.status !== 'verified')) {
+        return 'Every request document must be verified before final list generation.'
+      }
+      if (!qualifications.length || qualifications.some((entry) => !['passed', 'not_applicable'].includes(entry?.status))) {
+        return 'Every qualification check must be completed before final list generation.'
+      }
+    }
+    if (JSON.stringify(decisions) !== JSON.stringify(currentDecisions)) {
+      return 'Staff cannot add or change final decision records.'
+    }
+    const immutable = ['id', 'source', 'association', 'requestType', 'program', 'details']
+    if (immutable.some((key) => JSON.stringify(payload?.[key]) !== JSON.stringify(current.payload?.[key]))) {
+      return 'Staff can validate a request but cannot change its submitted identity or request details.'
+    }
+  }
+  return null
+}
+
+function payloadIdentity(resource, payload) {
+  if (resource.identity === 'default') return 'default'
+  if (resource.identity) return String(payload?.[resource.identity] ?? '')
+  return String(payload?.id ?? '')
+}
+
+function payloadAssociation(payload, key) {
+  if (key === 'barangay_association_details') return String(payload?.name || '')
+  return String(payload?.associationName || payload?.association || '')
+}
+
+async function associationOwnsRecord(actor, resource, id, allowMissing = false) {
+  if (!resource.associationColumn) return false
+  const { data, error } = await supabase
+    .from(resource.table)
+    .select(resource.associationColumn)
+    .eq(resource.column, id)
+    .maybeSingle()
+  if (error) return false
+  if (!data) return allowMissing
+  const expected = String(actor.association_name || '').trim().toLowerCase()
+  return String(data[resource.associationColumn] || '').trim().toLowerCase() === expected
+}
+
+app.put('/api/records/:key/:id', async (req, res) => {
+  const actor = await requireRole(req, res, ['admin', 'staff', 'association'])
+  if (!actor) return
+  const key = String(req.params.key || '')
+  const id = String(req.params.id || '')
+  const resource = recordResources[key]
+  if (!resource) {
+    res.status(404).json({ error: 'Unknown record resource.' })
     return
   }
-  const key = String(req.params.key)
-  const save = savers[key]
-  if (!save) {
-    res.json({ ok: true, skipped: true })
+  if (!canWriteResource(actor, key)) {
+    res.status(403).json({ error: 'You cannot update this record type.' })
     return
   }
-  const payloadText = typeof req.body?.payload === 'string' ? req.body.payload : JSON.stringify(req.body?.payload ?? null)
-  let payload
+  const payload = req.body?.payload
+  if (!payload || typeof payload !== 'object' || Array.isArray(payload)) {
+    res.status(400).json({ error: 'A record object is required.' })
+    return
+  }
+  if (payloadIdentity(resource, payload) !== id) {
+    res.status(400).json({ error: 'The record ID does not match the request path.' })
+    return
+  }
+  if (actor.role === 'association') {
+    const expected = String(actor.association_name || '').trim().toLowerCase()
+    if (!expected || payloadAssociation(payload, key).trim().toLowerCase() !== expected) {
+      res.status(403).json({ error: 'You can update only records assigned to your association.' })
+      return
+    }
+    if (!(await associationOwnsRecord(actor, resource, id, true))) {
+      res.status(403).json({ error: 'That record belongs to another association.' })
+      return
+    }
+  }
+  if (key === 'barangay_reviewable_items') {
+    const { data: current, error } = await supabase
+      .from('assistance_requests')
+      .select('status,payload')
+      .eq('id', id)
+      .maybeSingle()
+    if (error) {
+      res.status(500).json({ error: error.message })
+      return
+    }
+    const policyError = requestWriteError(actor, payload, current)
+    if (policyError) {
+      res.status(403).json({ error: policyError })
+      return
+    }
+  }
   try {
-    payload = JSON.parse(payloadText)
-  } catch {
-    res.status(400).json({ error: 'Payload must be JSON.' })
-    return
-  }
-  try {
-    await save(payload)
-    res.json({ ok: true })
+    await resource.save(payload)
+    res.json({ ok: true, id })
   } catch (error) {
     res.status(500).json({ error: error.message })
   }
 })
 
-app.delete('/api/store/:key', async (req, res) => {
-  if (!supabase) {
-    res.status(503).json({ error: 'Supabase is not connected.' })
+app.delete('/api/records/:key/:id', async (req, res) => {
+  const actor = await requireRole(req, res, ['admin', 'staff', 'association'])
+  if (!actor) return
+  const key = String(req.params.key || '')
+  const id = String(req.params.id || '')
+  const resource = recordResources[key]
+  if (!resource) {
+    res.status(404).json({ error: 'Unknown record resource.' })
     return
   }
-  const key = String(req.params.key)
-  const save = savers[key]
-  if (!save) {
-    res.json({ ok: true })
+  if (key === 'barangay_users') {
+    res.status(405).json({ error: 'Use the account-management workflow to remove users.' })
     return
   }
-  const empty = key === 'barangay_association_details' || key === 'barangay_privacy_settings' ? null : []
+  if (key === 'barangay_reviewable_items') {
+    res.status(403).json({ error: 'Submitted assistance requests are immutable workflow records and cannot be deleted.' })
+    return
+  }
+  if (!canWriteResource(actor, key) || (actor.role === 'association' && !associationDeletableResources.has(key))) {
+    res.status(403).json({ error: 'You cannot delete this record type.' })
+    return
+  }
+  if (actor.role === 'association' && !(await associationOwnsRecord(actor, resource, id))) {
+    res.status(403).json({ error: 'You can delete only records assigned to your association.' })
+    return
+  }
   try {
-    await save(empty)
-    res.json({ ok: true })
+    const { error } = await supabase.from(resource.table).delete().eq(resource.column, id)
+    if (error) throw new Error(error.message)
+    res.json({ ok: true, id })
   } catch (error) {
     res.status(500).json({ error: error.message })
   }
+})
+
+app.all('/api/store/:key', async (req, res) => {
+  if (!(await authenticate(req, res))) return
+  res.status(410).json({ error: 'Bulk store synchronization was retired. Use record-level endpoints.' })
 })
 
 // -- ML proxy ------------------------------------------------------------
@@ -1109,17 +1528,20 @@ app.delete('/api/store/:key', async (req, res) => {
 // is no CORS configuration in production and the client never needs to know
 // where the models are hosted.
 //
-// When Python is down the proxy answers 503 and the client falls back to local
-// rule-based scoring. That failure is reported, never raised.
+// When Python is down the proxy answers 503. Operational list generation fails
+// safely and never finalizes a request from a local heuristic fallback.
 
 const mlPort = Number(process.env.ML_PORT || 5050)
 const mlUrl = process.env.ML_URL || `http://127.0.0.1:${mlPort}`
 const ML_TIMEOUT_MS = Number(process.env.ML_TIMEOUT_MS || 20000)
 
 async function callMl(path, body) {
+  const mlHeaders = {}
+  if (body !== undefined) mlHeaders['Content-Type'] = 'application/json'
+  if (process.env.ML_INTERNAL_TOKEN) mlHeaders['X-ML-Internal-Token'] = process.env.ML_INTERNAL_TOKEN
   const response = await fetch(`${mlUrl}${path}`, {
     method: body === undefined ? 'GET' : 'POST',
-    headers: body === undefined ? {} : { 'Content-Type': 'application/json' },
+    headers: mlHeaders,
     body: body === undefined ? undefined : JSON.stringify(body),
     signal: AbortSignal.timeout(ML_TIMEOUT_MS),
   })
@@ -1139,6 +1561,9 @@ async function callMl(path, body) {
 // handful of fixed routes is what keeps VITE_ML_URL pointing straight at the
 // service behaving exactly the same way - both ends of ML_BASE agree on paths.
 app.use('/api/ml', async (req, res) => {
+  const trainRequest = /\/api\/train(?:\?|$)/.test(req.originalUrl)
+  const actor = await requireRole(req, res, trainRequest ? ['admin'] : ['admin', 'staff', 'association'])
+  if (!actor) return
   const suffix = req.originalUrl.slice('/api/ml'.length) || '/'
   const isBodyless = req.method === 'GET' || req.method === 'HEAD'
   try {
@@ -1149,19 +1574,23 @@ app.use('/api/ml', async (req, res) => {
   }
 })
 
-app.listen(apiPort, () => {
-  console.log(`API listening on http://localhost:${apiPort}`)
-  console.log(`ML service expected at ${mlUrl} (proxied under /api/ml)`)
-})
+if (process.env.NODE_ENV !== 'test') {
+  app.listen(apiPort, () => {
+    console.log(`API listening on http://localhost:${apiPort}`)
+    console.log(`ML service expected at ${mlUrl} (proxied under /api/ml)`)
+  })
 
-connectSupabase()
-  .then(() => {
-    console.log('Supabase ready.')
-    if (!usingSecretKey) {
-      console.log('Saves are blocked by row security. Add SUPABASE_SECRET_KEY to .env, then restart.')
-    }
-  })
-  .catch((error) => {
-    console.error('Supabase is not connected. Records stay in the browser until the project is configured.')
-    console.error(error.message)
-  })
+  connectSupabase()
+    .then(() => {
+      console.log('Supabase ready.')
+      if (!usingSecretKey) {
+        console.log('Saves are blocked by row security. Add SUPABASE_SECRET_KEY to .env, then restart.')
+      }
+    })
+    .catch((error) => {
+      console.error('Supabase is not connected. Records stay in the browser until the project is configured.')
+      console.error(error.message)
+    })
+}
+
+export { app, canWriteResource, payloadIdentity, requestWriteError, scopeStoresForActor }

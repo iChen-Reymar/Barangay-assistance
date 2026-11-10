@@ -20,7 +20,6 @@ import numpy as np
 from flask import Flask, jsonify, request
 from flask_cors import CORS
 
-from dataset import impute_unmeasured_household
 from features import FEATURE_NAMES, human_readable, vectorize
 from models import CLASS_ORDER, TREE_WEIGHT, LOGREG_WEIGHT, VulnerabilityScorer
 from train import train_with_real_records
@@ -30,7 +29,16 @@ METRICS_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "artifac
 MIN_RECORDS_FOR_SCORE = 1
 
 app = Flask(__name__)
-CORS(app)
+app.config["MAX_CONTENT_LENGTH"] = 2 * 1024 * 1024
+CORS(app, origins=["http://localhost:5173", "http://127.0.0.1:5173"])
+
+
+@app.before_request
+def require_internal_token():
+    """Reject direct production access when an internal service token is configured."""
+    expected = os.environ.get("ML_INTERNAL_TOKEN", "").strip()
+    if expected and request.headers.get("X-ML-Internal-Token", "") != expected:
+        return jsonify({"ok": False, "error": "Unauthorized service request."}), 401
 
 _state = {
     "scorer": None,
@@ -55,6 +63,8 @@ def _ensure_trained() -> None:
 
                 with open(METRICS_PATH, "r", encoding="utf8") as handle:
                     disk = json.load(handle)
+                if payload.get("featureNames") != FEATURE_NAMES:
+                    raise ValueError("Stale model feature schema")
                 _state["scorer"] = payload["scorer"]
                 _state["metrics"] = disk["metrics"]
                 _state["summary"] = disk["summary"]
@@ -89,11 +99,31 @@ def _normalise_records(payload) -> list[dict]:
         payload = payload.get("records") or payload.get("beneficiaries") or []
     if not isinstance(payload, list):
         return []
-    return [item for item in payload if isinstance(item, dict)]
+    records = [item for item in payload if isinstance(item, dict)]
+    if len(records) > 1000:
+        raise ValueError("A request may contain at most 1000 records.")
+    return records
 
 
 def _records_to_matrix(records: list[dict]) -> np.ndarray:
     return np.asarray([vectorize(record) for record in records], dtype=float)
+
+
+def _missing_assessment_fields(record: dict) -> list[str]:
+    """Return measured household fields required for operational scoring."""
+    missing = []
+    for key in ("familySize", "monthlyIncome", "age"):
+        try:
+            if float(record.get(key) or 0) <= 0:
+                missing.append(key)
+        except (TypeError, ValueError):
+            missing.append(key)
+    if record.get("workingHouseholdMembers") is None:
+        missing.append("workingHouseholdMembers")
+    for key in ("employmentStatus", "housingCondition"):
+        if not str(record.get(key) or "").strip():
+            missing.append(key)
+    return missing
 
 
 @app.get("/api/health")
@@ -142,27 +172,31 @@ def train():
 
 @app.post("/api/score")
 def score():
-    _ensure_trained()
     records = _normalise_records(request.get_json(silent=True))
     if len(records) < MIN_RECORDS_FOR_SCORE:
         return jsonify({"ok": False, "error": "No records supplied."}), 400
 
     scorer: VulnerabilityScorer = _state["scorer"]
-    prepared = []
-    imputed_flags = []
+    incomplete = []
     for record in records:
-        filled, imputed = impute_unmeasured_household(record)
-        prepared.append(filled)
-        imputed_flags.append(imputed)
+        missing = _missing_assessment_fields(record)
+        if missing:
+            incomplete.append({"id": record.get("id"), "missing": missing})
+    if incomplete:
+        return jsonify({
+            "ok": False,
+            "error": "Complete verified household assessments are required before ML scoring.",
+            "incomplete": incomplete,
+        }), 400
+
+    _ensure_trained()
+    prepared = records
     matrix = _records_to_matrix(prepared)
     results = scorer.score(matrix)
 
     payload = []
-    for record, result, imputed in zip(prepared, results, imputed_flags):
-        # Measured evaluation fields are explained as entered. A member who has
-        # not submitted an evaluation yet is still scored; those filled-in
-        # numbers are not reported as if the member wrote them down.
-        factors = [] if imputed else human_readable(record)
+    for record, result in zip(prepared, results):
+        factors = human_readable(record)
         payload.append(
             {
                 "id": record.get("id"),
@@ -177,7 +211,7 @@ def score():
                 "decisionTreePath": result["decisionTreePath"],
                 "logisticContributions": result["logisticContributions"],
                 "factors": factors,
-                "estimatedHousehold": imputed,
+                "estimatedHousehold": False,
             }
         )
 
@@ -194,7 +228,10 @@ def score():
 
 @app.errorhandler(Exception)
 def on_error(error):
-    return jsonify({"ok": False, "error": str(error)}), 500
+    if isinstance(error, ValueError):
+        return jsonify({"ok": False, "error": str(error)}), 400
+    app.logger.exception("Unhandled ML service error")
+    return jsonify({"ok": False, "error": "The ML service could not process the request."}), 500
 
 
 if __name__ == "__main__":

@@ -250,9 +250,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   )
 
   const changePassword = useCallback(
-    (input: PasswordChangeInput) => {
+    async (input: PasswordChangeInput) => {
       if (!user) return { success: false, error: 'Not signed in.' }
-      const result = changeUserPassword(user.id, input)
+      const result = await changeUserPassword(user.id, input)
       if (result.success) {
         logAuditEvent({
           user: user.fullName,

@@ -1,75 +1,91 @@
-# React + TypeScript + Vite
+# Barangay Buru-un Assistance Matching System
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+AI-enhanced matching system for social aid and livelihood programs in Barangay Buru-un, Iligan City. It manages association members and assistance requests, verifies eligibility data, and automatically produces explainable final prioritized household lists after Staff validation.
 
-Currently, two official plugins are available:
+## Architecture
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+- **Web:** React, TypeScript, Vite, Tailwind CSS
+- **Application API:** Node.js and Express (`http://localhost:3001`)
+- **ML service:** Python, Flask, scikit-learn (`http://127.0.0.1:5050`)
+- **Database and authentication:** Supabase/PostgreSQL
 
-## React Compiler
+The Express API is the browser-facing application layer. It authenticates requests, applies role checks, communicates with Supabase using the server secret, and proxies authorized ML requests to Flask.
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+## Roles and workflow
 
-## Expanding the ESLint configuration
+1. An Association Head submits member data and requests for their association.
+2. Barangay Staff verifies eligibility information and supporting evidence.
+3. Staff initiates generation only after documents, qualifications, and measured household assessments are complete.
+4. Decision Tree and Logistic Regression scoring is combined with explicit eligibility, duplicate-aid, cooling-period, and program rules to finalize the prioritized list.
+5. Administrators monitor requests, generated lists, reports, users, and audit history without altering beneficiary rankings. Legacy approval decisions remain available as historical records.
 
-If you are developing a production application, we recommend updating the configuration to enable type-aware lint rules:
+List generation does not release money or distribute aid. Actual scheduling and distribution remain separate human administrative activities.
 
-```js
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
+## Local setup
 
-      // Remove tseslint.configs.recommended and replace with this
-      tseslint.configs.recommendedTypeChecked,
-      // Alternatively, use this for stricter rules
-      tseslint.configs.strictTypeChecked,
-      // Optionally, add this for stylistic rules
-      tseslint.configs.stylisticTypeChecked,
+### Requirements
 
-      // Other configs...
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+- Node.js 24 or a current supported LTS release
+- npm
+- Python 3.11+
+- A Supabase project
 
+### Configuration
+
+1. Copy `.env.example` to `.env`.
+2. Add your Supabase URL, publishable key, and server-only secret key.
+3. In the Supabase SQL Editor, run `database/schema.sql`.
+4. Install JavaScript dependencies:
+
+   ```bash
+   npm install
+   npm --prefix server install
+   ```
+
+5. Create a Python virtual environment and install the ML dependencies:
+
+   ```bash
+   python -m venv .venv
+   .venv\Scripts\activate
+   pip install -r ml-service/requirements.txt
+   ```
+
+6. Start the complete development system:
+
+   ```bash
+   npm run dev
+   ```
+
+## Commands
+
+```bash
+npm run dev       # Web, API, and ML service
+npm run dev:web   # Vite only
+npm run dev:api   # Express only
+npm run ml        # Flask only
+npm run ml:train  # Train and evaluate the models
+npm run account:reset -- user@example.com  # Securely reset one Supabase Auth password
+npm test          # API role-isolation and ML feature/privacy regression tests
+npm run build     # TypeScript and production web build
+npm run lint      # ESLint
 ```
 
-You can also install [eslint-plugin-react-x](https://npmx.dev/package/eslint-plugin-react-x) and [eslint-plugin-react-dom](https://npmx.dev/package/eslint-plugin-react-dom) for React-specific lint rules:
+## Security notes
 
-```js
-// eslint.config.js
-import reactX from 'eslint-plugin-react-x'
-import reactDom from 'eslint-plugin-react-dom'
+- Never expose `SUPABASE_SECRET_KEY` or commit `.env`.
+- Rotate any secret copied into chat, logs, screenshots, or public documents.
+- `database/schema.sql` contains role- and association-scoped RLS policies; rerun it after policy changes.
+- Configure `APP_ORIGINS` to the exact deployed web origins.
+- Configure the same `ML_INTERNAL_TOKEN` for Express and Flask in production.
+- Back up Supabase before applying schema changes.
+- Passwords live only in Supabase Auth. The schema never creates or resets passwords.
+- Real names and identifiable training records must not be committed. ML datasets should use pseudonymous IDs.
+- GitHub Actions runs tests, lint, the production build, and production dependency audits on every pull request.
 
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-      // Enable lint rules for React
-      reactX.configs['recommended-typescript'],
-      // Enable lint rules for React DOM
-      reactDom.configs.recommended,
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+## Data synchronization
 
-```
+Browser storage is an offline cache, not the authorization boundary. Changes are diffed and sent through authenticated record-level endpoints, so creating, editing, or deleting one item affects only that database record. The retired bulk-store endpoints return HTTP `410` and cannot clear shared tables.
+
+## ML evaluation
+
+Synthetic metrics are development results only. A real-world accuracy claim requires anonymized records with relevant vulnerability indicators and labels assigned under a documented expert rubric. Names are never model features.

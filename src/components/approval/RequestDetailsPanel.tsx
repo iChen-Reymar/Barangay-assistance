@@ -347,7 +347,7 @@ export function RequestDetailsPanel({
 
       {showDecisionHistory && item.decisions.length > 0 && (
         <section className="border-t border-gray-100 pt-4">
-          <h4 className="mb-3 text-sm font-bold text-gray-900">Approval Decision History</h4>
+          <h4 className="mb-3 text-sm font-bold text-gray-900">Legacy Decision History</h4>
           <DecisionTimeline decisions={item.decisions} />
         </section>
       )}

@@ -1,4 +1,4 @@
-﻿import { useEffect, useState } from 'react'
+﻿import { useEffect, useMemo, useState } from 'react'
 import { Plus, Eye, Pencil } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import { DashboardNavbar } from '../../components/layout/DashboardNavbar'
@@ -37,16 +37,20 @@ function verificationVariant(status: VerificationStatus) {
 }
 
 function formatCurrency(amount: number) {
-  return `â‚± ${amount.toLocaleString('en-PH', { minimumFractionDigits: 2 })}`
+  return `₱ ${amount.toLocaleString('en-PH', { minimumFractionDigits: 2 })}`
 }
 
 function formToBeneficiary(input: StaffBeneficiaryFormInput, existing: StaffBeneficiary): StaffBeneficiary {
   return {
-    id: existing.id,
+    ...existing,
     name: input.name.trim(),
     association: input.association,
     familySize: input.familySize,
     monthlyIncome: input.monthlyIncome,
+    workingHouseholdMembers: input.workingHouseholdMembers,
+    age: input.age,
+    employmentStatus: input.employmentStatus,
+    housingCondition: input.housingCondition,
     vulnerability: input.vulnerability,
     verification: input.verification,
   }
@@ -63,8 +67,17 @@ export default function StaffBeneficiariesPage() {
   const [formOpen, setFormOpen] = useState(false)
   const [viewingBeneficiary, setViewingBeneficiary] = useState<StaffBeneficiary | null>(null)
   const [editingBeneficiary, setEditingBeneficiary] = useState<StaffBeneficiary | null>(null)
+  const [associationFilter, setAssociationFilter] = useState('Association: All')
+  const [vulnerabilityFilter, setVulnerabilityFilter] = useState('Vulnerability: All')
+  const [verificationFilter, setVerificationFilter] = useState('Verification: All')
 
-  const pagination = usePagination(items, PAGE_SIZE_DEFAULT, 'staff-beneficiaries')
+  const associationOptions = ['Association: All', ...new Set(items.map((item) => item.association).filter(Boolean))]
+  const filtered = useMemo(() => items.filter((item) =>
+    (associationFilter === 'Association: All' || item.association === associationFilter) &&
+    (vulnerabilityFilter === 'Vulnerability: All' || item.vulnerability === vulnerabilityFilter.toUpperCase()) &&
+    (verificationFilter === 'Verification: All' || item.verification === verificationFilter.toUpperCase()),
+  ), [associationFilter, items, verificationFilter, vulnerabilityFilter])
+  const pagination = usePagination(filtered, PAGE_SIZE_DEFAULT, `${associationFilter}-${vulnerabilityFilter}-${verificationFilter}`)
 
   useEffect(() => {
     return subscribeStaffBeneficiaryStorage(() => {
@@ -187,9 +200,9 @@ export default function StaffBeneficiariesPage() {
         <div className="rounded-lg border border-gray-200 bg-white shadow-sm">
           <div className="flex flex-col gap-3 border-b border-gray-200 px-4 py-4 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between md:px-5">
             <div className="flex w-full flex-col gap-3 sm:w-auto sm:flex-row sm:flex-wrap">
-              <Filter label="Association" options={['Association: All', 'Farmers Association', "Sitoy Farmer's Group", 'PWD Group']} />
-              <Filter label="Vulnerability" options={['Vulnerability: All', 'High', 'Medium', 'Low']} />
-              <Filter label="Verification" options={['Verification: All', 'Verified', 'Pending', 'Unverified']} />
+              <Filter label="Association" options={associationOptions} value={associationFilter} onChange={setAssociationFilter} />
+              <Filter label="Vulnerability" options={['Vulnerability: All', 'High', 'Medium', 'Low']} value={vulnerabilityFilter} onChange={setVulnerabilityFilter} />
+              <Filter label="Verification" options={['Verification: All', 'Verified', 'Pending', 'Unverified']} value={verificationFilter} onChange={setVerificationFilter} />
             </div>
             <Link to="/staff/beneficiaries/add" className="w-full sm:w-auto">
               <Button className="w-full sm:w-auto">

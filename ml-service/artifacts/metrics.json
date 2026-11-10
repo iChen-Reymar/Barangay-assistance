@@ -1,30 +1,30 @@
 {
   "metrics": {
     "synthetic": {
-      "accuracy": 0.6612,
-      "precisionMacro": 0.6782,
-      "recallMacro": 0.6688,
-      "f1Macro": 0.6731,
+      "accuracy": 0.8262,
+      "precisionMacro": 0.8288,
+      "recallMacro": 0.8264,
+      "f1Macro": 0.8272,
       "support": {
-        "HIGH": 49,
-        "MEDIUM": 40,
-        "LOW": 32
+        "HIGH": 679,
+        "MEDIUM": 560,
+        "LOW": 458
       },
       "perClass": {
         "HIGH": {
-          "precision": 0.68,
-          "recall": 0.6939,
-          "f1": 0.6869
+          "precision": 0.8836,
+          "recall": 0.8498,
+          "f1": 0.8664
         },
         "MEDIUM": {
-          "precision": 0.4878,
-          "recall": 0.5,
-          "f1": 0.4938
+          "precision": 0.7236,
+          "recall": 0.7714,
+          "f1": 0.7468
         },
         "LOW": {
-          "precision": 0.8667,
-          "recall": 0.8125,
-          "f1": 0.8387
+          "precision": 0.8792,
+          "recall": 0.8581,
+          "f1": 0.8685
         }
       },
       "confusionMatrix": {
@@ -35,48 +35,48 @@
         ],
         "rows": [
           [
-            34,
-            15,
-            0
+            577,
+            100,
+            2
           ],
           [
-            16,
-            20,
-            4
+            76,
+            432,
+            52
           ],
           [
             0,
-            6,
-            26
+            65,
+            393
           ]
         ]
       }
     },
     "decisionTree": {
-      "accuracy": 0.6612,
-      "precisionMacro": 0.6782,
-      "recallMacro": 0.6688,
-      "f1Macro": 0.6731,
+      "accuracy": 0.8262,
+      "precisionMacro": 0.8288,
+      "recallMacro": 0.8264,
+      "f1Macro": 0.8272,
       "support": {
-        "HIGH": 49,
-        "MEDIUM": 40,
-        "LOW": 32
+        "HIGH": 679,
+        "MEDIUM": 560,
+        "LOW": 458
       },
       "perClass": {
         "HIGH": {
-          "precision": 0.68,
-          "recall": 0.6939,
-          "f1": 0.6869
+          "precision": 0.8836,
+          "recall": 0.8498,
+          "f1": 0.8664
         },
         "MEDIUM": {
-          "precision": 0.4878,
-          "recall": 0.5,
-          "f1": 0.4938
+          "precision": 0.7236,
+          "recall": 0.7714,
+          "f1": 0.7468
         },
         "LOW": {
-          "precision": 0.8667,
-          "recall": 0.8125,
-          "f1": 0.8387
+          "precision": 0.8792,
+          "recall": 0.8581,
+          "f1": 0.8685
         }
       },
       "confusionMatrix": {
@@ -87,48 +87,48 @@
         ],
         "rows": [
           [
-            34,
-            15,
-            0
+            577,
+            100,
+            2
           ],
           [
-            16,
-            20,
-            4
+            76,
+            432,
+            52
           ],
           [
             0,
-            6,
-            26
+            65,
+            393
           ]
         ]
       }
     },
     "logisticRegression": {
-      "accuracy": 0.843,
-      "precisionMacro": 0.8507,
-      "recallMacro": 0.8477,
-      "f1Macro": 0.8486,
+      "accuracy": 0.8639,
+      "precisionMacro": 0.8631,
+      "recallMacro": 0.8647,
+      "f1Macro": 0.8638,
       "support": {
-        "HIGH": 49,
-        "MEDIUM": 40,
-        "LOW": 32
+        "HIGH": 679,
+        "MEDIUM": 560,
+        "LOW": 458
       },
       "perClass": {
         "HIGH": {
-          "precision": 0.8723,
-          "recall": 0.8367,
-          "f1": 0.8542
+          "precision": 0.9107,
+          "recall": 0.8866,
+          "f1": 0.8985
         },
         "MEDIUM": {
-          "precision": 0.7442,
-          "recall": 0.8,
-          "f1": 0.7711
+          "precision": 0.7881,
+          "recall": 0.8036,
+          "f1": 0.7958
         },
         "LOW": {
-          "precision": 0.9355,
-          "recall": 0.9062,
-          "f1": 0.9206
+          "precision": 0.8903,
+          "recall": 0.9039,
+          "f1": 0.8971
         }
       },
       "confusionMatrix": {
@@ -139,48 +139,48 @@
         ],
         "rows": [
           [
-            41,
-            8,
+            602,
+            77,
             0
           ],
           [
-            6,
-            32,
-            2
+            59,
+            450,
+            51
           ],
           [
             0,
-            3,
-            29
+            44,
+            414
           ]
         ]
       }
     },
     "blended": {
-      "accuracy": 0.8017,
-      "precisionMacro": 0.8176,
-      "recallMacro": 0.8049,
-      "f1Macro": 0.8091,
+      "accuracy": 0.858,
+      "precisionMacro": 0.8588,
+      "recallMacro": 0.8565,
+      "f1Macro": 0.8573,
       "support": {
-        "HIGH": 49,
-        "MEDIUM": 40,
-        "LOW": 32
+        "HIGH": 679,
+        "MEDIUM": 560,
+        "LOW": 458
       },
       "perClass": {
         "HIGH": {
-          "precision": 0.8478,
-          "recall": 0.7959,
-          "f1": 0.8211
+          "precision": 0.9149,
+          "recall": 0.8866,
+          "f1": 0.9005
         },
         "MEDIUM": {
-          "precision": 0.6739,
-          "recall": 0.775,
-          "f1": 0.7209
+          "precision": 0.7694,
+          "recall": 0.8161,
+          "f1": 0.792
         },
         "LOW": {
-          "precision": 0.931,
-          "recall": 0.8438,
-          "f1": 0.8852
+          "precision": 0.8921,
+          "recall": 0.8668,
+          "f1": 0.8793
         }
       },
       "confusionMatrix": {
@@ -191,19 +191,19 @@
         ],
         "rows": [
           [
-            39,
-            10,
-            0
+            602,
+            76,
+            1
           ],
           [
-            7,
-            31,
-            2
+            56,
+            457,
+            47
           ],
           [
             0,
-            5,
-            27
+            61,
+            397
           ]
         ]
       }
@@ -212,54 +212,62 @@
       "folds": 5,
       "decisionTree": {
         "folds": [
-          0.6575,
-          0.6301,
-          0.7222,
-          0.625,
-          0.6944
+          0.813,
+          0.8187,
+          0.7996,
+          0.8195,
+          0.8254
         ],
-        "mean": 0.6658,
-        "std": 0.0419,
-        "min": 0.625,
-        "max": 0.7222
+        "mean": 0.8152,
+        "std": 0.0098,
+        "min": 0.7996,
+        "max": 0.8254
       },
       "logisticRegression": {
         "folds": [
-          0.7945,
-          0.7945,
-          0.8056,
-          0.8194,
-          0.8889
+          0.8557,
+          0.8394,
+          0.8489,
+          0.8637,
+          0.8585
         ],
-        "mean": 0.8206,
-        "std": 0.0395,
-        "min": 0.7945,
-        "max": 0.8889
+        "mean": 0.8532,
+        "std": 0.0094,
+        "min": 0.8394,
+        "max": 0.8637
       },
       "blended": {
         "folds": [
-          0.7671,
-          0.7808,
-          0.7361,
-          0.7778,
-          0.7917
+          0.8608,
+          0.8489,
+          0.8489,
+          0.8659,
+          0.8637
         ],
-        "mean": 0.7707,
-        "std": 0.0212,
-        "min": 0.7361,
-        "max": 0.7917
+        "mean": 0.8576,
+        "std": 0.0082,
+        "min": 0.8489,
+        "max": 0.8659
       }
     }
   },
   "summary": {
-    "samples": 483,
+    "samples": 8483,
     "features": [
       "family_size",
       "monthly_income",
       "income_per_capita",
+      "working_household_members",
+      "income_per_worker",
       "head_age",
-      "employment_score",
-      "housing_score",
+      "employment_employed",
+      "employment_self_employed",
+      "employment_seasonal_worker",
+      "employment_unemployed",
+      "housing_concrete",
+      "housing_light_materials",
+      "housing_temporary",
+      "housing_makeshift_salvaged",
       "has_elderly",
       "has_pwd",
       "has_young_children",
@@ -268,9 +276,9 @@
       "dependent_load"
     ],
     "classDistribution": {
-      "HIGH": 194,
-      "MEDIUM": 159,
-      "LOW": 130
+      "HIGH": 3394,
+      "MEDIUM": 2799,
+      "LOW": 2290
     },
     "realRecordsIncluded": 0,
     "realRosterRows": 483,
@@ -306,6 +314,7 @@
       "imputedFields": [
         "familySize",
         "monthlyIncome",
+        "workingHouseholdMembers",
         "age",
         "employmentStatus",
         "housingCondition",
@@ -313,13 +322,28 @@
         "label"
       ]
     },
-    "nSynthetic": 0,
-    "trainSize": 362,
-    "testSize": 121,
-    "scoringSamples": 483,
+    "nSynthetic": 8000,
+    "trainSize": 6786,
+    "testSize": 1697,
+    "scoringSamples": 8483,
     "cvFolds": 5,
     "targetAccuracy": 0.8,
+    "gridSearch": {
+      "decisionTree": {
+        "bestParameters": {
+          "clf__max_depth": 8,
+          "clf__min_samples_leaf": 8
+        },
+        "bestF1Macro": 0.8225
+      },
+      "logisticRegression": {
+        "bestParameters": {
+          "clf__C": 4.0
+        },
+        "bestF1Macro": 0.8523
+      }
+    },
     "meetsTarget": true
   },
-  "trainedAt": "2026-11-03T08:54:27.799174+00:00"
+  "trainedAt": "2026-11-09T14:36:18.997431+00:00"
 }

@@ -1,5 +1,5 @@
 export type VulnerabilityLevel = 'HIGH' | 'MEDIUM' | 'LOW'
-export type RequestStatus = 'PENDING' | 'APPROVED' | 'UNDER REVIEW' | 'REJECTED'
+export type RequestStatus = 'PENDING' | 'UNDER REVIEW' | 'LIST GENERATED' | 'APPROVED' | 'REJECTED'
 export type MatchStatus = 'HIGH MATCH' | 'MEDIUM MATCH' | 'MODERATE MATCH'
 
 export const dashboardStats = {
@@ -191,8 +191,8 @@ export const reportTemplates: ReportTemplate[] = [
     reportType: 'ai_scoring',
   },
   {
-    title: 'Approved Assistance Report',
-    description: 'Registry of approved grants with payout timelines and status updates.',
+    title: 'Generated Assistance List Report',
+    description: 'Registry of automatically finalized prioritized household lists and generation status.',
     icon: 'check',
     slug: 'approved_assistance',
     reportType: 'approved',

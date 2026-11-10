@@ -59,7 +59,7 @@ export default function StaffDashboardPage() {
           <StatCard label="Assessed Beneficiaries" value={beneficiaries.filter((row) => row.vulnerability).length} icon={Shield} />
           <StatCard label="High Vulnerability" value={beneficiaries.filter((row) => row.vulnerability === 'HIGH').length} icon={AlertTriangle} />
           <StatCard label="Pending Verification" value={pendingCount} icon={Clock} />
-          <StatCard label="Approved Assistance" value={generatedCount} icon={CheckCircle} />
+          <StatCard label="Generated Lists" value={generatedCount} icon={CheckCircle} />
         </div>
 
         <div className="mb-6">

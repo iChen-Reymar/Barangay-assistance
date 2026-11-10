@@ -20,7 +20,7 @@ import type { RequestStatus } from '../../data/mockData'
 import { useAssociationDisplayUser } from '../../hooks/useAssociationDisplayUser'
 
 function statusVariant(status: RequestStatus) {
-  if (status === 'APPROVED') return 'success' as const
+  if (status === 'APPROVED' || status === 'LIST GENERATED') return 'success' as const
   if (status === 'REJECTED') return 'danger' as const
   if (status === 'UNDER REVIEW') return 'info' as const
   if (status === 'PENDING') return 'warning' as const
@@ -76,7 +76,7 @@ export default function AssociationDashboardPage() {
   const pendingCount = requests.filter(
     (item) => item.status === 'PENDING' || item.status === 'UNDER REVIEW',
   ).length
-  const approvedItems = requests.filter((item) => item.status === 'APPROVED')
+  const approvedItems = requests.filter((item) => item.status === 'LIST GENERATED' || item.status === 'APPROVED')
   const rejectedCount = requests.filter((item) => item.status === 'REJECTED').length
   const recent = requests.slice(0, 4)
 
@@ -93,7 +93,7 @@ export default function AssociationDashboardPage() {
         <div className="mb-6 grid grid-cols-2 gap-4 lg:grid-cols-4">
           <StatCard label="Total Members" value={memberCount} icon={Users} />
           <StatCard label="Pending Requests" value={pendingCount} icon={Clock} />
-          <StatCard label="AI Generated" value={approvedItems.length} icon={CheckCircle} />
+           <StatCard label="Generated Lists" value={approvedItems.length} icon={CheckCircle} />
           <StatCard label="Not Qualified" value={rejectedCount} icon={XCircle} />
         </div>
 
@@ -130,23 +130,23 @@ export default function AssociationDashboardPage() {
 
         <div className="mt-6 rounded-lg border border-gray-200 bg-white shadow-sm">
           <div className="border-b border-gray-200 px-5 py-4">
-            <h2 className="text-sm font-bold text-gray-900">Approved Assistance</h2>
+             <h2 className="text-sm font-bold text-gray-900">Final Prioritized Lists</h2>
           </div>
           {approvedItems.length === 0 ? (
             <p className="px-5 py-6 text-sm text-gray-500">
-              Approved requests from barangay staff will appear here.
+               Automatically generated lists will appear here after Staff validation.
             </p>
           ) : (
             <div className="grid gap-4 p-5 sm:grid-cols-2 lg:grid-cols-3">
               {approvedItems.map((item) => (
                 <div key={item.id} className="rounded-lg border border-gray-200 p-4">
                   <p className="font-bold text-green-800">{item.requestType}</p>
-                  <p className="mt-1 text-xs text-gray-500">Approved: {approvedOn(item)}</p>
+                   <p className="mt-1 text-xs text-gray-500">Finalized: {approvedOn(item)}</p>
                   <p className="text-sm text-gray-600">
                     {item.details?.memberCount ?? 'â€”'} members
                   </p>
                   <div className="mt-2">
-                    <Badge variant="success">APPROVED</Badge>
+                     <Badge variant="success">{item.status}</Badge>
                   </div>
                 </div>
               ))}

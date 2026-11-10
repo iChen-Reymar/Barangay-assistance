@@ -47,7 +47,7 @@ function approvedAdminCount(users: StoredUser[], exceptId?: string) {
   ).length
 }
 
-export function createManagedUser(input: {
+export async function createManagedUser(input: {
   firstName: string
   lastName: string
   email: string
@@ -55,9 +55,9 @@ export function createManagedUser(input: {
   contactNumber: string
   role: UserRole
   associationName?: string
-}): { success: boolean; error?: string } {
-  if (input.password.length < 6) {
-    return { success: false, error: 'Password must be at least 6 characters.' }
+}): Promise<{ success: boolean; error?: string }> {
+  if (input.password.length < 8) {
+    return { success: false, error: 'Password must be at least 8 characters.' }
   }
 
   const users = readUsers()
@@ -66,26 +66,16 @@ export function createManagedUser(input: {
     return { success: false, error: 'An account with this email already exists.' }
   }
 
-  const now = new Date().toISOString()
-  const roleLabel = roleToLabel(input.role)
-  const user: StoredUser = {
-    id: crypto.randomUUID(),
-    email: input.email.trim(),
-    password: input.password,
-    firstName: input.firstName.trim(),
-    lastName: input.lastName.trim(),
-    fullName: `${input.firstName.trim()} ${input.lastName.trim()}`,
-    contactNumber: input.contactNumber.trim(),
-    position: roleLabel,
-    department: input.role === 'association' ? 'registered-associations' : 'barangay-hall',
-    role: input.role,
-    roleLabel,
-    status: 'approved',
-    createdAt: now,
-    approvedAt: now,
-    associationName: input.role === 'association' ? input.associationName?.trim() || undefined : undefined,
-  }
-  writeUsers([...users, user])
+  const { data } = await supabase.auth.getSession()
+  if (!data.session?.access_token) return { success: false, error: 'Sign in as an administrator first.' }
+  const response = await fetch('/api/users', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${data.session.access_token}` },
+    body: JSON.stringify(input),
+  })
+  const body = await response.json().catch(() => ({})) as { error?: string; user?: StoredUser }
+  if (!response.ok || !body.user) return { success: false, error: body.error || 'Could not create the user.' }
+  rememberUser(body.user)
   return { success: true }
 }
 
@@ -104,8 +94,8 @@ export async function updateManagedUser(
   const password = input.password?.trim() ?? ''
   if (!firstName && !lastName) return { success: false, error: 'Name is required.' }
   if (!email.includes('@')) return { success: false, error: 'Enter a valid email.' }
-  if (password && password.length < 6) {
-    return { success: false, error: 'Password must be at least 6 characters. The default password is 123123.' }
+  if (password && password.length < 8) {
+    return { success: false, error: 'Password must be at least 8 characters.' }
   }
 
   const users = readUsers()
@@ -145,10 +135,10 @@ export async function updateManagedUser(
   return { success: true }
 }
 
-export function updateUserRole(
+export async function updateUserRole(
   userId: string,
   role: UserRole,
-): { success: boolean; error?: string } {
+): Promise<{ success: boolean; error?: string }> {
   const users = readUsers()
   const index = users.findIndex((user) => user.id === userId)
   if (index === -1) return { success: false, error: 'User not found.' }
@@ -157,6 +147,16 @@ export function updateUserRole(
   if (current.role === 'admin' && current.status === 'approved' && role !== 'admin' && approvedAdminCount(users, userId) === 0) {
     return { success: false, error: 'At least one administrator must remain.' }
   }
+
+  const { data } = await supabase.auth.getSession()
+  if (!data.session?.access_token) return { success: false, error: 'Sign in as an administrator first.' }
+  const response = await fetch(`/api/users/${userId}/role`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${data.session.access_token}` },
+    body: JSON.stringify({ role }),
+  })
+  const body = await response.json().catch(() => ({})) as { error?: string }
+  if (!response.ok) return { success: false, error: body.error || 'Could not change the user role.' }
 
   const roleLabel = roleToLabel(role)
   const updated: StoredUser = {
@@ -172,10 +172,10 @@ export function updateUserRole(
   return { success: true }
 }
 
-export function removeUser(
+export async function removeUser(
   userId: string,
   actorId: string,
-): { success: boolean; error?: string } {
+): Promise<{ success: boolean; error?: string }> {
   if (userId === actorId) {
     return { success: false, error: 'You cannot remove the account you are signed in with.' }
   }
@@ -187,6 +187,14 @@ export function removeUser(
     return { success: false, error: 'At least one administrator must remain.' }
   }
 
+  const { data } = await supabase.auth.getSession()
+  if (!data.session?.access_token) return { success: false, error: 'Sign in as an administrator first.' }
+  const response = await fetch(`/api/users/${userId}`, {
+    method: 'DELETE',
+    headers: { Authorization: `Bearer ${data.session.access_token}` },
+  })
+  const body = await response.json().catch(() => ({})) as { error?: string }
+  if (!response.ok) return { success: false, error: body.error || 'Could not remove the user.' }
   writeUsers(users.filter((user) => user.id !== userId))
   return { success: true }
 }
@@ -350,8 +358,10 @@ function rememberUser(account: StoredUser) {
   writeStoreWithoutSync(USERS_KEY, JSON.stringify([account, ...users]))
 }
 
-async function fetchVisibleUsers() {
-  const { data, error } = await supabase.from('users').select('*')
+async function fetchVisibleUsers(userId?: string) {
+  let query = supabase.from('users').select('*')
+  if (userId) query = query.eq('id', userId)
+  const { data, error } = await query
   if (error || !Array.isArray(data)) return []
   return data.flatMap((row) => {
     const account = profileFromRow(row as Record<string, unknown>)
@@ -359,33 +369,11 @@ async function fetchVisibleUsers() {
   })
 }
 
-async function createUserRow(account: StoredUser) {
-  await supabase.from('users').insert({
-    id: account.id,
-    email: account.email,
-    full_name: account.fullName,
-    role: account.role,
-    status: account.status,
-    association_name: account.associationName || null,
-    payload: {
-      firstName: account.firstName,
-      lastName: account.lastName,
-      contactNumber: account.contactNumber,
-      position: account.position,
-      department: account.department,
-      roleLabel: account.roleLabel,
-      associationType: account.associationType || null,
-      associationAddress: account.associationAddress || null,
-      registrationNumber: account.registrationNumber || null,
-      createdAt: account.createdAt,
-    },
-  })
-}
-
 export async function restoreUsersFromSession() {
   const token = readAccessToken()
   if (token) {
-    const visible = await fetchVisibleUsers()
+    const { data } = await supabase.auth.getUser(token)
+    const visible = await fetchVisibleUsers(data.user?.id)
     if (visible.length > 0) {
       const merged = new Map(readUsers().map((user) => [user.email.toLowerCase(), user]))
       for (const account of visible) merged.set(account.email.toLowerCase(), account)
@@ -435,12 +423,14 @@ export async function login(email: string, password: string, rememberMe: boolean
     const invalidCredentials = /invalid login credentials|invalid email or password/i.test(message)
     return {
       success: false,
-      error: invalidCredentials || !message ? 'Invalid Username or Password' : message,
+      error: invalidCredentials || !message
+        ? 'Invalid username or password. Use the complete email address for Gmail accounts.'
+        : message,
     }
   }
 
   saveAccessToken(data.session.access_token, rememberMe)
-  const visible = await fetchVisibleUsers()
+  const visible = await fetchVisibleUsers(data.user.id)
   const signedInEmail = authEmail.toLowerCase()
   const fromTable = visible.find((user) => user.email.toLowerCase() === signedInEmail)
     ?? readUsers().find((user) => user.email.toLowerCase() === signedInEmail)
@@ -449,15 +439,25 @@ export async function login(email: string, password: string, rememberMe: boolean
   const metadataRole = roleFromLabel(metadataValue(userMetadata, ['role', 'user_role', 'role_label']))
     ?? roleFromLabel(metadataValue(appMetadata, ['role', 'user_role', 'role_label']))
   const metadataStatus = metadataValue(userMetadata, ['status'])
-  const role = fromTable?.role ?? metadataRole ?? 'admin'
-  const status = fromTable?.status ?? (metadataStatus === 'pending' || metadataStatus === 'rejected' ? metadataStatus : 'approved')
+  const role = fromTable?.role ?? metadataRole
+  if (!role) {
+    await supabase.auth.signOut({ scope: 'local' })
+    clearSession()
+    return { success: false, error: 'This account has no authorized system role. Contact the administrator.' }
+  }
+  const status = fromTable?.status
+    ?? (metadataStatus === 'approved' || metadataStatus === 'pending' || metadataStatus === 'rejected' ? metadataStatus : 'pending')
   if (status === 'pending') {
+    await supabase.auth.signOut({ scope: 'local' })
+    clearSession()
     return {
       success: false,
       error: 'Your account is pending admin approval. Please wait for confirmation before signing in.',
     }
   }
   if (status === 'rejected') {
+    await supabase.auth.signOut({ scope: 'local' })
+    clearSession()
     return {
       success: false,
       error: 'Your access request was rejected. Contact the barangay administrator for assistance.',
@@ -483,7 +483,6 @@ export async function login(email: string, password: string, rememberMe: boolean
     createdAt: new Date().toISOString(),
   }
   rememberUser(account)
-  if (!fromTable) await createUserRow(account)
 
   const session: SessionUser = {
     id: account.id,
@@ -504,35 +503,13 @@ async function saveAccessRequest(user: StoredUser, password: string): Promise<{ 
   const response = await fetch('/api/access-requests', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(user),
+    body: JSON.stringify({ ...user, password }),
   })
-  if (!response.ok) {
-    const body = (await response.json().catch(() => ({}))) as { error?: string }
+  const body = (await response.json().catch(() => ({}))) as { error?: string; user?: StoredUser }
+  if (!response.ok || !body.user) {
     return { success: false, error: body.error ?? 'The request could not be saved to Supabase.' }
   }
-
-  const { error: signupError } = await supabase.auth.signUp({
-    email: user.email,
-    password,
-    options: {
-      data: {
-        role: user.role,
-        full_name: user.fullName,
-        status: 'pending',
-        contact_number: user.contactNumber,
-        position: user.position,
-        department: user.department,
-      },
-    },
-  })
-  if (signupError) {
-    if (signupError.message.toLowerCase().includes('already')) {
-      return { success: false, error: 'An account with this email already exists.' }
-    }
-    return { success: false, error: signupError.message }
-  }
-
-  rememberUser(user)
+  rememberUser(body.user)
   return { success: true }
 }
 
@@ -547,7 +524,7 @@ export async function submitAccessRequest(input: AccessRequestInput): Promise<{ 
   const newUser: StoredUser = {
     id: crypto.randomUUID(),
     email: input.email.trim(),
-    password: input.password,
+    password: '',
     firstName: input.firstName.trim(),
     lastName: input.lastName.trim(),
     fullName: `${input.firstName.trim()} ${input.lastName.trim()}`,
@@ -576,7 +553,7 @@ export async function submitAssociationHeadRequest(
   const newUser: StoredUser = {
     id: crypto.randomUUID(),
     email: input.email.trim(),
-    password: input.password,
+    password: '',
     firstName: input.firstName.trim(),
     lastName: input.lastName.trim(),
     fullName: `${input.firstName.trim()} ${input.lastName.trim()}`,
@@ -663,7 +640,7 @@ export function anonymizeRejectedUsers(): number {
       fullName: `Anonymized User ${user.id.slice(0, 6).toUpperCase()}`,
       email: `anon-${user.id.slice(0, 8)}@redacted.local`,
       contactNumber: '***-***-****',
-      password: crypto.randomUUID(),
+      password: '',
       associationAddress: undefined,
       associationName: user.associationName
         ? `Association ${user.id.slice(0, 6).toUpperCase()}`
@@ -740,26 +717,27 @@ export function updateUserProfile(
   return { success: true }
 }
 
-export function changeUserPassword(
+export async function changeUserPassword(
   userId: string,
   input: PasswordChangeInput,
-): { success: boolean; error?: string } {
+): Promise<{ success: boolean; error?: string }> {
   const users = readUsers()
   const index = users.findIndex((u) => u.id === userId)
   if (index === -1) {
     return { success: false, error: 'User not found.' }
   }
 
-  if (users[index].password !== input.currentPassword) {
-    return { success: false, error: 'Current password is incorrect.' }
+  if (input.newPassword.length < 8) {
+    return { success: false, error: 'New password must be at least 8 characters.' }
   }
 
-  if (input.newPassword.length < 6) {
-    return { success: false, error: 'New password must be at least 6 characters.' }
-  }
-
-  users[index] = { ...users[index], password: input.newPassword }
-  writeUsers(users)
+  const { error: verificationError } = await supabase.auth.signInWithPassword({
+    email: users[index].email,
+    password: input.currentPassword,
+  })
+  if (verificationError) return { success: false, error: 'Current password is incorrect.' }
+  const { error } = await supabase.auth.updateUser({ password: input.newPassword })
+  if (error) return { success: false, error: error.message }
   return { success: true }
 }
 

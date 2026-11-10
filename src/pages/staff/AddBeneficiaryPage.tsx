@@ -32,14 +32,26 @@ export default function AddBeneficiaryPage() {
     const association = String(data.get('association') ?? '').trim()
     const familySize = Number(data.get('familySize'))
     const monthlyIncome = Number(data.get('monthlyIncome'))
+    const workingHouseholdMembers = Number(data.get('workingHouseholdMembers'))
+    const age = Number(data.get('age'))
+    const employmentStatus = String(data.get('employmentStatus') ?? '').trim()
+    const housingCondition = String(data.get('housingCondition') ?? '').trim()
     const indicators = data.getAll('vulnerabilityIndicators').map(String)
 
     if (!name || !association || !Number.isFinite(familySize) || familySize < 1) {
       setError('Enter the beneficiary name, association, and a valid family size.')
       return
     }
-    if (!Number.isFinite(monthlyIncome) || monthlyIncome < 0) {
-      setError('Enter a valid monthly income.')
+    if (!Number.isFinite(monthlyIncome) || monthlyIncome <= 0) {
+      setError('Enter a monthly income greater than zero.')
+      return
+    }
+    if (!Number.isFinite(workingHouseholdMembers) || workingHouseholdMembers < 0 || workingHouseholdMembers > familySize) {
+      setError('Working household members must be between 0 and the family size.')
+      return
+    }
+    if (!Number.isFinite(age) || age < 1 || !employmentStatus || !housingCondition) {
+      setError('Age, employment status, and housing condition are required for ML assessment.')
       return
     }
 
@@ -53,14 +65,15 @@ export default function AddBeneficiaryPage() {
       association,
       familySize,
       monthlyIncome,
+      workingHouseholdMembers,
       vulnerability,
       verification: 'PENDING',
-      age: Number(data.get('age')) || undefined,
+      age,
       sex: String(data.get('sex') ?? '') || undefined,
       contactNumber: String(data.get('contactNumber') ?? '').trim() || undefined,
       address: String(data.get('address') ?? '').trim() || undefined,
-      employmentStatus: String(data.get('employmentStatus') ?? '') || undefined,
-      housingCondition: String(data.get('housingCondition') ?? '') || undefined,
+      employmentStatus,
+      housingCondition,
       vulnerabilityIndicators: indicators,
       membershipType: String(data.get('membershipType') ?? '') || undefined,
     })
@@ -102,7 +115,7 @@ export default function AddBeneficiaryPage() {
               </div>
               <div>
                 <label className="mb-1 block text-xs font-semibold uppercase text-gray-500">Age</label>
-                <input name="age" type="number" min="0" className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm" placeholder="Years" />
+                <input name="age" type="number" min="1" required className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm" placeholder="Years" />
               </div>
               <div>
                 <label className="mb-1 block text-xs font-semibold uppercase text-gray-500">Sex</label>
@@ -133,13 +146,17 @@ export default function AddBeneficiaryPage() {
               <div>
                 <label className="mb-1 block text-xs font-semibold uppercase text-gray-500">Monthly Income</label>
                 <div className="relative">
-                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm text-gray-500">â‚±</span>
-                  <input name="monthlyIncome" type="number" min="0" step="0.01" required className="w-full rounded-lg border border-gray-200 py-2 pl-8 pr-3 text-sm" placeholder="0.00" />
+                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm text-gray-500">₱</span>
+                  <input name="monthlyIncome" type="number" min="0.01" step="0.01" required className="w-full rounded-lg border border-gray-200 py-2 pl-8 pr-3 text-sm" placeholder="0.00" />
                 </div>
               </div>
               <div>
+                <label className="mb-1 block text-xs font-semibold uppercase text-gray-500">Working Household Members</label>
+                <input name="workingHouseholdMembers" type="number" min="0" required className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm" placeholder="No. currently working" />
+              </div>
+              <div>
                 <label className="mb-1 block text-xs font-semibold uppercase text-gray-500">Employment Status</label>
-                <select name="employmentStatus" className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm">
+                <select name="employmentStatus" required className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm">
                   <option value="">Select</option>
                   <option>Employed</option>
                   <option>Self-Employed</option>
@@ -149,7 +166,7 @@ export default function AddBeneficiaryPage() {
               </div>
               <div>
                 <label className="mb-1 block text-xs font-semibold uppercase text-gray-500">Housing Condition</label>
-                <select name="housingCondition" className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm">
+                <select name="housingCondition" required className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm">
                   <option value="">Select</option>
                   <option>Concrete</option>
                   <option>Light Materials</option>

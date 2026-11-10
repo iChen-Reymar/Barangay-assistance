@@ -22,7 +22,7 @@ interface ApprovedRequestDetailModalProps {
 }
 
 function statusVariant(status: string) {
-  if (status === 'RELEASED') return 'success'
+  if (status === 'RELEASED' || status === 'APPROVED' || status === 'LIST GENERATED') return 'success'
   if (status === 'SCHEDULED') return 'info'
   if (status === 'PENDING COLLECTION') return 'warning'
   return 'neutral'
@@ -37,7 +37,7 @@ export function ApprovedRequestDetailModal({
   if (!request) return null
 
   return (
-    <Modal open={open} onClose={onClose} title="Approved Request Details" size="lg">
+    <Modal open={open} onClose={onClose} title="Generated List Details" size="lg">
       <div className="space-y-4">
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
@@ -61,11 +61,11 @@ export function ApprovedRequestDetailModal({
             <dd className="mt-0.5 text-gray-900">{request.program}</dd>
           </div>
           <div>
-            <dt className="text-[10px] font-semibold uppercase text-gray-400">Approved Date</dt>
+             <dt className="text-[10px] font-semibold uppercase text-gray-400">Generated Date</dt>
             <dd className="mt-0.5 text-gray-900">{request.approvedDate}</dd>
           </div>
           <div>
-            <dt className="text-[10px] font-semibold uppercase text-gray-400">Approved By</dt>
+             <dt className="text-[10px] font-semibold uppercase text-gray-400">Finalized By</dt>
             <dd className="mt-0.5 text-gray-900">{request.approvedBy}</dd>
           </div>
           <div>
@@ -79,8 +79,8 @@ export function ApprovedRequestDetailModal({
         </dl>
 
         <div className="rounded-lg border border-green-100 bg-green-50 p-4 text-sm text-green-900">
-          This request has been approved. Use the disbursement status above to coordinate release or
-          collection with the association contact.
+           This final prioritized list was generated after Staff validation. Aid release and distribution
+           remain separate administrative activities.
         </div>
 
         <div className="flex justify-end gap-3">

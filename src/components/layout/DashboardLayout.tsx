@@ -1,6 +1,8 @@
+import { useEffect } from 'react'
 import { Outlet } from 'react-router-dom'
 import { DashboardLayoutProvider } from './DashboardLayoutContext'
 import { DashboardSidebar, type NavItem } from './DashboardSidebar'
+import { pullFromDatabase } from '../../services/databaseSync'
 
 interface DashboardLayoutProps {
   navItems: NavItem[]
@@ -10,6 +12,34 @@ interface DashboardLayoutProps {
 }
 
 export default function DashboardLayout({ navItems, user, logoutPath, settingsPath }: DashboardLayoutProps) {
+  useEffect(() => {
+    let active = true
+    let refreshing = false
+    const refresh = async () => {
+      if (!active || refreshing) return
+      refreshing = true
+      try {
+        await pullFromDatabase()
+      } finally {
+        refreshing = false
+      }
+    }
+    const onFocus = () => void refresh()
+    const onVisibility = () => {
+      if (document.visibilityState === 'visible') void refresh()
+    }
+    void refresh()
+    const interval = window.setInterval(() => void refresh(), 15000)
+    window.addEventListener('focus', onFocus)
+    document.addEventListener('visibilitychange', onVisibility)
+    return () => {
+      active = false
+      window.clearInterval(interval)
+      window.removeEventListener('focus', onFocus)
+      document.removeEventListener('visibilitychange', onVisibility)
+    }
+  }, [])
+
   return (
     <DashboardLayoutProvider settingsPath={settingsPath}>
       <div className="h-screen overflow-hidden bg-gray-50">

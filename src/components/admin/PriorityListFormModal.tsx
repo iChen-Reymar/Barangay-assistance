@@ -13,7 +13,7 @@ interface PriorityListFormModalProps {
   onSave: (id: string, input: PriorityListUpdateInput) => void
 }
 
-const statusOptions: RequestStatus[] = ['PENDING', 'UNDER REVIEW', 'APPROVED', 'REJECTED']
+const statusOptions: RequestStatus[] = ['PENDING', 'UNDER REVIEW', 'LIST GENERATED', 'APPROVED', 'REJECTED']
 
 /**
  * Active programs, plus the entry's current choice if it is no longer offered so

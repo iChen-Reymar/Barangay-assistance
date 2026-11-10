@@ -12,6 +12,7 @@ from __future__ import annotations
 INPUT_FIELDS = {
     "familySize",
     "monthlyIncome",
+    "workingHouseholdMembers",
     "age",
     "employmentStatus",
     "housingCondition",
@@ -34,34 +35,22 @@ INDICATORS = [
     INDICATOR_NO_PRIOR_AID,
 ]
 
-# Housing materials ordered from most to least resilient. Ordinal encoding, so a
-# higher number genuinely means worse shelter.
-HOUSING_SCORE = {
-    "concrete": 0.0,
-    "light materials": 1.0,
-    "temporary": 2.0,
-    "makeshift / salvaged": 3.0,
-}
-
-# Employment categories ordered by income stability.
-EMPLOYMENT_SCORE = {
-    "employed": 0.0,
-    "self-employed": 1.0,
-    "seasonal worker": 2.0,
-    "unemployed": 3.0,
-}
-
-DEFAULT_HOUSING_SCORE = 1.0  # unknown housing treated as "light materials"
-DEFAULT_EMPLOYMENT_SCORE = 1.0  # unknown employment treated as "self-employed"
-
 # Final ordered feature vector handed to scikit-learn.
 FEATURE_NAMES = [
     "family_size",
     "monthly_income",
     "income_per_capita",
+    "working_household_members",
+    "income_per_worker",
     "head_age",
-    "employment_score",
-    "housing_score",
+    "employment_employed",
+    "employment_self_employed",
+    "employment_seasonal_worker",
+    "employment_unemployed",
+    "housing_concrete",
+    "housing_light_materials",
+    "housing_temporary",
+    "housing_makeshift_salvaged",
     "has_elderly",
     "has_pwd",
     "has_young_children",
@@ -103,6 +92,7 @@ def encode(record: dict) -> dict[str, float]:
     """Turn one raw beneficiary record into the named model feature dict."""
     family_size = max(1.0, _num(record.get("familySize"), 1.0))
     monthly_income = max(0.0, _num(record.get("monthlyIncome"), 0.0))
+    working_members = max(0.0, min(family_size, _num(record.get("workingHouseholdMembers"), 0.0)))
 
     housing_raw = str(record.get("housingCondition") or "").strip().lower()
     employment_raw = str(record.get("employmentStatus") or "").strip().lower()
@@ -110,13 +100,28 @@ def encode(record: dict) -> dict[str, float]:
     flags = _indicator_flags(record.get("vulnerabilityIndicators"))
     dependent_load = flags["has_elderly"] + flags["has_pwd"] + flags["has_young_children"]
 
+    employment_flags = {
+        "employment_employed": 1.0 if employment_raw == "employed" else 0.0,
+        "employment_self_employed": 1.0 if employment_raw == "self-employed" else 0.0,
+        "employment_seasonal_worker": 1.0 if employment_raw == "seasonal worker" else 0.0,
+        "employment_unemployed": 1.0 if employment_raw == "unemployed" else 0.0,
+    }
+    housing_flags = {
+        "housing_concrete": 1.0 if housing_raw == "concrete" else 0.0,
+        "housing_light_materials": 1.0 if housing_raw == "light materials" else 0.0,
+        "housing_temporary": 1.0 if housing_raw == "temporary" else 0.0,
+        "housing_makeshift_salvaged": 1.0 if housing_raw == "makeshift / salvaged" else 0.0,
+    }
+
     return {
         "family_size": family_size,
         "monthly_income": monthly_income,
         "income_per_capita": monthly_income / family_size,
+        "working_household_members": working_members,
+        "income_per_worker": monthly_income / max(1.0, working_members),
         "head_age": _num(record.get("age"), 40.0),
-        "employment_score": EMPLOYMENT_SCORE.get(employment_raw, DEFAULT_EMPLOYMENT_SCORE),
-        "housing_score": HOUSING_SCORE.get(housing_raw, DEFAULT_HOUSING_SCORE),
+        **employment_flags,
+        **housing_flags,
         **flags,
         "dependent_load": dependent_load,
     }
@@ -135,6 +140,7 @@ def human_readable(record: dict) -> list[str]:
         f"family of {encoded['family_size']:.0f}",
         f"₱{encoded['monthly_income']:,.0f}/month",
         f"₱{encoded['income_per_capita']:,.0f} per member",
+        f"{encoded['working_household_members']:.0f} working household members",
     ]
     if encoded["has_elderly"]:
         parts.append("elderly member")
@@ -146,6 +152,6 @@ def human_readable(record: dict) -> list[str]:
         parts.append("unemployed adults")
     if encoded["no_prior_aid"]:
         parts.append("no prior assistance")
-    if encoded["housing_score"] >= 2.0:
+    if encoded["housing_temporary"] or encoded["housing_makeshift_salvaged"]:
         parts.append("substandard housing")
     return parts

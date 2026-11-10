@@ -55,7 +55,7 @@ export default function DashboardPage() {
           <StatCard label="Total Associations" value={associations.length} icon={Building2} />
           <StatCard label="Total Beneficiaries" value={beneficiaries.length} icon={Users} />
           <StatCard label="Pending Requests" value={requests.filter((row) => row.status === 'PENDING' || row.status === 'UNDER REVIEW').length} icon={Clock} />
-          <StatCard label="Approved Assistance" value={generated.length} icon={CheckCircle} />
+          <StatCard label="Generated Lists" value={generated.length} icon={CheckCircle} />
           <StatCard label="High Vulnerability" value={high} icon={AlertTriangle} />
         </div>
 

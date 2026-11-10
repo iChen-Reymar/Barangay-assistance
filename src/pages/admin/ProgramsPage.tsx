@@ -31,7 +31,7 @@ function formatDate(date: Date) {
 
 function formatCurrency(amount?: number) {
   if (amount === undefined) return 'â€”'
-  return `â‚± ${amount.toLocaleString('en-PH', { minimumFractionDigits: 2 })}`
+  return `₱ ${amount.toLocaleString('en-PH', { minimumFractionDigits: 2 })}`
 }
 
 function isClosingSoon(program: AssistanceProgram) {
@@ -271,7 +271,7 @@ export default function ProgramsPage() {
                 render: (row) => (
                   <span className="text-gray-600">
                     {row.startDate}
-                    {row.endDate ? ` â€“ ${row.endDate}` : ''}
+                    {row.endDate ? ` - ${row.endDate}` : ''}
                   </span>
                 ),
               },

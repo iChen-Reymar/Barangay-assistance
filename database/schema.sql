@@ -40,7 +40,7 @@ create table if not exists public.associations (
     check (type in ('Agricultural', 'Livelihood', 'Special Sector', 'Youth')),
   status text not null default 'ACTIVE'
     check (status in ('ACTIVE', 'INACTIVE')),
-  head_user_id text references public.users (id) on delete set null,
+  head_user_id text references public.users (id) on update cascade on delete set null,
   contact_person text not null default '',
   contact_number text not null default '',
   members integer not null default 0 check (members >= 0),
@@ -124,6 +124,7 @@ create table if not exists public.aid_records (
 -- Barangay Staff: beneficiaries they classify and verify.
 create table if not exists public.beneficiaries (
   id text primary key,
+  member_id text references public.association_members (id) on update cascade on delete set null,
   name text not null,
   association_name text not null,
   family_size integer not null default 0 check (family_size >= 0),
@@ -166,7 +167,7 @@ create table if not exists public.assistance_requests (
     check (vulnerability in ('HIGH', 'MEDIUM', 'LOW')),
   request_date text not null,
   status text not null default 'PENDING'
-    check (status in ('PENDING', 'APPROVED', 'UNDER REVIEW', 'REJECTED')),
+    check (status in ('PENDING', 'UNDER REVIEW', 'LIST GENERATED', 'APPROVED', 'REJECTED')),
   score integer,
   program_name text,
   description text,
@@ -227,9 +228,13 @@ create table if not exists public.request_decisions (
   payload jsonb not null default '{}'::jsonb
 );
 
--- Staff generates this ranked list. The API replaces the whole list on each run.
+-- Generated results have a stable beneficiary ID. Rank is display order only;
+-- it cannot be the primary key because each association can have a rank 1.
 create table if not exists public.generated_assistance_list (
-  rank_no integer primary key check (rank_no > 0),
+  id text primary key,
+  beneficiary_id text,
+  request_id text references public.assistance_requests (id) on update cascade on delete set null,
+  rank_no integer not null check (rank_no > 0),
   beneficiary_name text not null,
   association_name text not null,
   score integer not null,
@@ -242,6 +247,20 @@ create table if not exists public.generated_assistance_list (
   payload jsonb not null default '{}'::jsonb
 );
 
+-- Upgrade earlier installations to the Staff-triggered automatic final-list workflow.
+alter table public.assistance_requests drop constraint if exists assistance_requests_status_check;
+alter table public.assistance_requests add constraint assistance_requests_status_check
+  check (status in ('PENDING', 'UNDER REVIEW', 'LIST GENERATED', 'APPROVED', 'REJECTED'));
+
+-- Upgrade installations created before generated rows had stable IDs.
+alter table public.generated_assistance_list add column if not exists id text;
+update public.generated_assistance_list
+set id = md5(lower(coalesce(association_name, '')) || '|' || lower(beneficiary_name))
+where id is null or id = '';
+alter table public.generated_assistance_list alter column id set not null;
+alter table public.generated_assistance_list drop constraint if exists generated_assistance_list_pkey;
+alter table public.generated_assistance_list add constraint generated_assistance_list_pkey primary key (id);
+
 create table if not exists public.priority_list (
   id text primary key,
   rank_no integer not null check (rank_no > 0),
@@ -252,10 +271,14 @@ create table if not exists public.priority_list (
   recommended text not null,
   previous_aid text not null check (previous_aid in ('None', 'Yes')),
   status text not null
-    check (status in ('PENDING', 'APPROVED', 'UNDER REVIEW', 'REJECTED')),
+    check (status in ('PENDING', 'UNDER REVIEW', 'LIST GENERATED', 'APPROVED', 'REJECTED')),
   notes text,
   payload jsonb not null default '{}'::jsonb
 );
+
+alter table public.priority_list drop constraint if exists priority_list_status_check;
+alter table public.priority_list add constraint priority_list_status_check
+  check (status in ('PENDING', 'UNDER REVIEW', 'LIST GENERATED', 'APPROVED', 'REJECTED'));
 
 create table if not exists public.audit_logs (
   id text primary key,
@@ -294,7 +317,7 @@ create table if not exists public.report_history (
 
 create table if not exists public.notifications (
   id text primary key,
-  user_id text references public.users (id) on delete set null,
+  user_id text references public.users (id) on update cascade on delete set null,
   association_name text,
   message text not null,
   notice_time text not null,
@@ -355,6 +378,18 @@ alter table public.aid_records add column if not exists submitted_by text;
 alter table public.aid_records add column if not exists submitted_at text;
 alter table public.aid_records add column if not exists payload jsonb not null default '{}'::jsonb;
 alter table public.beneficiaries add column if not exists payload jsonb not null default '{}'::jsonb;
+alter table public.beneficiaries add column if not exists member_id text;
+do $$
+begin
+  if not exists (
+    select 1 from pg_constraint where conname = 'beneficiaries_member_id_fkey'
+  ) then
+    alter table public.beneficiaries
+      add constraint beneficiaries_member_id_fkey
+      foreign key (member_id) references public.association_members (id)
+      on update cascade on delete set null;
+  end if;
+end $$;
 alter table public.assistance_programs add column if not exists sponsoring_agency text not null default '';
 alter table public.assistance_programs add column if not exists description text not null default '';
 alter table public.assistance_programs add column if not exists eligibility_criteria text not null default '';
@@ -386,6 +421,20 @@ alter table public.request_documents add column if not exists payload jsonb not 
 alter table public.qualification_checks add column if not exists payload jsonb not null default '{}'::jsonb;
 alter table public.request_decisions add column if not exists payload jsonb not null default '{}'::jsonb;
 alter table public.generated_assistance_list add column if not exists payload jsonb not null default '{}'::jsonb;
+alter table public.generated_assistance_list add column if not exists beneficiary_id text;
+alter table public.generated_assistance_list add column if not exists request_id text;
+do $$
+begin
+  if not exists (
+    select 1 from pg_constraint
+    where conname = 'generated_assistance_list_request_id_fkey'
+  ) then
+    alter table public.generated_assistance_list
+      add constraint generated_assistance_list_request_id_fkey
+      foreign key (request_id) references public.assistance_requests (id)
+      on update cascade on delete set null;
+  end if;
+end $$;
 alter table public.priority_list add column if not exists payload jsonb not null default '{}'::jsonb;
 alter table public.audit_logs add column if not exists display_date text not null default '';
 alter table public.audit_logs add column if not exists user_email text;
@@ -411,9 +460,11 @@ create index if not exists associations_head_idx on public.associations (head_us
 create index if not exists associations_name_idx on public.associations (lower(name));
 create index if not exists association_members_owner_idx on public.association_members (lower(association_name));
 create index if not exists beneficiaries_association_idx on public.beneficiaries (association_name);
+create unique index if not exists beneficiaries_member_key on public.beneficiaries (member_id) where member_id is not null;
 create index if not exists aid_records_association_idx on public.aid_records (lower(association_name));
 create index if not exists assistance_requests_status_idx on public.assistance_requests (status);
 create index if not exists assistance_requests_association_idx on public.assistance_requests (association_name);
+create index if not exists generated_assistance_request_idx on public.generated_assistance_list (request_id);
 create index if not exists notifications_user_idx on public.notifications (user_id, is_read);
 create index if not exists notifications_association_idx on public.notifications (association_name, is_read);
 create index if not exists member_documents_member_idx on public.member_documents (member_id);
@@ -592,8 +643,89 @@ begin
   end loop;
 end $$;
 
--- The API writes with the secret key and bypasses these policies.
--- Signed-in users can read. A public visitor can only submit a pending account.
+-- Auth users are the identity source of truth. Older imports sometimes kept a
+-- generated profile ID even though the email belonged to an existing Auth
+-- account. Rebuild every user-ID foreign key with ON UPDATE CASCADE, then align
+-- those profiles by email without losing their related records.
+do $$
+declare
+  spec record;
+  old_constraint record;
+begin
+  for spec in
+    select * from (values
+      ('associations', 'head_user_id', 'associations_head_user_id_fkey', 'set null'),
+      ('notifications', 'user_id', 'notifications_user_id_fkey', 'set null'),
+      ('report_history', 'user_id', 'report_history_user_id_fkey', 'set null'),
+      ('privacy_settings', 'updated_by', 'privacy_settings_updated_by_fkey', 'set null')
+    ) as link(child_table, child_column, constraint_name, on_delete)
+  loop
+    for old_constraint in
+      select constraint_row.conname
+      from pg_constraint as constraint_row
+      join pg_class as relation on relation.oid = constraint_row.conrelid
+      join pg_namespace as namespace on namespace.oid = relation.relnamespace
+      join pg_attribute as attribute
+        on attribute.attrelid = relation.oid
+       and attribute.attnum = any (constraint_row.conkey)
+      where namespace.nspname = 'public'
+        and relation.relname = spec.child_table
+        and attribute.attname = spec.child_column
+        and constraint_row.contype = 'f'
+        and constraint_row.confrelid = 'public.users'::regclass
+    loop
+      execute format(
+        'alter table public.%I drop constraint %I',
+        spec.child_table,
+        old_constraint.conname
+      );
+    end loop;
+
+    execute format(
+      'alter table public.%I add constraint %I foreign key (%I) references public.users (id) on update cascade on delete %s',
+      spec.child_table,
+      spec.constraint_name,
+      spec.child_column,
+      spec.on_delete
+    );
+  end loop;
+end $$;
+
+update public.users as profile
+set id = account.id::text
+from auth.users as account
+where lower(btrim(profile.email)) = lower(btrim(account.email))
+  and profile.id <> account.id::text
+  and not exists (
+    select 1
+    from public.users as conflicting_profile
+    where conflicting_profile.id = account.id::text
+      and conflicting_profile.email <> profile.email
+  );
+
+-- The API writes with the secret key and bypasses these policies. Browser reads
+-- are restricted by role and association so a signed-in account cannot inspect
+-- every resident in the barangay.
+create or replace function public.current_app_role()
+returns text
+language sql
+stable
+security definer
+set search_path = public
+as $$
+  select role from public.users where id = auth.uid()::text and status = 'approved'
+$$;
+
+create or replace function public.current_app_association()
+returns text
+language sql
+stable
+security definer
+set search_path = public
+as $$
+  select association_name from public.users where id = auth.uid()::text and status = 'approved'
+$$;
+
 do $$
 declare
   table_name text;
@@ -609,19 +741,102 @@ begin
     execute format('alter table public.%I enable row level security', table_name);
     execute format('drop policy if exists app_access on public.%I', table_name);
     execute format('drop policy if exists authenticated_read on public.%I', table_name);
-    execute format(
-      'create policy authenticated_read on public.%I for select to authenticated using (true)',
-      table_name
-    );
   end loop;
 end $$;
 
-drop policy if exists public_account_request on public.users;
-create policy public_account_request
-  on public.users
-  for insert
-  to anon
-  with check (
-    status = 'pending'
-    and role in ('staff', 'association')
+drop policy if exists users_read on public.users;
+create policy users_read on public.users for select to authenticated
+  using (id = auth.uid()::text or public.current_app_role() = 'admin');
+
+drop policy if exists associations_read on public.associations;
+create policy associations_read on public.associations for select to authenticated
+  using (
+    public.current_app_role() in ('admin', 'staff')
+    or head_user_id = auth.uid()::text
+    or lower(name) = lower(coalesce(public.current_app_association(), ''))
   );
+
+drop policy if exists association_profiles_read on public.association_profiles;
+create policy association_profiles_read on public.association_profiles for select to authenticated
+  using (public.current_app_role() in ('admin', 'staff') or lower(name) = lower(coalesce(public.current_app_association(), '')));
+
+drop policy if exists association_members_read on public.association_members;
+create policy association_members_read on public.association_members for select to authenticated
+  using (public.current_app_role() in ('admin', 'staff') or lower(association_name) = lower(coalesce(public.current_app_association(), '')));
+
+drop policy if exists member_documents_read on public.member_documents;
+create policy member_documents_read on public.member_documents for select to authenticated
+  using (
+    public.current_app_role() in ('admin', 'staff')
+    or exists (
+      select 1 from public.association_members member
+      where member.id = member_id
+        and lower(member.association_name) = lower(coalesce(public.current_app_association(), ''))
+    )
+  );
+
+drop policy if exists aid_records_read on public.aid_records;
+create policy aid_records_read on public.aid_records for select to authenticated
+  using (public.current_app_role() in ('admin', 'staff') or lower(association_name) = lower(coalesce(public.current_app_association(), '')));
+
+drop policy if exists beneficiaries_read on public.beneficiaries;
+create policy beneficiaries_read on public.beneficiaries for select to authenticated
+  using (public.current_app_role() in ('admin', 'staff') or lower(association_name) = lower(coalesce(public.current_app_association(), '')));
+
+drop policy if exists assistance_programs_read on public.assistance_programs;
+create policy assistance_programs_read on public.assistance_programs for select to authenticated using (true);
+
+drop policy if exists assistance_requests_read on public.assistance_requests;
+create policy assistance_requests_read on public.assistance_requests for select to authenticated
+  using (public.current_app_role() in ('admin', 'staff') or lower(association_name) = lower(coalesce(public.current_app_association(), '')));
+
+drop policy if exists request_documents_read on public.request_documents;
+create policy request_documents_read on public.request_documents for select to authenticated
+  using (
+    public.current_app_role() in ('admin', 'staff')
+    or exists (select 1 from public.assistance_requests item where item.id = request_id and lower(item.association_name) = lower(coalesce(public.current_app_association(), '')))
+  );
+
+drop policy if exists qualification_checks_read on public.qualification_checks;
+create policy qualification_checks_read on public.qualification_checks for select to authenticated
+  using (
+    public.current_app_role() in ('admin', 'staff')
+    or exists (select 1 from public.assistance_requests item where item.id = request_id and lower(item.association_name) = lower(coalesce(public.current_app_association(), '')))
+  );
+
+drop policy if exists request_decisions_read on public.request_decisions;
+create policy request_decisions_read on public.request_decisions for select to authenticated
+  using (
+    public.current_app_role() in ('admin', 'staff')
+    or exists (select 1 from public.assistance_requests item where item.id = request_id and lower(item.association_name) = lower(coalesce(public.current_app_association(), '')))
+  );
+
+drop policy if exists generated_assistance_list_read on public.generated_assistance_list;
+create policy generated_assistance_list_read on public.generated_assistance_list for select to authenticated
+  using (public.current_app_role() in ('admin', 'staff') or lower(association_name) = lower(coalesce(public.current_app_association(), '')));
+
+drop policy if exists priority_list_read on public.priority_list;
+create policy priority_list_read on public.priority_list for select to authenticated
+  using (public.current_app_role() in ('admin', 'staff') or lower(association_name) = lower(coalesce(public.current_app_association(), '')));
+
+drop policy if exists notifications_read on public.notifications;
+create policy notifications_read on public.notifications for select to authenticated
+  using (
+    public.current_app_role() in ('admin', 'staff')
+    or user_id = auth.uid()::text
+    or lower(association_name) = lower(coalesce(public.current_app_association(), ''))
+  );
+
+drop policy if exists audit_logs_read on public.audit_logs;
+create policy audit_logs_read on public.audit_logs for select to authenticated using (public.current_app_role() = 'admin');
+drop policy if exists audit_changes_read on public.audit_changes;
+create policy audit_changes_read on public.audit_changes for select to authenticated using (public.current_app_role() = 'admin');
+drop policy if exists report_history_read on public.report_history;
+create policy report_history_read on public.report_history for select to authenticated
+  using (public.current_app_role() = 'admin' or user_id = auth.uid()::text);
+drop policy if exists privacy_settings_read on public.privacy_settings;
+create policy privacy_settings_read on public.privacy_settings for select to authenticated using (public.current_app_role() = 'admin');
+
+drop policy if exists public_account_request on public.users;
+-- Public account requests go through the rate-limited Express endpoint. There
+-- is intentionally no anonymous direct-write policy on the users table.

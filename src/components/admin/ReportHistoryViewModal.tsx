@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 import { Modal } from '../ui/Modal'
 import { Button } from '../ui/Button'
 import type { ReportFormat } from '../../data/mockData'
@@ -25,10 +25,6 @@ export function ReportHistoryViewModal({
   onDownload,
 }: ReportHistoryViewModalProps) {
   const [sheetIndex, setSheetIndex] = useState(0)
-
-  useEffect(() => {
-    setSheetIndex(0)
-  }, [preview?.entry.id, preview?.entry.name, preview?.title])
 
   if (!preview) return null
 

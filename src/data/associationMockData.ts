@@ -7,6 +7,7 @@ export type RequestTimelineStep =
   | 'Submitted'
   | 'Under Review'
   | 'AI Assessment'
+  | 'List Generated'
   | 'Admin Review'
   | 'Approved'
   | 'Rejected'
@@ -104,7 +105,7 @@ export const recentRequests: {
   id: string
   program: string
   date: string
-  status: 'PENDING' | 'UNDER REVIEW' | 'APPROVED'
+  status: 'PENDING' | 'UNDER REVIEW' | 'LIST GENERATED' | 'APPROVED'
   members: number
 }[] = []
 

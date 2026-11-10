@@ -1,7 +1,6 @@
 ﻿import { useEffect, useMemo, useState } from 'react'
 import { Download } from 'lucide-react'
 import { DashboardNavbar } from '../../components/layout/DashboardNavbar'
-import { ApprovalDecisionModal } from '../../components/approval/ApprovalDecisionModal'
 import { AssistanceRequestRowActions } from '../../components/approval/AssistanceRequestRowActions'
 import { RequestDetailsModal } from '../../components/approval/RequestDetailsModal'
 import { DataTable, type Column } from '../../components/ui/DataTable'
@@ -11,28 +10,27 @@ import { SearchBar } from '../../components/ui/SearchBar'
 import { Pagination } from '../../components/ui/Pagination'
 import { PAGE_SIZE_DEFAULT, usePagination } from '../../hooks/usePagination'
 import { useReviewActor } from '../../hooks/useReviewActor'
-import { buildChanges, logAuditEvent } from '../../services/auditStorage'
 import {
   getAssistanceItems,
   getItemById,
-  submitAssistanceDecision,
   subscribeDecisionStorage,
   verifyDocument,
   verifyQualification,
 } from '../../services/decisionStorage'
-import type { DecisionType, DocumentStatus, QualificationStatus, ReviewableAssistanceItem } from '../../types/approval'
+import type { DocumentStatus, QualificationStatus, ReviewableAssistanceItem } from '../../types/approval'
 import type { RequestStatus } from '../../data/mockData'
 import { useAuth } from '../../context/useAuth'
 import { getInitials } from '../../utils/userDisplay'
+import { downloadCsv } from '../../utils/csvExport'
 
 function statusVariant(status: RequestStatus) {
-  if (status === 'APPROVED') return 'success'
+  if (status === 'APPROVED' || status === 'LIST GENERATED') return 'success'
   if (status === 'REJECTED') return 'danger'
   if (status === 'UNDER REVIEW') return 'info'
   return 'warning'
 }
 
-const statusTabs: Array<'All' | RequestStatus> = ['All', 'PENDING', 'APPROVED', 'REJECTED', 'UNDER REVIEW']
+const statusTabs: Array<'All' | RequestStatus> = ['All', 'PENDING', 'UNDER REVIEW', 'LIST GENERATED', 'APPROVED', 'REJECTED']
 
 export default function StaffAssistanceRequestsPage() {
   const { user, profile } = useAuth()
@@ -42,18 +40,18 @@ export default function StaffAssistanceRequestsPage() {
 
   const [items, setItems] = useState<ReviewableAssistanceItem[]>(() => getAssistanceItems())
   const [activeTab, setActiveTab] = useState<'All' | RequestStatus>('All')
-  const [decisionModal, setDecisionModal] = useState<{
-    type: DecisionType
-    item: ReviewableAssistanceItem
-  } | null>(null)
   const [viewItem, setViewItem] = useState<ReviewableAssistanceItem | null>(null)
+  const [search, setSearch] = useState('')
 
   useEffect(() => subscribeDecisionStorage(() => setItems(getAssistanceItems())), [])
 
   const filtered = useMemo(() => {
-    if (activeTab === 'All') return items
-    return items.filter((item) => item.status === activeTab)
-  }, [items, activeTab])
+    const query = search.trim().toLowerCase()
+    return items.filter((item) =>
+      (activeTab === 'All' || item.status === activeTab) &&
+      (!query || [item.id, item.association, item.requestType].some((value) => value.toLowerCase().includes(query))),
+    )
+  }, [items, activeTab, search])
 
   const pagination = usePagination(filtered, PAGE_SIZE_DEFAULT, activeTab)
 
@@ -75,31 +73,6 @@ export default function StaffAssistanceRequestsPage() {
     setViewItem(getItemById(viewItem.id))
   }
 
-  function handleDecision(notes: string) {
-    if (!decisionModal || decisionModal.type === 'override') return
-    const result = submitAssistanceDecision(decisionModal.item.id, {
-      decision: decisionModal.type,
-      notes,
-      reviewedBy: actor.name,
-      reviewedByEmail: actor.email,
-    })
-    if (result) {
-      logAuditEvent({
-        user: actor.name,
-        userEmail: actor.email,
-        action: 'Approval',
-        actionColor: decisionModal.type === 'reject' ? 'red' : 'green',
-        description: `${decisionModal.type} assistance request for ${result.association}.`,
-        entityType: 'assistance_request',
-        entityId: result.id,
-        changes: buildChanges([
-          { key: 'status', label: 'Status', oldValue: decisionModal.item.status, newValue: result.status },
-          { key: 'notes', label: 'Notes', oldValue: 'â€”', newValue: notes || 'â€”' },
-        ]),
-      })
-    }
-  }
-
   const columns: Column<ReviewableAssistanceItem>[] = [
     {
       key: 'id',
@@ -113,8 +86,8 @@ export default function StaffAssistanceRequestsPage() {
       key: 'score',
       header: 'V-Score',
       render: (r) => (
-        <span className={r.score && r.score >= 80 ? 'font-semibold text-red-500' : 'text-gray-700'}>
-          {r.score ?? 'â€”'}
+    <span className={r.score && r.score >= 80 ? 'font-semibold text-red-500' : 'text-gray-700'}>
+          {r.score ?? '—'}
         </span>
       ),
     },
@@ -132,8 +105,6 @@ export default function StaffAssistanceRequestsPage() {
         <AssistanceRequestRowActions
           item={r}
           onView={setViewItem}
-          onApprove={(item) => setDecisionModal({ type: 'approve', item })}
-          onReject={(item) => setDecisionModal({ type: 'reject', item })}
         />
       ),
     },
@@ -167,8 +138,13 @@ export default function StaffAssistanceRequestsPage() {
           </div>
 
           <div className="flex flex-col gap-3 border-b border-gray-200 px-4 py-4 sm:flex-row sm:items-center sm:justify-between md:px-5">
-            <SearchBar placeholder="Search request IDs or beneficiary names..." className="max-w-sm flex-1" />
-            <Button variant="outline" className="w-full sm:w-auto">
+            <SearchBar placeholder="Search request IDs or association names..." value={search} onChange={setSearch} className="max-w-sm flex-1" />
+            <Button
+              variant="outline"
+              className="w-full sm:w-auto"
+              disabled={!filtered.length}
+              onClick={() => downloadCsv('assistance_requests.csv', ['Request ID', 'Association', 'Program', 'Date', 'Status'], filtered.map((item) => [item.id, item.association, item.requestType, item.date, item.status]))}
+            >
               <Download className="h-4 w-4" />
               Export CSV
             </Button>
@@ -188,16 +164,6 @@ export default function StaffAssistanceRequestsPage() {
           />
         </div>
       </main>
-
-      <ApprovalDecisionModal
-        open={!!decisionModal}
-        onClose={() => setDecisionModal(null)}
-        decisionType={decisionModal?.type ?? 'approve'}
-        itemTitle={decisionModal?.item.association ?? ''}
-        itemSubtitle={decisionModal?.item.requestType}
-        currentStatus={decisionModal?.item.status}
-        onSubmit={handleDecision}
-      />
 
       <RequestDetailsModal
         open={!!viewItem}

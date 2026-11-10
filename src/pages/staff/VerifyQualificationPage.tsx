@@ -26,7 +26,7 @@ function sameAssociation(left: string, right: string) {
 }
 
 function isOpenRequest(request: ReviewableAssistanceItem) {
-  return request.status !== 'APPROVED' && request.status !== 'REJECTED'
+  return request.status !== 'LIST GENERATED' && request.status !== 'APPROVED' && request.status !== 'REJECTED'
 }
 
 function qualificationSummary(requests: ReviewableAssistanceItem[]) {
