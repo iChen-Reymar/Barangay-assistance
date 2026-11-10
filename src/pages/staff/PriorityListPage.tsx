@@ -30,6 +30,12 @@ import {
 import { getStaffBeneficiaries, subscribeStaffBeneficiaryStorage } from '../../services/staffBeneficiaryStorage'
 import { synchronizeRecordNow, waitForDatabaseSynchronization } from '../../services/databaseSync'
 import { listGenerationTransitionError } from '../../services/assistanceWorkflow'
+import {
+  completeStaffAssessment,
+  findCompleteStaffAssessment,
+  generatedRowsForVerifiedMembers,
+  verifiedMembersForAssistance,
+} from '../../services/assistanceListEligibility'
 
 const REVIEWABLE_ITEMS_KEY = 'barangay_reviewable_items'
 
@@ -43,19 +49,8 @@ function sameAssociation(left: string, right: string) {
   return left.trim().toLowerCase() === right.trim().toLowerCase()
 }
 
-function completeAssessment(beneficiary: StaffBeneficiary) {
-  return beneficiary.verification === 'VERIFIED'
-    && beneficiary.familySize > 0
-    && beneficiary.monthlyIncome > 0
-    && beneficiary.workingHouseholdMembers !== undefined
-    && (beneficiary.age ?? 0) > 0
-    && Boolean(beneficiary.employmentStatus?.trim())
-    && Boolean(beneficiary.housingCondition?.trim())
-}
-
 function findAssessment(assessments: StaffBeneficiary[], member: AssociationMember) {
-  return assessments.find((beneficiary) => beneficiary.memberId === member.id)
-    ?? assessments.find((beneficiary) => beneficiary.id === member.id)
+  return findCompleteStaffAssessment(assessments, member)
 }
 
 function unscoredMember(member: AssociationMember, associationName: string, assessment?: StaffBeneficiary): PriorityItem {
@@ -173,8 +168,9 @@ export default function StaffPriorityListPage() {
       const eligibleMembers = new Set(roster.map((member) => member.id))
       const measured = assessed.filter(
         (beneficiary) => sameAssociation(beneficiary.association, request.association)
-          && completeAssessment(beneficiary)
-          && eligibleMembers.has(beneficiary.memberId || beneficiary.id),
+          && completeStaffAssessment(beneficiary)
+          && Boolean(beneficiary.memberId)
+          && eligibleMembers.has(beneficiary.memberId as string),
       )
       if (measured.length === 0) {
         setGenerationMessage('No members are ready. Open Verify Qualification and prepare at least one member for generation.')
@@ -209,16 +205,12 @@ export default function StaffPriorityListPage() {
   }
 
   const rosterForSelection = useMemo(() => {
-    return members.filter((member) => {
-      const belongsTo = member.associationName?.trim() ?? ''
-      if (!member.name.trim() || !belongsTo) return false
-      if (association === 'All Associations') return true
-      return sameAssociation(belongsTo, association)
-    })
-  }, [association, members])
+    return verifiedMembersForAssistance(members, assessed, association)
+  }, [association, assessed, members])
 
   const generated = useMemo(() => {
-    const relevantSource = selectedRequestId ? source.filter((row) => row.requestId === selectedRequestId) : []
+    const verifiedMemberIds = new Set(rosterForSelection.map((member) => member.id))
+    const relevantSource = generatedRowsForVerifiedMembers(source, selectedRequestId, verifiedMemberIds)
     const scoreById = new Map(relevantSource.map((row) => [row.beneficiaryId, row]))
     const rows: PriorityItem[] = rosterForSelection.map((member) => {
       const scored = scoreById.get(member.id)
@@ -254,7 +246,7 @@ export default function StaffPriorityListPage() {
   const readyMemberCount = selectedRequest
     ? membersOnAssociations(selectedRequest.association).filter((member) => {
         const assessment = findAssessment(assessed, member)
-        return Boolean(assessment && completeAssessment(assessment))
+        return Boolean(assessment)
       }).length
     : 0
 
@@ -264,6 +256,11 @@ export default function StaffPriorityListPage() {
     { key: 'rank', header: 'Rank', render: (r) => <span className="font-bold text-gray-900">{r.rank}</span> },
     { key: 'name', header: 'Name', render: (r) => <span className="font-medium text-gray-900">{r.name}</span> },
     { key: 'association', header: 'Association' },
+    {
+      key: 'verification',
+      header: 'Verification',
+      render: () => <Badge variant="success">VERIFIED</Badge>,
+    },
     {
       key: 'score',
       header: 'Vulnerability Score',
@@ -393,8 +390,8 @@ export default function StaffPriorityListPage() {
             emptyMessage={
               rosterForSelection.length === 0
                 ? association === 'All Associations'
-                  ? 'No members have submitted both a barangay certification and a valid ID yet.'
-                  : `No members of ${association} have submitted both a barangay certification and a valid ID yet.`
+                  ? 'No members have complete Staff-verified qualification data yet.'
+                  : `No members of ${association} have complete Staff-verified qualification data yet.`
                 : `No members of ${association === 'All Associations' ? 'these associations' : association} match these filters.`
             }
           />

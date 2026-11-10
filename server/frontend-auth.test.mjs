@@ -15,6 +15,7 @@ globalThis.sessionStorage = new MemoryStorage()
 const persistence = await import('../src/services/sessionPersistence.ts')
 const recovery = await import('../src/services/passwordRecovery.ts')
 const workflow = await import('../src/services/assistanceWorkflow.ts')
+const eligibility = await import('../src/services/assistanceListEligibility.ts')
 
 test('non-remembered Supabase sessions stay in session storage', () => {
   persistence.setRememberSession(false)
@@ -51,4 +52,43 @@ test('final list generation requires the persisted Staff-review transition', () 
   assert.match(workflow.listGenerationTransitionError('PENDING'), /enter Staff review/)
   assert.equal(workflow.listGenerationTransitionError('UNDER REVIEW'), null)
   assert.match(workflow.listGenerationTransitionError('APPROVED'), /finalized/i)
+})
+
+test('assistance lists retain only linked members with complete verified assessments', () => {
+  const baseMember = {
+    name: 'RUPERTO GILLO',
+    associationName: 'ERPAT',
+  }
+  const members = [
+    { ...baseMember, id: 'ruperto' },
+    { ...baseMember, id: 'pending', name: 'PENDING MEMBER' },
+    { ...baseMember, id: 'unlinked', name: 'UNLINKED MEMBER' },
+    { ...baseMember, id: 'incomplete', name: 'INCOMPLETE MEMBER' },
+  ]
+  const completeAssessment = {
+    association: 'ERPAT',
+    familySize: 3,
+    monthlyIncome: 5000,
+    workingHouseholdMembers: 1,
+    age: 61,
+    employmentStatus: 'Self-Employed',
+    housingCondition: 'Temporary',
+    verification: 'VERIFIED',
+  }
+  const assessments = [
+    { ...completeAssessment, id: 'beneficiary-1', memberId: 'ruperto' },
+    { ...completeAssessment, id: 'beneficiary-2', memberId: 'pending', verification: 'PENDING' },
+    { ...completeAssessment, id: 'beneficiary-3', memberId: 'different-member' },
+    { ...completeAssessment, id: 'beneficiary-4', memberId: 'incomplete', housingCondition: '' },
+  ]
+
+  const eligible = eligibility.verifiedMembersForAssistance(members, assessments, 'ERPAT')
+  assert.deepEqual(eligible.map((member) => member.id), ['ruperto'])
+
+  const generated = eligibility.generatedRowsForVerifiedMembers([
+    { beneficiaryId: 'ruperto', requestId: 'request-1' },
+    { beneficiaryId: 'unlinked', requestId: 'request-1' },
+    { beneficiaryId: 'ruperto', requestId: 'old-request' },
+  ], 'request-1', new Set(eligible.map((member) => member.id)))
+  assert.deepEqual(generated, [{ beneficiaryId: 'ruperto', requestId: 'request-1' }])
 })
