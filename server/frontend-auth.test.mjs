@@ -92,3 +92,34 @@ test('assistance lists retain only linked members with complete verified assessm
   ], 'request-1', new Set(eligible.map((member) => member.id)))
   assert.deepEqual(generated, [{ beneficiaryId: 'ruperto', requestId: 'request-1' }])
 })
+
+test('a new request can retain and rescore the same member independently', () => {
+  const requestA = {
+    id: 'request-a:member-1',
+    requestId: 'request-a',
+    beneficiaryId: 'member-1',
+    score: 70,
+  }
+  const requestB = {
+    id: 'request-b:member-1',
+    requestId: 'request-b',
+    beneficiaryId: 'member-1',
+    score: 82,
+  }
+
+  const combined = eligibility.replaceGeneratedRowsForRequest([requestA], [requestB], 'request-b')
+  assert.deepEqual(combined, [requestB, requestA])
+})
+
+test('regenerating one request replaces only that request rows', () => {
+  const oldRequestA = { id: 'request-a:member-1', requestId: 'request-a', score: 70 }
+  const requestB = { id: 'request-b:member-1', requestId: 'request-b', score: 82 }
+  const newRequestA = { id: 'request-a:member-1', requestId: 'request-a', score: 91 }
+
+  const combined = eligibility.replaceGeneratedRowsForRequest(
+    [oldRequestA, requestB],
+    [newRequestA],
+    'request-a',
+  )
+  assert.deepEqual(combined, [newRequestA, requestB])
+})

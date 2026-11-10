@@ -49,3 +49,11 @@ export function generatedRowsForVerifiedMembers<T extends { beneficiaryId: strin
   if (!requestId) return []
   return rows.filter((row) => row.requestId === requestId && verifiedMemberIds.has(row.beneficiaryId))
 }
+
+export function replaceGeneratedRowsForRequest<T extends { requestId?: string }>(
+  existingRows: T[],
+  freshRows: T[],
+  requestId: string,
+) {
+  return [...freshRows, ...existingRows.filter((row) => row.requestId !== requestId)]
+}

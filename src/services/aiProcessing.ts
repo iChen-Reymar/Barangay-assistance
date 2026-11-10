@@ -11,6 +11,7 @@ import { getAidRecords } from './aidRecordStorage'
 import { getAssociationByName } from './associationStorage'
 import { getPrograms } from './programStorage'
 import { getAssociationMemberById, upsertAssociationMember } from './memberStorage'
+import { replaceGeneratedRowsForRequest } from './assistanceListEligibility'
 
 const LIST_KEY = 'barangay_generated_assistance_list'
 const MODEL_KEY = 'barangay_ml_model_state'
@@ -201,9 +202,10 @@ export async function generateAssistanceListAsync(): Promise<GeneratedAssistance
 /**
  * Score association members and store that list.
  *
- * Rows already stored are kept only when their name is in `retainNames`, so
- * staff accounts and other non-members drop out. Matching names are replaced
- * by the new scores.
+ * Every request is scored independently. Generating a new request keeps older
+ * request lists for history, while regenerating the same request replaces only
+ * that request's rows. Actual received-aid history still controls cooling and
+ * duplicate-program eligibility.
  */
 export async function generateAssistanceListFor(
   beneficiaries: StaffBeneficiary[],
@@ -212,12 +214,7 @@ export async function generateAssistanceListFor(
   const existingSelections = getGeneratedAssistanceList()
   const checked = beneficiaries.map((beneficiary) => ({
     beneficiary,
-    eligibility: existingSelections.some((row) =>
-      row.requestId !== options.requestId
-      && row.beneficiaryId === beneficiary.id
-      && row.program.trim().toLowerCase() === options.programName.trim().toLowerCase())
-      ? { eligible: false, reason: 'Duplicate prevention: this household is already in another generated list for the same program.' }
-      : programEligibility(beneficiary, options.programName),
+    eligibility: programEligibility(beneficiary, options.programName),
   }))
   const named = checked.filter((entry) => entry.eligibility.eligible).map((entry) => entry.beneficiary)
   if (!named.length) throw new Error('No verified households passed the program eligibility, duplicate-aid, and cooling-period rules.')
@@ -259,8 +256,7 @@ export async function generateAssistanceListFor(
       })
     }
   }
-  const kept = existingSelections.filter((row) => row.requestId !== options.requestId)
-  return persist([...freshRanked, ...kept])
+  return persist(replaceGeneratedRowsForRequest(existingSelections, freshRanked, options.requestId))
 }
 
 function includesAny(value: string, terms: string[]) {
