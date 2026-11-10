@@ -4,11 +4,13 @@ import { DashboardNavbar } from '../../components/layout/DashboardNavbar'
 import { StatCard } from '../../components/ui/StatCard'
 import { Badge } from '../../components/ui/Badge'
 import { NotificationPanel } from '../../components/ui/NotificationPanel'
+import { NotificationDetailsModal } from '../../components/association/NotificationDetailsModal'
 import { useAuth } from '../../context/useAuth'
 import {
   getAssociationNotifications,
   resolveAssociationViewer,
   subscribeAssociationNotifications,
+  type AssociationNotification,
 } from '../../services/associationNotificationStorage'
 import { getAssociationDetails, getAssociationMembers, subscribeMemberStorage } from '../../services/memberStorage'
 import {
@@ -48,6 +50,7 @@ export default function AssociationDashboardPage() {
   const [notifications, setNotifications] = useState(() =>
     getAssociationNotifications(associationName, viewer.userId).slice(0, 4),
   )
+  const [selectedNotification, setSelectedNotification] = useState<AssociationNotification | null>(null)
   const [requests, setRequests] = useState<ReviewableAssistanceItem[]>(() =>
     getAssociationAssistanceItems(associationName),
   )
@@ -124,7 +127,11 @@ export default function AssociationDashboardPage() {
 
           <div className="rounded-lg border border-gray-200 bg-white p-5 shadow-sm">
             <h2 className="mb-4 text-sm font-bold text-gray-900">Latest Notifications</h2>
-            <NotificationPanel notifications={notifications} compact />
+            <NotificationPanel
+              notifications={notifications}
+              compact
+              onSelect={(id) => setSelectedNotification(notifications.find((item) => item.id === id) ?? null)}
+            />
           </div>
         </div>
 
@@ -154,6 +161,7 @@ export default function AssociationDashboardPage() {
           )}
         </div>
       </main>
+      <NotificationDetailsModal notification={selectedNotification} onClose={() => setSelectedNotification(null)} />
     </>
   )
 }

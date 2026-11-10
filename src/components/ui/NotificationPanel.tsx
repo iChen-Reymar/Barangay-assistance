@@ -14,12 +14,14 @@ interface NotificationPanelProps {
   notifications: NotificationItem[]
   title?: string
   compact?: boolean
+  onSelect?: (notificationId: string) => void
 }
 
 export function NotificationPanel({
   notifications,
   title = 'Notifications',
   compact = false,
+  onSelect,
 }: NotificationPanelProps) {
   if (notifications.length === 0) {
     return (
@@ -31,16 +33,24 @@ export function NotificationPanel({
     return (
       <ul className="space-y-3">
         {notifications.map((n) => (
-          <li key={n.id} className="flex gap-3 rounded-lg border border-gray-100 p-3 hover:bg-gray-50">
-            <Bell className={`mt-0.5 h-4 w-4 shrink-0 ${n.type === 'warning' ? 'text-red-500' : 'text-primary'}`} />
-            <div className="min-w-0 flex-1">
-              <p className={`text-sm ${n.read ? 'text-gray-500' : 'font-medium text-gray-900'}`}>
-                {n.message}
-              </p>
-              {n.reason && <p className="mt-1 text-sm text-gray-600">Reason: {n.reason}</p>}
-              <p className="text-xs text-gray-400">{n.time}</p>
-            </div>
-            {!n.read && <span className="h-2 w-2 shrink-0 rounded-full bg-primary" />}
+          <li key={n.id}>
+            <button
+              type="button"
+              onClick={() => onSelect?.(n.id)}
+              disabled={!onSelect}
+              className="flex w-full gap-3 rounded-lg border border-gray-100 p-3 text-left hover:border-green-200 hover:bg-green-50/40 focus:outline-none focus:ring-2 focus:ring-primary/30 disabled:cursor-default disabled:hover:border-gray-100 disabled:hover:bg-transparent"
+            >
+              <Bell className={`mt-0.5 h-4 w-4 shrink-0 ${n.type === 'warning' ? 'text-red-500' : 'text-primary'}`} />
+              <span className="min-w-0 flex-1">
+                <span className={`block text-sm ${n.read ? 'text-gray-500' : 'font-medium text-gray-900'}`}>
+                  {n.message}
+                </span>
+                {n.reason && <span className="mt-1 block truncate text-sm text-gray-600">Reason: {n.reason}</span>}
+                <span className="block text-xs text-gray-400">{n.time}</span>
+                {onSelect ? <span className="mt-1 block text-xs font-medium text-green-700">Open details</span> : null}
+              </span>
+              {!n.read && <span className="h-2 w-2 shrink-0 rounded-full bg-primary" />}
+            </button>
           </li>
         ))}
       </ul>
@@ -54,19 +64,26 @@ export function NotificationPanel({
       </div>
       <div className="divide-y divide-gray-100">
         {notifications.map((n) => (
-          <div key={n.id} className="flex items-start gap-3 px-5 py-4 hover:bg-gray-50">
-            <div className={`rounded-lg p-2 ${n.type === 'warning' ? 'bg-red-50' : 'bg-green-50'}`}>
+          <button
+            key={n.id}
+            type="button"
+            onClick={() => onSelect?.(n.id)}
+            disabled={!onSelect}
+            className="flex w-full items-start gap-3 px-5 py-4 text-left hover:bg-green-50/40 focus:outline-none focus:ring-2 focus:ring-inset focus:ring-primary/30 disabled:cursor-default disabled:hover:bg-transparent"
+          >
+            <span className={`rounded-lg p-2 ${n.type === 'warning' ? 'bg-red-50' : 'bg-green-50'}`}>
               <Bell className={`h-4 w-4 ${n.type === 'warning' ? 'text-red-500' : 'text-primary'}`} />
-            </div>
-            <div className="min-w-0 flex-1">
-              <p className={`text-sm ${n.read ? 'text-gray-500' : 'font-medium text-gray-900'}`}>
+            </span>
+            <span className="min-w-0 flex-1">
+              <span className={`block text-sm ${n.read ? 'text-gray-500' : 'font-medium text-gray-900'}`}>
                 {n.message}
-              </p>
-              {n.reason && <p className="mt-1 text-sm text-gray-600">Reason: {n.reason}</p>}
-              <p className="mt-1 text-xs text-gray-400">{n.time}</p>
-            </div>
+              </span>
+              {n.reason && <span className="mt-1 block text-sm text-gray-600">Reason: {n.reason}</span>}
+              <span className="mt-1 block text-xs text-gray-400">{n.time}</span>
+              {onSelect ? <span className="mt-1 block text-xs font-medium text-green-700">Open details</span> : null}
+            </span>
             {!n.read && <Badge variant="info">New</Badge>}
-          </div>
+          </button>
         ))}
       </div>
     </div>

@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { DashboardNavbar } from '../../components/layout/DashboardNavbar'
 import { NotificationPanel } from '../../components/ui/NotificationPanel'
+import { NotificationDetailsModal } from '../../components/association/NotificationDetailsModal'
 import { useAuth } from '../../context/useAuth'
 import { useAssociationDisplayUser } from '../../hooks/useAssociationDisplayUser'
 import {
@@ -22,6 +23,7 @@ export default function NotificationsPage() {
   const [notifications, setNotifications] = useState<AssociationNotification[]>(() =>
     getAssociationNotifications(associationName, viewer.userId),
   )
+  const [selected, setSelected] = useState<AssociationNotification | null>(null)
 
   useEffect(() => {
     markAssociationNotificationsRead(associationName, viewer.userId)
@@ -40,8 +42,12 @@ export default function NotificationsPage() {
         notificationsPath="/association/notifications"
       />
       <main className="flex-1 overflow-y-auto p-4 sm:p-5 md:p-6">
-        <NotificationPanel notifications={notifications} />
+        <NotificationPanel
+          notifications={notifications}
+          onSelect={(id) => setSelected(notifications.find((item) => item.id === id) ?? null)}
+        />
       </main>
+      <NotificationDetailsModal notification={selected} onClose={() => setSelected(null)} />
     </>
   )
 }

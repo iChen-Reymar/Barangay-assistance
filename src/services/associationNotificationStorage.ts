@@ -12,6 +12,7 @@ export interface AssociationNotification {
   rejectedBy?: string
   reason?: string
   requestId?: string
+  memberNames?: string[]
   event?: 'submitted' | 'review' | 'generated' | 'approved' | 'rejected' | 'members_excluded'
 }
 
@@ -241,7 +242,8 @@ export function notifyMembersExcluded(input: {
     requestId: input.requestId,
     event: 'members_excluded',
     message: `${count} member${count === 1 ? '' : 's'} for request ${input.requestId} ${count === 1 ? 'is' : 'are'} not ready for assistance-list generation.`,
-    reason: `Incomplete Member Qualification Data or missing Staff verification: ${memberNames.join(', ')}.`,
+    reason: 'Complete Member Qualification Data and Staff verification for the members listed in this notification.',
+    memberNames,
     time: now.toLocaleString('en-US', {
       month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit',
     }),
