@@ -8,7 +8,7 @@ import { useStaffDisplayUser } from '../../hooks/useStaffDisplayUser'
 import type { AssociationMember } from '../../data/associationMockData'
 import type { StaffBeneficiary } from '../../data/staffMockData'
 import { getAssociations, subscribeAssociationStorage } from '../../services/associationStorage'
-import { getAssociationMembers, subscribeMemberStorage, verifyMemberAttachment } from '../../services/memberStorage'
+import { getAssociationMembers, subscribeMemberStorage } from '../../services/memberStorage'
 import {
   getStaffBeneficiaries,
   subscribeStaffBeneficiaryStorage,
@@ -91,18 +91,6 @@ export default function StaffVerifyQualificationPage() {
     memberName?: string,
     reason?: string,
   ) {
-    const memberDocument = documentId.match(/^member:(.+):(certificate|id)$/)
-    if (memberDocument && (status === 'verified' || status === 'rejected')) {
-      verifyMemberAttachment(
-        memberDocument[1],
-        memberDocument[2] === 'certificate' ? 'barangayCertificate' : 'governmentId',
-        status,
-        actor.name,
-        selectedAssociation ?? undefined,
-        reason,
-      )
-      return
-    }
     verifyDocument(
       itemId,
       documentId,

@@ -15,7 +15,6 @@ globalThis.sessionStorage = new MemoryStorage()
 const persistence = await import('../src/services/sessionPersistence.ts')
 const recovery = await import('../src/services/passwordRecovery.ts')
 const workflow = await import('../src/services/assistanceWorkflow.ts')
-const memberEligibility = await import('../src/services/memberEligibility.ts')
 
 test('non-remembered Supabase sessions stay in session storage', () => {
   persistence.setRememberSession(false)
@@ -52,15 +51,4 @@ test('final list generation requires the persisted Staff-review transition', () 
   assert.match(workflow.listGenerationTransitionError('PENDING'), /enter Staff review/)
   assert.equal(workflow.listGenerationTransitionError('UNDER REVIEW'), null)
   assert.match(workflow.listGenerationTransitionError('APPROVED'), /finalized/i)
-})
-
-test('staff verification cannot bypass required member documents', () => {
-  const member = {
-    staffVerified: true,
-    barangayCertificate: { dataUrl: 'data:image/png;base64,one', status: 'verified' },
-    governmentId: { dataUrl: 'data:image/png;base64,two', status: 'uploaded' },
-  }
-  assert.equal(memberEligibility.memberDocumentsVerified(member), false)
-  member.governmentId.status = 'verified'
-  assert.equal(memberEligibility.memberDocumentsVerified(member), true)
 })

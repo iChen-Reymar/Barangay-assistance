@@ -203,58 +203,10 @@ function downloadDataUrl(dataUrl: string, filename: string) {
   link.click()
 }
 
-function isCertificateDocument(doc: SupportingDocument) {
-  return /residency|barangay certificate/i.test(doc.name)
-}
-
-function isGovernmentIdDocument(doc: SupportingDocument) {
-  return /government id/i.test(doc.name)
-}
-
 type ListedDocument = SupportingDocument & { missing?: boolean }
 
-function memberFileDocument(
-  member: AssociationMember,
-  kind: 'certificate' | 'id',
-): ListedDocument {
-  const file = kind === 'certificate' ? member.barangayCertificate : member.governmentId
-  const label = kind === 'certificate' ? 'Barangay Certificate of Residency' : 'Valid Government ID'
-  const type = kind === 'certificate' ? 'Certificate' : 'Identification'
-  if (!file) {
-    return {
-      id: `member:${member.id}:${kind}`,
-      name: label,
-      type,
-      uploadedAt: new Date().toISOString(),
-      fileSize: '—',
-      status: 'uploaded',
-      missing: true,
-    }
-  }
-  return {
-    id: `member:${member.id}:${kind}`,
-    name: label,
-    type,
-    uploadedAt: file.uploadedAt,
-    fileSize: file.fileSize,
-    status: file.status,
-    verifiedBy: file.verifiedBy,
-    verifiedAt: file.verifiedAt,
-    rejectionReason: file.rejectionReason,
-    dataUrl: file.dataUrl,
-  }
-}
-
 function documentsForPerson(request: ReviewableAssistanceItem, person: ReviewPerson): ListedDocument[] {
-  return (request.documents ?? []).map((doc) => {
-    if (person.kind === 'member' && isCertificateDocument(doc)) {
-      return memberFileDocument(person.member, 'certificate')
-    }
-    if (person.kind === 'member' && isGovernmentIdDocument(doc)) {
-      return memberFileDocument(person.member, 'id')
-    }
-    return asMemberInformation(doc, person)
-  })
+  return (request.documents ?? []).map((doc) => asMemberInformation(doc, person))
 }
 
 function statusRank(status: string) {

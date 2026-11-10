@@ -30,23 +30,17 @@ import {
 import { getStaffBeneficiaries, subscribeStaffBeneficiaryStorage } from '../../services/staffBeneficiaryStorage'
 import { synchronizeRecordNow, waitForDatabaseSynchronization } from '../../services/databaseSync'
 import { listGenerationTransitionError } from '../../services/assistanceWorkflow'
-import { memberDocumentsVerified } from '../../services/memberEligibility'
 
 const REVIEWABLE_ITEMS_KEY = 'barangay_reviewable_items'
 
 type PriorityItem = Omit<GeneratedAssistanceRow, 'score' | 'verification'> & {
   score: number | null
   verification: VerificationStatus
-  documentEligible: boolean
   member: AssociationMember
 }
 
 function sameAssociation(left: string, right: string) {
   return left.trim().toLowerCase() === right.trim().toLowerCase()
-}
-
-function memberEligibleForList(member: AssociationMember) {
-  return memberDocumentsVerified(member)
 }
 
 function completeAssessment(beneficiary: StaffBeneficiary) {
@@ -77,7 +71,6 @@ function unscoredMember(member: AssociationMember, associationName: string, asse
     verification: assessment?.verification ?? 'PENDING',
     reason: '',
     generatedAt: '',
-    documentEligible: memberEligibleForList(member),
     member,
   }
 }
@@ -89,7 +82,7 @@ function vulnerabilityVariant(level: VulnerabilityLevel) {
 }
 
 function downloadList(rows: PriorityItem[]) {
-  const header = ['Rank', 'Name', 'Association', 'Score', 'Classification', 'Program', 'Document Eligibility', 'Scored By', 'Decision Tree', 'Logistic Regression']
+  const header = ['Rank', 'Name', 'Association', 'Score', 'Classification', 'Program', 'Scored By', 'Decision Tree', 'Logistic Regression']
   const lines = rows.map((row) =>
     [
       row.rank,
@@ -98,7 +91,6 @@ function downloadList(rows: PriorityItem[]) {
       row.score ?? '',
       row.classification,
       row.program,
-      row.documentEligible ? 'ELIGIBLE' : 'DOCUMENTS REQUIRED',
       row.engine === 'ml' ? 'ML Models' : 'Local Rules',
       row.decisionTreePrediction ?? '',
       row.logisticRegressionPrediction ?? '',
@@ -150,7 +142,7 @@ export default function StaffPriorityListPage() {
   function membersOnAssociations(associationName: string) {
     return getAssociationMembers().filter((member) => {
       const belongsTo = member.associationName?.trim() ?? ''
-      if (!member.name.trim() || !belongsTo || !memberEligibleForList(member)) return false
+      if (!member.name.trim() || !belongsTo) return false
       if (associationName === 'All Associations') return true
       return sameAssociation(belongsTo, associationName)
     })
@@ -209,7 +201,7 @@ export default function StaffPriorityListPage() {
           && eligibleMembers.has(beneficiary.memberId || beneficiary.id),
       )
       if (measured.length === 0) {
-        setGenerationMessage('No members are ready. A member needs verified qualification, a verified barangay certificate, and a verified government ID.')
+        setGenerationMessage('No members are ready. Open Verify Qualification and prepare at least one member for generation.')
         return
       }
       setAssociation(request.association)
@@ -260,7 +252,6 @@ export default function StaffPriorityListPage() {
       return {
         ...scored,
         association: associationName,
-        documentEligible: memberEligibleForList(member),
         member,
       }
     })
@@ -290,10 +281,6 @@ export default function StaffPriorityListPage() {
         return Boolean(assessment && completeAssessment(assessment))
       }).length
     : 0
-  const selectedAssociationMembers = selectedRequest
-    ? members.filter((member) => sameAssociation(member.associationName ?? '', selectedRequest.association))
-    : []
-  const membersMissingDocuments = selectedAssociationMembers.filter((member) => !memberDocumentsVerified(member)).length
 
   const pagination = usePagination(generated, PAGE_SIZE_DEFAULT, `${classification}-${association}-${program}`, 'records')
 
@@ -321,15 +308,6 @@ export default function StaffPriorityListPage() {
         : <Badge variant={vulnerabilityVariant(r.classification)}>{r.classification}</Badge>,
     },
     { key: 'program', header: 'Program' },
-    {
-      key: 'documentEligibility',
-      header: 'Document Eligibility',
-      render: (r) => (
-        <Badge variant={r.documentEligible ? 'success' : 'warning'}>
-          {r.documentEligible ? 'ELIGIBLE' : 'DOCUMENTS REQUIRED'}
-        </Badge>
-      ),
-    },
     {
       key: 'scoredBy',
       header: 'Scored By',
@@ -405,12 +383,7 @@ export default function StaffPriorityListPage() {
         ) : null}
         {selectedRequestId && readyMemberCount === 0 ? (
           <p className="mb-4 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
-            Verify at least one member's qualification, barangay certificate, and government ID to enable generation.
-          </p>
-        ) : null}
-        {selectedRequestId && readyMemberCount > 0 && membersMissingDocuments > 0 ? (
-          <p className="mb-4 rounded-lg border border-gray-200 bg-gray-50 px-4 py-3 text-sm text-gray-700">
-            {membersMissingDocuments} member{membersMissingDocuments === 1 ? '' : 's'} will remain visible but will be excluded because their required documents are not verified.
+            Verify at least one member's qualification and household information to enable generation.
           </p>
         ) : null}
         <div className="rounded-lg border border-gray-200 bg-white shadow-sm">
