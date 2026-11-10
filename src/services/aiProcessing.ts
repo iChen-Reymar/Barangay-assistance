@@ -1,5 +1,5 @@
 import type { StaffBeneficiary, VulnerabilityLevel } from '../data/staffMockData'
-import { getStaffBeneficiaries } from './staffBeneficiaryStorage'
+import { getStaffBeneficiaries, updateStaffBeneficiary } from './staffBeneficiaryStorage'
 import {
   scoreBeneficiaries,
   retrainModels,
@@ -10,6 +10,7 @@ import {
 import { getAidRecords } from './aidRecordStorage'
 import { getAssociationByName } from './associationStorage'
 import { getPrograms } from './programStorage'
+import { getAssociationMemberById, upsertAssociationMember } from './memberStorage'
 
 const LIST_KEY = 'barangay_generated_assistance_list'
 const MODEL_KEY = 'barangay_ml_model_state'
@@ -234,6 +235,30 @@ export async function generateAssistanceListFor(
   const program = getPrograms().find((entry) => entry.name.trim().toLowerCase() === options.programName.trim().toLowerCase())
   const limit = program?.maxBeneficiaries && program.maxBeneficiaries > 0 ? program.maxBeneficiaries : Number.POSITIVE_INFINITY
   const freshRanked = dedupeAndRank(fresh).slice(0, limit)
+  const assessedAt = new Date().toISOString()
+  const staffRecords = getStaffBeneficiaries()
+  for (const row of freshRanked) {
+    const staffRecord = staffRecords.find((entry) => entry.memberId === row.beneficiaryId || entry.id === row.beneficiaryId)
+    if (staffRecord) {
+      updateStaffBeneficiary({
+        ...staffRecord,
+        vulnerability: row.classification,
+        vulnerabilityScore: row.score,
+        vulnerabilitySource: 'ml',
+        vulnerabilityAssessedAt: assessedAt,
+      })
+    }
+    const member = getAssociationMemberById(row.beneficiaryId)
+    if (member) {
+      upsertAssociationMember({
+        ...member,
+        vulnerability: row.classification,
+        vulnerabilityScore: row.score,
+        vulnerabilitySource: 'ml',
+        vulnerabilityAssessedAt: assessedAt,
+      })
+    }
+  }
   const kept = existingSelections.filter((row) => row.requestId !== options.requestId)
   return persist([...freshRanked, ...kept])
 }

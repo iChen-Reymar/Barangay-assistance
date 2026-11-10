@@ -40,7 +40,7 @@ export default function MembersPage() {
     getAssociationMembers(associationName),
   )
   const [membershipFilter, setMembershipFilter] = useState<'All' | 'ACTIVE' | 'INACTIVE'>('All')
-  const [vulnerabilityFilter, setVulnerabilityFilter] = useState<'All' | VulnerabilityLevel>('All')
+  const [vulnerabilityFilter, setVulnerabilityFilter] = useState<'All' | 'UNASSESSED' | VulnerabilityLevel>('All')
   const [formOpen, setFormOpen] = useState(false)
   const [viewOpen, setViewOpen] = useState(false)
   const [editingMember, setEditingMember] = useState<AssociationMember | null>(null)
@@ -55,8 +55,9 @@ export default function MembersPage() {
     return items.filter((row) => {
       const membershipMatch =
         membershipFilter === 'All' || row.membershipStatus === membershipFilter
-      const vulnerabilityMatch =
-        vulnerabilityFilter === 'All' || row.vulnerability === vulnerabilityFilter
+      const vulnerabilityMatch = vulnerabilityFilter === 'All'
+        || (vulnerabilityFilter === 'UNASSESSED' && row.vulnerabilitySource !== 'ml')
+        || (row.vulnerabilitySource === 'ml' && row.vulnerability === vulnerabilityFilter)
       return membershipMatch && vulnerabilityMatch
     })
   }, [items, membershipFilter, vulnerabilityFilter])
@@ -122,7 +123,12 @@ export default function MembersPage() {
     {
       key: 'vulnerability',
       header: 'Vulnerability Status',
-      render: (r) => <Badge variant={vulnerabilityVariant(r.vulnerability)}>{r.vulnerability}</Badge>,
+      render: (r) => r.vulnerabilitySource === 'ml' ? (
+        <div>
+          <Badge variant={vulnerabilityVariant(r.vulnerability)}>{r.vulnerability}</Badge>
+          <p className="mt-1 text-xs text-gray-400">AI score {r.vulnerabilityScore ?? '—'}/100</p>
+        </div>
+      ) : <Badge variant="neutral">AWAITING AI</Badge>,
     },
     {
       key: 'assistanceStatus',
@@ -202,11 +208,12 @@ export default function MembersPage() {
               <select
                 value={vulnerabilityFilter}
                 onChange={(e) =>
-                  setVulnerabilityFilter(e.target.value as 'All' | VulnerabilityLevel)
+                  setVulnerabilityFilter(e.target.value as 'All' | 'UNASSESSED' | VulnerabilityLevel)
                 }
                 className="rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-700"
               >
                 <option value="All">Vulnerability: All</option>
+                <option value="UNASSESSED">Awaiting AI</option>
                 <option value="HIGH">High</option>
                 <option value="MEDIUM">Medium</option>
                 <option value="LOW">Low</option>

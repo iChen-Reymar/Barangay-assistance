@@ -11,6 +11,9 @@ export interface StaffBeneficiary {
   monthlyIncome: number
   workingHouseholdMembers?: number
   vulnerability: VulnerabilityLevel
+  vulnerabilityScore?: number
+  vulnerabilitySource?: 'ml'
+  vulnerabilityAssessedAt?: string
   verification: VerificationStatus
   age?: number
   sex?: string

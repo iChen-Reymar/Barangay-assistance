@@ -120,7 +120,7 @@ function informationLines(person: ReviewPerson, association: string) {
       `Date Joined: ${member.dateJoined}`,
       `Membership: ${member.membershipStatus}`,
       `Assistance Status: ${member.assistanceStatus}`,
-      `Vulnerability: ${member.vulnerability}`,
+      `Vulnerability: ${member.vulnerabilitySource === 'ml' ? `${member.vulnerability} (${member.vulnerabilityScore ?? '—'}/100)` : 'Awaiting AI generation'}`,
       `Senior Citizen: ${member.isSenior ? 'Yes' : 'No'}`,
       `PWD: ${member.isPwd ? 'Yes' : 'No'}`,
       ...(member.notes ? [`Notes: ${member.notes}`] : []),
@@ -471,6 +471,9 @@ function MemberList({
         <ul className="divide-y divide-gray-100 overflow-hidden rounded-lg border border-gray-200">
           {people.map((person) => {
             const level = person.kind === 'member' ? person.member.vulnerability : person.beneficiary.vulnerability
+            const assessed = person.kind === 'member'
+              ? person.member.vulnerabilitySource === 'ml'
+              : person.beneficiary.vulnerabilitySource === 'ml'
             return (
               <li key={person.id}>
                 <button
@@ -486,9 +489,11 @@ function MemberList({
                         : person.beneficiary.verification}
                     </span>
                   </span>
-                  <Badge variant={level === 'HIGH' ? 'danger' : level === 'MEDIUM' ? 'warning' : 'success'}>
-                    {level}
-                  </Badge>
+                  {assessed ? (
+                    <Badge variant={level === 'HIGH' ? 'danger' : level === 'MEDIUM' ? 'warning' : 'success'}>
+                      {level}
+                    </Badge>
+                  ) : <Badge variant="neutral">AWAITING AI</Badge>}
                 </button>
               </li>
             )
@@ -650,11 +655,11 @@ function MemberHouseholdVerification({
 }) {
   const [form, setForm] = useState<HouseholdVerificationForm>(() => ({
     familySize: existing?.familySize ?? member.familySize,
-    monthlyIncome: existing?.monthlyIncome ?? 0,
-    workingHouseholdMembers: existing?.workingHouseholdMembers ?? 0,
+    monthlyIncome: existing?.monthlyIncome ?? member.monthlyIncome ?? 0,
+    workingHouseholdMembers: existing?.workingHouseholdMembers ?? member.workingHouseholdMembers ?? 0,
     age: existing?.age ?? member.age,
-    employmentStatus: existing?.employmentStatus ?? '',
-    housingCondition: existing?.housingCondition ?? '',
+    employmentStatus: existing?.employmentStatus ?? member.employmentStatus ?? '',
+    housingCondition: existing?.housingCondition ?? member.housingCondition ?? '',
   }))
   const [error, setError] = useState('')
 
@@ -772,7 +777,12 @@ function MemberDetails({ member, association }: { member: AssociationMember; ass
       <Field label="Date Joined" value={member.dateJoined} />
       <Field label="Membership" value={member.membershipStatus} />
       <Field label="Assistance Status" value={member.assistanceStatus} />
-      <Field label="Vulnerability" value={member.vulnerability} />
+      <Field
+        label="Vulnerability"
+        value={member.vulnerabilitySource === 'ml'
+          ? `${member.vulnerability} · ${member.vulnerabilityScore ?? '—'}/100`
+          : 'Awaiting AI generation'}
+      />
       <Field label="Senior Citizen" value={member.isSenior ? 'Yes' : 'No'} />
       <Field label="PWD" value={member.isPwd ? 'Yes' : 'No'} />
       <Field label="Verification" value={member.staffVerified ? 'VERIFIED' : 'UNVERIFIED'} />

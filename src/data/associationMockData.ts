@@ -31,10 +31,17 @@ export interface AssociationMember {
   address: string
   dateJoined: string
   familySize: number
+  monthlyIncome?: number
+  workingHouseholdMembers?: number
+  employmentStatus?: string
+  housingCondition?: string
   isPwd: boolean
   isSenior: boolean
   membershipStatus: MemberStatus
   vulnerability: VulnerabilityLevel
+  vulnerabilityScore?: number
+  vulnerabilitySource?: 'ml'
+  vulnerabilityAssessedAt?: string
   assistanceStatus: AssistanceStatus
   position?: string
   notes?: string

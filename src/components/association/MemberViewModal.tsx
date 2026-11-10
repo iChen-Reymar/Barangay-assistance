@@ -37,9 +37,11 @@ export function MemberViewModal({ open, onClose, member, onEdit }: MemberViewMod
             <Badge variant={selected.membershipStatus === 'ACTIVE' ? 'success' : 'neutral'}>
               {selected.membershipStatus}
             </Badge>
-            <Badge variant={vulnerabilityVariant(selected.vulnerability)}>
-              {selected.vulnerability}
-            </Badge>
+            {selected.vulnerabilitySource === 'ml' ? (
+              <Badge variant={vulnerabilityVariant(selected.vulnerability)}>
+                {`${selected.vulnerability} · ${selected.vulnerabilityScore ?? '—'}/100`}
+              </Badge>
+            ) : <Badge variant="neutral">AWAITING AI</Badge>}
           </div>
         </div>
 
@@ -55,6 +57,22 @@ export function MemberViewModal({ open, onClose, member, onEdit }: MemberViewMod
           <div>
             <dt className="text-[10px] font-semibold uppercase text-gray-400">Family Size</dt>
             <dd className="mt-0.5 text-gray-900">{selected.familySize}</dd>
+          </div>
+          <div>
+            <dt className="text-[10px] font-semibold uppercase text-gray-400">Monthly Income</dt>
+            <dd className="mt-0.5 text-gray-900">{selected.monthlyIncome ? `₱${selected.monthlyIncome.toLocaleString('en-PH')}` : '—'}</dd>
+          </div>
+          <div>
+            <dt className="text-[10px] font-semibold uppercase text-gray-400">Working Household Members</dt>
+            <dd className="mt-0.5 text-gray-900">{selected.workingHouseholdMembers ?? '—'}</dd>
+          </div>
+          <div>
+            <dt className="text-[10px] font-semibold uppercase text-gray-400">Employment</dt>
+            <dd className="mt-0.5 text-gray-900">{selected.employmentStatus || '—'}</dd>
+          </div>
+          <div>
+            <dt className="text-[10px] font-semibold uppercase text-gray-400">Housing Condition</dt>
+            <dd className="mt-0.5 text-gray-900">{selected.housingCondition || '—'}</dd>
           </div>
           <div>
             <dt className="text-[10px] font-semibold uppercase text-gray-400">Contact Number</dt>

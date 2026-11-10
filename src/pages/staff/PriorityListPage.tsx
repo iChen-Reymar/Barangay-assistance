@@ -300,7 +300,9 @@ export default function StaffPriorityListPage() {
     {
       key: 'classification',
       header: 'Classification',
-      render: (r) => <Badge variant={vulnerabilityVariant(r.classification)}>{r.classification}</Badge>,
+      render: (r) => r.score == null
+        ? <Badge variant="neutral">AWAITING AI</Badge>
+        : <Badge variant={vulnerabilityVariant(r.classification)}>{r.classification}</Badge>,
     },
     { key: 'program', header: 'Program' },
     {

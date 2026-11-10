@@ -7,7 +7,6 @@ import type {
   AssistanceStatus,
   MemberAttachment,
   MemberStatus,
-  VulnerabilityLevel,
 } from '../../data/associationMockData'
 import { memberPositions, splitMemberPosition } from '../../data/memberPositions'
 
@@ -28,6 +27,10 @@ const emptyForm: MemberFormInput = {
   address: '',
   dateJoined: '',
   familySize: 1,
+  monthlyIncome: 0,
+  workingHouseholdMembers: 0,
+  employmentStatus: '',
+  housingCondition: '',
   isPwd: false,
   isSenior: false,
   membershipStatus: 'ACTIVE',
@@ -91,10 +94,17 @@ export function MemberFormModal({
         address: initialValues.address,
         dateJoined: initialValues.dateJoined,
         familySize: initialValues.familySize,
+        monthlyIncome: initialValues.monthlyIncome ?? 0,
+        workingHouseholdMembers: initialValues.workingHouseholdMembers ?? 0,
+        employmentStatus: initialValues.employmentStatus ?? '',
+        housingCondition: initialValues.housingCondition ?? '',
         isPwd: initialValues.isPwd,
         isSenior: initialValues.isSenior,
         membershipStatus: initialValues.membershipStatus,
         vulnerability: initialValues.vulnerability,
+        vulnerabilityScore: initialValues.vulnerabilityScore,
+        vulnerabilitySource: initialValues.vulnerabilitySource,
+        vulnerabilityAssessedAt: initialValues.vulnerabilityAssessedAt,
         position: roster.position,
         notes: roster.notes ?? '',
         barangayCertificate: initialValues.barangayCertificate,
@@ -122,6 +132,22 @@ export function MemberFormModal({
     }
     if (form.age < 1) {
       setError('Age must be at least 1.')
+      return
+    }
+    if ((form.monthlyIncome ?? 0) <= 0) {
+      setError('Monthly income must be greater than zero for AI scoring.')
+      return
+    }
+    if ((form.workingHouseholdMembers ?? 0) < 0 || (form.workingHouseholdMembers ?? 0) > form.familySize) {
+      setError('Working household members must be between 0 and the family size.')
+      return
+    }
+    if (!form.employmentStatus?.trim()) {
+      setError('Employment status is required for AI scoring.')
+      return
+    }
+    if (!form.housingCondition?.trim()) {
+      setError('Housing condition is required for AI scoring.')
       return
     }
     onSave({
@@ -170,32 +196,6 @@ export function MemberFormModal({
             </select>
           </div>
           <div>
-            <label className="mb-1 block text-xs font-semibold uppercase text-gray-500">Age</label>
-            <input
-              required
-              type="number"
-              min={1}
-              value={form.age || ''}
-              onChange={(e) => setForm((prev) => ({ ...prev, age: Number(e.target.value) || 0 }))}
-              className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
-            />
-          </div>
-          <div>
-            <label className="mb-1 block text-xs font-semibold uppercase text-gray-500">
-              Family Size
-            </label>
-            <input
-              required
-              type="number"
-              min={1}
-              value={form.familySize || ''}
-              onChange={(e) =>
-                setForm((prev) => ({ ...prev, familySize: Number(e.target.value) || 1 }))
-              }
-              className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
-            />
-          </div>
-          <div>
             <label className="mb-1 block text-xs font-semibold uppercase text-gray-500">
               Contact Number
             </label>
@@ -231,6 +231,47 @@ export function MemberFormModal({
           </div>
         </div>
 
+        <section className="rounded-xl border border-gray-200 bg-gray-50 p-4">
+          <div className="mb-4">
+            <h3 className="text-sm font-bold text-gray-900">Household profile for AI scoring</h3>
+            <p className="mt-1 text-xs leading-5 text-gray-500">
+              Staff verifies these details before the AI generates the member's vulnerability score and priority rank.
+            </p>
+          </div>
+          <div className="grid gap-4 sm:grid-cols-3">
+            <div>
+              <label className="mb-1 block text-xs font-semibold text-gray-600">Family size</label>
+              <input required type="number" min={1} value={form.familySize || ''} onChange={(e) => setForm((prev) => ({ ...prev, familySize: Number(e.target.value) || 1 }))} className="w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary" />
+            </div>
+            <div>
+              <label className="mb-1 block text-xs font-semibold text-gray-600">Monthly income</label>
+              <input required type="number" min={0.01} step="0.01" value={form.monthlyIncome || ''} onChange={(e) => setForm((prev) => ({ ...prev, monthlyIncome: Number(e.target.value) || 0 }))} className="w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary" />
+            </div>
+            <div>
+              <label className="mb-1 block text-xs font-semibold text-gray-600">Working members</label>
+              <input required type="number" min={0} max={form.familySize} value={form.workingHouseholdMembers ?? 0} onChange={(e) => setForm((prev) => ({ ...prev, workingHouseholdMembers: Number(e.target.value) || 0 }))} className="w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary" />
+            </div>
+            <div>
+              <label className="mb-1 block text-xs font-semibold text-gray-600">Age</label>
+              <input required type="number" min={1} value={form.age || ''} onChange={(e) => setForm((prev) => ({ ...prev, age: Number(e.target.value) || 0 }))} className="w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary" />
+            </div>
+            <div>
+              <label className="mb-1 block text-xs font-semibold text-gray-600">Employment</label>
+              <select required value={form.employmentStatus ?? ''} onChange={(e) => setForm((prev) => ({ ...prev, employmentStatus: e.target.value }))} className="w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary">
+                <option value="">Select status</option>
+                <option>Employed</option><option>Self-Employed</option><option>Seasonal Worker</option><option>Unemployed</option>
+              </select>
+            </div>
+            <div>
+              <label className="mb-1 block text-xs font-semibold text-gray-600">Housing condition</label>
+              <select required value={form.housingCondition ?? ''} onChange={(e) => setForm((prev) => ({ ...prev, housingCondition: e.target.value }))} className="w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary">
+                <option value="">Select condition</option>
+                <option>Concrete</option><option>Light Materials</option><option>Temporary</option><option>Makeshift / Salvaged</option>
+              </select>
+            </div>
+          </div>
+        </section>
+
         <div className="grid gap-4 sm:grid-cols-2">
           <div>
             <label className="mb-1 block text-xs font-semibold uppercase text-gray-500">
@@ -247,24 +288,13 @@ export function MemberFormModal({
               <option value="INACTIVE">Inactive</option>
             </select>
           </div>
-          <div>
-            <label className="mb-1 block text-xs font-semibold uppercase text-gray-500">
-              Vulnerability Level
-            </label>
-            <select
-              value={form.vulnerability}
-              onChange={(e) =>
-                setForm((prev) => ({
-                  ...prev,
-                  vulnerability: e.target.value as VulnerabilityLevel,
-                }))
-              }
-              className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
-            >
-              <option value="HIGH">High</option>
-              <option value="MEDIUM">Medium</option>
-              <option value="LOW">Low</option>
-            </select>
+          <div className="rounded-lg border border-dashed border-primary/30 bg-primary/5 px-3 py-2">
+            <p className="text-xs font-semibold text-primary">AI vulnerability</p>
+            <p className="mt-0.5 text-sm text-gray-700">
+              {initialValues?.vulnerabilitySource === 'ml'
+                ? `${initialValues.vulnerability} · ${initialValues.vulnerabilityScore ?? '—'}/100`
+                : 'Awaiting Staff verification and AI generation'}
+            </p>
           </div>
         </div>
 
