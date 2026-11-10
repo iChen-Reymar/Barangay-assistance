@@ -61,3 +61,36 @@ test('staff generates final lists while admin monitors requests', () => {
     qualifications: [{ status: 'passed' }],
   }, null), /pending/i)
 })
+
+test('staff request validation ignores object key order but rejects changed details', () => {
+  const storedDetails = {
+    email: 'head@example.com',
+    purpose: 'Emergency assistance',
+    memberCount: 3,
+  }
+  const reorderedDetails = {
+    memberCount: 3,
+    purpose: 'Emergency assistance',
+    email: 'head@example.com',
+  }
+  const storedPayload = {
+    id: 'asst-1',
+    source: 'assistance',
+    association: 'ERPAT',
+    requestType: 'Tulong Bayan',
+    program: 'Tulong Bayan',
+    status: 'UNDER REVIEW',
+    decisions: [],
+    details: storedDetails,
+  }
+  const current = { status: 'UNDER REVIEW', payload: storedPayload }
+
+  assert.equal(requestWriteError({ role: 'staff' }, {
+    ...storedPayload,
+    details: reorderedDetails,
+  }, current), null)
+  assert.match(requestWriteError({ role: 'staff' }, {
+    ...storedPayload,
+    details: { ...reorderedDetails, memberCount: 4 },
+  }, current), /cannot change/i)
+})

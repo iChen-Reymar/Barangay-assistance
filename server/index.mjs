@@ -3,6 +3,7 @@ import express from 'express'
 import fs from 'node:fs'
 import path from 'node:path'
 import { AsyncLocalStorage } from 'node:async_hooks'
+import { isDeepStrictEqual } from 'node:util'
 import { createClient } from '@supabase/supabase-js'
 import { fileURLToPath } from 'node:url'
 import { publicSupabaseKey, publicSupabaseUrl } from '../config/supabase-public.mjs'
@@ -1450,11 +1451,11 @@ function requestWriteError(actor, payload, current = null) {
     if (current.status === 'PENDING' && status === 'LIST GENERATED') {
       return 'A request must enter Staff review before its final list can be generated.'
     }
-    if (JSON.stringify(decisions) !== JSON.stringify(currentDecisions)) {
+    if (!isDeepStrictEqual(decisions, currentDecisions)) {
       return 'Staff cannot add or change final decision records.'
     }
     const immutable = ['id', 'source', 'association', 'requestType', 'program', 'details']
-    if (immutable.some((key) => JSON.stringify(payload?.[key]) !== JSON.stringify(current.payload?.[key]))) {
+    if (immutable.some((key) => !isDeepStrictEqual(payload?.[key], current.payload?.[key]))) {
       return 'Staff can validate a request but cannot change its submitted identity or request details.'
     }
   }
