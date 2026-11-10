@@ -977,6 +977,10 @@ create policy assistance_programs_write_admin on public.assistance_programs for 
   using (public.current_app_role() = 'admin')
   with check (public.current_app_role() = 'admin');
 
+-- Keep request creation and workflow updates as separate privileges. The API
+-- uses INSERT for a new Association request and UPDATE for an existing request;
+-- it must not UPSERT this table because PostgreSQL then evaluates INSERT RLS
+-- even when the conflict branch would update an existing row.
 drop policy if exists assistance_requests_insert_association on public.assistance_requests;
 create policy assistance_requests_insert_association on public.assistance_requests for insert to authenticated
   with check (

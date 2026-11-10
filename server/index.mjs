@@ -302,9 +302,9 @@ async function saveNotifications(rows) {
   }
 }
 
-async function saveRequests(rows) {
+async function saveRequests(rows, operation) {
   if (!Array.isArray(rows)) return
-  await upsertRows('assistance_requests', rows.map((row) => {
+  const mappedRows = rows.map((row) => {
     const details = row.details ?? {}
     return {
       id: row.id,
@@ -332,7 +332,23 @@ async function saveRequests(rows) {
       vulnerability_score: details.vulnerabilityScore ?? null,
       payload: row,
     }
-  }))
+  })
+  if (operation === 'insert') {
+    await insert('assistance_requests', mappedRows)
+  } else if (operation === 'update') {
+    for (const row of mappedRows) {
+      const { data, error } = await supabase
+        .from('assistance_requests')
+        .update(row)
+        .eq('id', row.id)
+        .select('id')
+        .maybeSingle()
+      if (error) throw new Error(error.message)
+      if (!data) throw new Error(`Assistance request ${row.id} is no longer available for update.`)
+    }
+  } else {
+    throw new Error('An explicit assistance-request write operation is required.')
+  }
   for (const row of rows) {
     const documents = (row.documents ?? []).map((doc) => ({
       id: String(doc.id).startsWith(`${row.id}:`) ? doc.id : `${row.id}:${doc.id}`,
@@ -1397,7 +1413,12 @@ const recordResources = {
   barangay_aid_records: { table: 'aid_records', column: 'id', associationColumn: 'association_name', save: (item) => saveAidRecords([item]) },
   barangay_staff_beneficiaries: { table: 'beneficiaries', column: 'id', associationColumn: 'association_name', save: (item) => saveBeneficiaries([item]) },
   barangay_assistance_programs: { table: 'assistance_programs', column: 'id', save: (item) => savePrograms([item]) },
-  barangay_reviewable_items: { table: 'assistance_requests', column: 'id', associationColumn: 'association_name', save: (item) => saveRequests([item]) },
+  barangay_reviewable_items: {
+    table: 'assistance_requests',
+    column: 'id',
+    associationColumn: 'association_name',
+    save: (item, context) => saveRequests([item], context?.requestExists ? 'update' : 'insert'),
+  },
   barangay_generated_assistance_list: { table: 'generated_assistance_list', column: 'id', associationColumn: 'association_name', save: (item) => saveGenerated([item]) },
   barangay_priority_list: { table: 'priority_list', column: 'id', associationColumn: 'association_name', save: (item) => savePriority([item]) },
   barangay_audit_logs: { table: 'audit_logs', column: 'id', save: (item) => saveAudit([item]) },
@@ -1468,6 +1489,10 @@ function payloadIdentity(resource, payload) {
   return String(payload?.id ?? '')
 }
 
+function requestWriteOperation(current) {
+  return current ? 'update' : 'insert'
+}
+
 function payloadAssociation(payload, key) {
   if (key === 'barangay_association_details') return String(payload?.name || '')
   return String(payload?.associationName || payload?.association || '')
@@ -1520,6 +1545,7 @@ app.put('/api/records/:key/:id', async (req, res) => {
       return
     }
   }
+  let requestExists = false
   if (key === 'barangay_reviewable_items') {
     const { data: current, error } = await supabase
       .from('assistance_requests')
@@ -1530,6 +1556,7 @@ app.put('/api/records/:key/:id', async (req, res) => {
       res.status(500).json({ error: error.message })
       return
     }
+    requestExists = requestWriteOperation(current) === 'update'
     const policyError = requestWriteError(actor, payload, current)
     if (policyError) {
       res.status(403).json({ error: policyError })
@@ -1537,7 +1564,7 @@ app.put('/api/records/:key/:id', async (req, res) => {
     }
   }
   try {
-    await resource.save(payload)
+    await resource.save(payload, { requestExists })
     res.json({ ok: true, id })
   } catch (error) {
     res.status(500).json({ error: error.message })
@@ -1676,4 +1703,12 @@ if (process.env.NODE_ENV !== 'test' && !process.env.VERCEL) {
     })
 }
 
-export { app, canWriteResource, initializeServer, payloadIdentity, requestWriteError, scopeStoresForActor }
+export {
+  app,
+  canWriteResource,
+  initializeServer,
+  payloadIdentity,
+  requestWriteError,
+  requestWriteOperation,
+  scopeStoresForActor,
+}

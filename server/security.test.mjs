@@ -2,7 +2,7 @@ import assert from 'node:assert/strict'
 import test from 'node:test'
 
 process.env.NODE_ENV = 'test'
-const { canWriteResource, payloadIdentity, requestWriteError, scopeStoresForActor } = await import('./index.mjs')
+const { canWriteResource, payloadIdentity, requestWriteError, requestWriteOperation, scopeStoresForActor } = await import('./index.mjs')
 
 test('resource writes follow the role matrix', () => {
   assert.equal(canWriteResource({ role: 'admin' }, 'barangay_privacy_settings'), true)
@@ -93,4 +93,9 @@ test('staff request validation ignores object key order but rejects changed deta
     ...storedPayload,
     details: { ...reorderedDetails, memberCount: 4 },
   }, current), /cannot change/i)
+})
+
+test('request persistence separates new inserts from existing updates', () => {
+  assert.equal(requestWriteOperation(null), 'insert')
+  assert.equal(requestWriteOperation({ id: 'asst-1' }), 'update')
 })
