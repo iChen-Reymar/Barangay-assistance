@@ -8,6 +8,7 @@ import type {
   QualificationStatus,
   ReviewableAssistanceItem,
 } from '../types/approval'
+import { listGenerationTransitionError } from './assistanceWorkflow'
 
 const ITEMS_KEY = 'barangay_reviewable_items'
 const UPDATED_EVENT = 'decision-storage-updated'
@@ -147,7 +148,7 @@ export function markAssistanceListGenerated(itemId: string): ReviewableAssistanc
   if (index === -1) return null
   const current = items[index]
   if (current.status === 'LIST GENERATED') return enrichReviewableItem(current)
-  if (current.status === 'APPROVED' || current.status === 'REJECTED') return enrichReviewableItem(current)
+  if (listGenerationTransitionError(current.status)) return null
 
   items[index] = { ...current, status: 'LIST GENERATED' }
   writeItems(items)

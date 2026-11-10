@@ -26,6 +26,7 @@ let rejectedBootstrapToken = ''
 let bootstrapPromise: Promise<void> | null = null
 const syncQueues = new Map<string, Promise<void>>()
 const failedSyncJobs = new Map<number, () => Promise<void>>()
+const latestSyncErrors = new Map<string, Error>()
 let syncJobId = 0
 let activeSyncJobs = 0
 
@@ -99,6 +100,26 @@ async function putRecord(key: string, id: string, payload: unknown) {
   })
 }
 
+export async function synchronizeRecordNow(key: string, id: string, payload: unknown) {
+  const pending = syncQueues.get(key)
+  if (pending) await pending
+  try {
+    await putRecord(key, id, payload)
+    latestSyncErrors.delete(key)
+  } catch (error) {
+    const syncError = error instanceof Error ? error : new Error('Database synchronization failed.')
+    latestSyncErrors.set(key, syncError)
+    throw syncError
+  }
+}
+
+export async function waitForDatabaseSynchronization(key: string) {
+  const pending = syncQueues.get(key)
+  if (pending) await pending
+  const error = latestSyncErrors.get(key)
+  if (error) throw error
+}
+
 async function deleteRecord(key: string, id: string) {
   await retryableRequest(`/api/records/${encodeURIComponent(key)}/${encodeURIComponent(id)}`, {
     method: 'DELETE',
@@ -138,6 +159,7 @@ function queueStoreChange(key: string, previousRaw: string | null, nextRaw: stri
     publishSyncStatus({ phase: 'syncing', pending: activeSyncJobs + failedSyncJobs.size })
     try {
       await syncStoreChange(key, previousRaw, nextRaw)
+      latestSyncErrors.delete(key)
       failedSyncJobs.delete(id)
       activeSyncJobs -= 1
       publishSyncStatus(failedSyncJobs.size > 0
@@ -149,6 +171,7 @@ function queueStoreChange(key: string, previousRaw: string | null, nextRaw: stri
       activeSyncJobs -= 1
       failedSyncJobs.set(id, execute)
       const message = error instanceof Error ? error.message : 'Database synchronization failed.'
+      latestSyncErrors.set(key, error instanceof Error ? error : new Error(message))
       console.error(`Database synchronization failed for ${key}.`, error)
       publishSyncStatus({ phase: 'failed', pending: failedSyncJobs.size, error: message })
     }

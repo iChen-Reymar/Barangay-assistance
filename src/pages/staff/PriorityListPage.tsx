@@ -20,10 +20,20 @@ import { featureLabel } from '../../services/mlService'
 import { getAssociations, subscribeAssociationStorage } from '../../services/associationStorage'
 import { getAssociationMembers, subscribeMemberStorage } from '../../services/memberStorage'
 import { getPrograms, subscribeProgramStorage } from '../../services/programStorage'
-import { getAssistanceItems, markAssistanceListGenerated, subscribeDecisionStorage } from '../../services/decisionStorage'
+import {
+  getAssistanceItems,
+  getItemById,
+  markAssistanceListGenerated,
+  markAssistanceUnderReview,
+  subscribeDecisionStorage,
+} from '../../services/decisionStorage'
 import { getStaffBeneficiaries, subscribeStaffBeneficiaryStorage } from '../../services/staffBeneficiaryStorage'
 import { addStaffBeneficiary, updateStaffBeneficiary } from '../../services/staffBeneficiaryStorage'
 import { StaffBeneficiaryFormModal, type StaffBeneficiaryFormInput } from '../../components/staff/StaffBeneficiaryFormModal'
+import { synchronizeRecordNow, waitForDatabaseSynchronization } from '../../services/databaseSync'
+import { listGenerationTransitionError } from '../../services/assistanceWorkflow'
+
+const REVIEWABLE_ITEMS_KEY = 'barangay_reviewable_items'
 
 type PriorityItem = Omit<GeneratedAssistanceRow, 'score' | 'verification'> & {
   score: number | null
@@ -190,6 +200,18 @@ export default function StaffPriorityListPage() {
         setGenerationMessage('Verify every request document and complete all qualification checks before generating the final list.')
         return
       }
+      let reviewedRequest = getItemById(request.id)
+      if (reviewedRequest?.status === 'PENDING') {
+        reviewedRequest = markAssistanceUnderReview(request.id)
+      }
+      if (!reviewedRequest) throw new Error('The selected assistance request is no longer available.')
+      const transitionError = listGenerationTransitionError(reviewedRequest.status)
+      if (transitionError) throw new Error(transitionError)
+
+      // Do not start ML processing until Supabase has accepted the Staff-review
+      // transition. This prevents an asynchronous PENDING -> LIST GENERATED write.
+      await synchronizeRecordNow(REVIEWABLE_ITEMS_KEY, reviewedRequest.id, reviewedRequest)
+
       const roster = membersOnAssociations(request.association)
       const eligibleMembers = new Set(roster.map((member) => member.id))
       const measured = assessed.filter(
@@ -216,7 +238,11 @@ export default function StaffPriorityListPage() {
         throw new Error('The ML service did not produce a complete final list. The request status was not changed.')
       }
       setSource(generatedList)
-      markAssistanceListGenerated(request.id)
+      const finalizedRequest = markAssistanceListGenerated(request.id)
+      if (!finalizedRequest || finalizedRequest.status !== 'LIST GENERATED') {
+        throw new Error('The request could not be finalized because it has not completed Staff review.')
+      }
+      await waitForDatabaseSynchronization(REVIEWABLE_ITEMS_KEY)
       setGenerationMessage(`Final prioritized list generated for ${requestRows.length} household${requestRows.length === 1 ? '' : 's'} in request ${request.id}.`)
     } catch (error) {
       setGenerationMessage(error instanceof Error ? error.message : 'Unable to generate the final prioritized list.')

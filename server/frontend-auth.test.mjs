@@ -14,6 +14,7 @@ globalThis.sessionStorage = new MemoryStorage()
 
 const persistence = await import('../src/services/sessionPersistence.ts')
 const recovery = await import('../src/services/passwordRecovery.ts')
+const workflow = await import('../src/services/assistanceWorkflow.ts')
 
 test('non-remembered Supabase sessions stay in session storage', () => {
   persistence.setRememberSession(false)
@@ -44,4 +45,10 @@ test('password recovery rejects internal addresses and weak passwords', () => {
   assert.match(recovery.newPasswordError('123', '123'), /8 characters/)
   assert.match(recovery.newPasswordError('long-password', 'different-password'), /do not match/)
   assert.equal(recovery.newPasswordError('long-password', 'long-password'), '')
+})
+
+test('final list generation requires the persisted Staff-review transition', () => {
+  assert.match(workflow.listGenerationTransitionError('PENDING'), /enter Staff review/)
+  assert.equal(workflow.listGenerationTransitionError('UNDER REVIEW'), null)
+  assert.match(workflow.listGenerationTransitionError('APPROVED'), /finalized/i)
 })
