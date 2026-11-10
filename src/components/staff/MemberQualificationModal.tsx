@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useState, type FormEvent } from 'react'
 import { createPortal } from 'react-dom'
 import {
   CheckCircle,
@@ -18,8 +18,10 @@ import { formatDate } from '../../services/authStorage'
 import { formatDecisionDate } from '../../services/decisionStorage'
 import { getAssociationMembers, subscribeMemberStorage, verifyMemberRecord } from '../../services/memberStorage'
 import {
+  addStaffBeneficiary,
   getStaffBeneficiaries,
   subscribeStaffBeneficiaryStorage,
+  updateStaffBeneficiary,
   verifyStaffBeneficiary,
 } from '../../services/staffBeneficiaryStorage'
 import {
@@ -399,6 +401,7 @@ export function MemberQualificationModal({
             onVerifyQualification={onVerifyQualification}
             onViewDocument={openDocument}
             reviewerName={reviewerName}
+            assessment={beneficiaries.find((row) => row.memberId === person.id || row.id === person.id)}
           />
         ) : (
           <MemberList
@@ -505,6 +508,7 @@ function PersonReview({
   onVerifyQualification,
   onViewDocument,
   reviewerName,
+  assessment,
 }: {
   person: ReviewPerson
   association: string
@@ -526,9 +530,10 @@ function PersonReview({
   ) => void
   onViewDocument: (request: ReviewableAssistanceItem, doc: SupportingDocument) => void
   reviewerName: string
+  assessment?: StaffBeneficiary
 }) {
   const verified = person.kind === 'member'
-    ? person.member.staffVerified === true
+    ? person.member.staffVerified === true && assessment?.verification === 'VERIFIED'
     : person.beneficiary.verification === 'VERIFIED'
   const verifiedBy = person.kind === 'member' ? person.member.staffVerifiedBy : undefined
   const verifiedAt = person.kind === 'member' ? person.member.staffVerifiedAt : undefined
@@ -553,20 +558,20 @@ function PersonReview({
           <ChevronLeft className="h-4 w-4" />
           {association} members
         </button>
-        {verified ? (
+        {person.kind === 'beneficiary' && verified ? (
           <Badge variant="success">VERIFIED</Badge>
-        ) : (
+        ) : person.kind === 'beneficiary' ? (
           <Button size="sm" onClick={markVerified}>
             Verified
           </Button>
-        )}
+        ) : null}
       </div>
-      {verified && verifiedBy && verifiedAt ? (
+      {person.kind === 'member' && verified && verifiedBy && verifiedAt ? (
         <p className="text-xs text-green-700">
-          Verified by {verifiedBy} on {formatDate(verifiedAt)}. Incomplete documents were not required.
+          Qualification verified by {verifiedBy} on {formatDate(verifiedAt)}.
         </p>
       ) : null}
-      {!verified ? (
+      {person.kind === 'beneficiary' && !verified ? (
         <p className="text-xs text-gray-500">
           You can mark this record verified even when some documents are not complete.
         </p>
@@ -583,6 +588,15 @@ function PersonReview({
           <BeneficiaryDetails beneficiary={person.beneficiary} association={association} />
         )}
       </section>
+
+      {person.kind === 'member' ? (
+        <MemberHouseholdVerification
+          key={person.member.id}
+          member={person.member}
+          existing={assessment}
+          reviewerName={reviewerName}
+        />
+      ) : null}
 
       <section>
         <h3 className="mb-3 flex items-center gap-2 text-sm font-bold text-gray-900">
@@ -613,6 +627,137 @@ function PersonReview({
         )}
       </section>
     </div>
+  )
+}
+
+interface HouseholdVerificationForm {
+  familySize: number
+  monthlyIncome: number
+  workingHouseholdMembers: number
+  age: number
+  employmentStatus: string
+  housingCondition: string
+}
+
+function MemberHouseholdVerification({
+  member,
+  existing,
+  reviewerName,
+}: {
+  member: AssociationMember
+  existing?: StaffBeneficiary
+  reviewerName: string
+}) {
+  const [form, setForm] = useState<HouseholdVerificationForm>(() => ({
+    familySize: existing?.familySize ?? member.familySize,
+    monthlyIncome: existing?.monthlyIncome ?? 0,
+    workingHouseholdMembers: existing?.workingHouseholdMembers ?? 0,
+    age: existing?.age ?? member.age,
+    employmentStatus: existing?.employmentStatus ?? '',
+    housingCondition: existing?.housingCondition ?? '',
+  }))
+  const [error, setError] = useState('')
+
+  function submit(event: FormEvent) {
+    event.preventDefault()
+    setError('')
+    if (form.familySize < 1) return setError('Family size must be at least 1.')
+    if (form.monthlyIncome <= 0) return setError('Monthly income must be greater than zero.')
+    if (form.workingHouseholdMembers < 0 || form.workingHouseholdMembers > form.familySize) {
+      return setError('Working household members must be between 0 and the family size.')
+    }
+    if (form.age < 1) return setError('Age is required.')
+    if (!form.employmentStatus.trim()) return setError('Employment status is required.')
+    if (!form.housingCondition.trim()) return setError('Housing condition is required.')
+
+    const record: StaffBeneficiary = {
+      ...(existing ?? {}),
+      id: existing?.id ?? crypto.randomUUID(),
+      memberId: member.id,
+      name: member.name.trim(),
+      association: member.associationName || 'Unassigned',
+      familySize: form.familySize,
+      monthlyIncome: form.monthlyIncome,
+      workingHouseholdMembers: form.workingHouseholdMembers,
+      age: form.age,
+      employmentStatus: form.employmentStatus,
+      housingCondition: form.housingCondition,
+      vulnerability: member.vulnerability,
+      verification: 'VERIFIED',
+      vulnerabilityIndicators: existing?.vulnerabilityIndicators ?? [
+        ...(member.isPwd ? ['PWD Member (Person with Disability)'] : []),
+        ...(member.isSenior ? ['Elderly Member (60+)'] : []),
+      ],
+    }
+    if (existing) updateStaffBeneficiary(record)
+    else addStaffBeneficiary(record)
+    verifyMemberRecord(member.id, reviewerName)
+  }
+
+  const inputClass = 'w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary'
+
+  return (
+    <section>
+      <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+        <h3 className="flex items-center gap-2 text-sm font-bold text-gray-900">
+          <ShieldCheck className="h-4 w-4 text-primary" />
+          Member Qualification Data
+        </h3>
+        {member.staffVerified && existing?.verification === 'VERIFIED' ? <Badge variant="success">VERIFIED</Badge> : null}
+      </div>
+      <form onSubmit={submit} className="space-y-4 rounded-lg border border-gray-200 bg-gray-50 p-4">
+        <p className="text-xs text-gray-500">
+          Complete these household fields and verify the member for ML vulnerability scoring.
+        </p>
+        {error ? <p className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">{error}</p> : null}
+        <div className="grid gap-3 sm:grid-cols-3">
+          <label className="text-xs font-semibold uppercase text-gray-500">
+            Family Size
+            <input type="number" min={1} required value={form.familySize || ''} onChange={(event) => setForm((current) => ({ ...current, familySize: Number(event.target.value) || 0 }))} className={`mt-1 ${inputClass}`} />
+          </label>
+          <label className="text-xs font-semibold uppercase text-gray-500">
+            Monthly Income
+            <input type="number" min={0.01} step="0.01" required value={form.monthlyIncome || ''} onChange={(event) => setForm((current) => ({ ...current, monthlyIncome: Number(event.target.value) || 0 }))} className={`mt-1 ${inputClass}`} />
+          </label>
+          <label className="text-xs font-semibold uppercase text-gray-500">
+            Working Members
+            <input type="number" min={0} max={form.familySize} required value={form.workingHouseholdMembers} onChange={(event) => setForm((current) => ({ ...current, workingHouseholdMembers: Number(event.target.value) || 0 }))} className={`mt-1 ${inputClass}`} />
+          </label>
+        </div>
+        <div className="grid gap-3 sm:grid-cols-3">
+          <label className="text-xs font-semibold uppercase text-gray-500">
+            Age
+            <input type="number" min={1} required value={form.age || ''} onChange={(event) => setForm((current) => ({ ...current, age: Number(event.target.value) || 0 }))} className={`mt-1 ${inputClass}`} />
+          </label>
+          <label className="text-xs font-semibold uppercase text-gray-500">
+            Employment
+            <select required value={form.employmentStatus} onChange={(event) => setForm((current) => ({ ...current, employmentStatus: event.target.value }))} className={`mt-1 ${inputClass}`}>
+              <option value="">Select status</option>
+              <option>Employed</option>
+              <option>Self-Employed</option>
+              <option>Seasonal Worker</option>
+              <option>Unemployed</option>
+            </select>
+          </label>
+          <label className="text-xs font-semibold uppercase text-gray-500">
+            Housing Condition
+            <select required value={form.housingCondition} onChange={(event) => setForm((current) => ({ ...current, housingCondition: event.target.value }))} className={`mt-1 ${inputClass}`}>
+              <option value="">Select condition</option>
+              <option>Concrete</option>
+              <option>Light Materials</option>
+              <option>Temporary</option>
+              <option>Makeshift / Salvaged</option>
+            </select>
+          </label>
+        </div>
+        <div className="flex justify-end">
+          <Button type="submit" size="sm">
+            <CheckCircle className="h-4 w-4" />
+            {member.staffVerified && existing?.verification === 'VERIFIED' ? 'Update Verification' : 'Save & Verify Member'}
+          </Button>
+        </div>
+      </form>
+    </section>
   )
 }
 

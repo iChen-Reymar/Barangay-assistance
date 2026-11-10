@@ -40,8 +40,6 @@ import StaffAidRecordsPage from './pages/staff/AidRecordsPage'
 import StaffStatusReportsPage from './pages/staff/StatusReportsPage'
 import StaffVerifyQualificationPage from './pages/staff/VerifyQualificationPage'
 import StaffSettingsPage from './pages/staff/SettingsPage'
-import StaffBeneficiariesPage from './pages/staff/BeneficiariesPage'
-import StaffAddBeneficiaryPage from './pages/staff/AddBeneficiaryPage'
 
 export default function App() {
   return (
@@ -109,8 +107,6 @@ export default function App() {
           <Route index element={<StaffDashboardPage />} />
           <Route path="vulnerability-assessment" element={<StaffVulnerabilityAssessmentPage />} />
           <Route path="assistance-requests" element={<StaffAssistanceRequestsPage />} />
-          <Route path="beneficiaries" element={<StaffBeneficiariesPage />} />
-          <Route path="beneficiaries/add" element={<StaffAddBeneficiaryPage />} />
           <Route path="priority-list" element={<StaffPriorityListPage />} />
           <Route path="recommendations" element={<StaffRecommendationsPage />} />
           <Route path="verify-qualification" element={<StaffVerifyQualificationPage />} />

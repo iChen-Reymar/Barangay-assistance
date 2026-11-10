@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { FileDown, Sparkles, Loader2, GitBranch, Sigma, AlertTriangle, ClipboardCheck } from 'lucide-react'
+import { FileDown, Sparkles, Loader2, GitBranch, Sigma, AlertTriangle } from 'lucide-react'
 import { DashboardNavbar } from '../../components/layout/DashboardNavbar'
 import { DataTable, type Column } from '../../components/ui/DataTable'
 import { Badge } from '../../components/ui/Badge'
@@ -28,8 +28,6 @@ import {
   subscribeDecisionStorage,
 } from '../../services/decisionStorage'
 import { getStaffBeneficiaries, subscribeStaffBeneficiaryStorage } from '../../services/staffBeneficiaryStorage'
-import { addStaffBeneficiary, updateStaffBeneficiary } from '../../services/staffBeneficiaryStorage'
-import { StaffBeneficiaryFormModal, type StaffBeneficiaryFormInput } from '../../components/staff/StaffBeneficiaryFormModal'
 import { synchronizeRecordNow, waitForDatabaseSynchronization } from '../../services/databaseSync'
 import { listGenerationTransitionError } from '../../services/assistanceWorkflow'
 
@@ -39,8 +37,6 @@ type PriorityItem = Omit<GeneratedAssistanceRow, 'score' | 'verification'> & {
   score: number | null
   verification: VerificationStatus
   documentEligible: boolean
-  assessmentStatus: 'MISSING' | 'INCOMPLETE' | 'VERIFIED'
-  missingAssessmentFields: string[]
   member: AssociationMember
 }
 
@@ -72,21 +68,7 @@ function findAssessment(assessments: StaffBeneficiary[], member: AssociationMemb
     ?? assessments.find((beneficiary) => beneficiary.id === member.id)
 }
 
-function missingAssessmentFields(beneficiary?: StaffBeneficiary) {
-  if (!beneficiary) return ['Assessment record', 'Family size', 'Monthly income', 'Working household members', 'Age', 'Employment status', 'Housing condition', 'Staff verification']
-  const missing: string[] = []
-  if (beneficiary.familySize < 1) missing.push('Family size')
-  if (beneficiary.monthlyIncome <= 0) missing.push('Monthly income')
-  if (beneficiary.workingHouseholdMembers === undefined) missing.push('Working household members')
-  if ((beneficiary.age ?? 0) < 1) missing.push('Age')
-  if (!beneficiary.employmentStatus?.trim()) missing.push('Employment status')
-  if (!beneficiary.housingCondition?.trim()) missing.push('Housing condition')
-  if (beneficiary.verification !== 'VERIFIED') missing.push('Staff verification')
-  return missing
-}
-
 function unscoredMember(member: AssociationMember, associationName: string, assessment?: StaffBeneficiary): PriorityItem {
-  const missing = missingAssessmentFields(assessment)
   return {
     id: member.id,
     beneficiaryId: member.id,
@@ -100,8 +82,6 @@ function unscoredMember(member: AssociationMember, associationName: string, asse
     reason: '',
     generatedAt: '',
     documentEligible: memberEligibleForList(member),
-    assessmentStatus: !assessment ? 'MISSING' : missing.length ? 'INCOMPLETE' : 'VERIFIED',
-    missingAssessmentFields: missing,
     member,
   }
 }
@@ -113,7 +93,7 @@ function vulnerabilityVariant(level: VulnerabilityLevel) {
 }
 
 function downloadList(rows: PriorityItem[]) {
-  const header = ['Rank', 'Name', 'Association', 'Score', 'Classification', 'Program', 'Document Eligibility', 'Assessment Status', 'Missing Assessment Fields', 'Scored By', 'Decision Tree', 'Logistic Regression']
+  const header = ['Rank', 'Name', 'Association', 'Score', 'Classification', 'Program', 'Document Eligibility', 'Scored By', 'Decision Tree', 'Logistic Regression']
   const lines = rows.map((row) =>
     [
       row.rank,
@@ -123,8 +103,6 @@ function downloadList(rows: PriorityItem[]) {
       row.classification,
       row.program,
       row.documentEligible ? 'ELIGIBLE' : 'DOCUMENTS REQUIRED',
-      row.assessmentStatus,
-      row.missingAssessmentFields.join('; '),
       row.engine === 'ml' ? 'ML Models' : 'Local Rules',
       row.decisionTreePrediction ?? '',
       row.logisticRegressionPrediction ?? '',
@@ -153,7 +131,6 @@ export default function StaffPriorityListPage() {
   const [selected, setSelected] = useState<GeneratedAssistanceRow | null>(null)
   const [selectedRequestId, setSelectedRequestId] = useState('')
   const [generationMessage, setGenerationMessage] = useState('')
-  const [assessmentMember, setAssessmentMember] = useState<AssociationMember | null>(null)
 
   const associationOptions = [
     'All Associations',
@@ -272,8 +249,6 @@ export default function StaffPriorityListPage() {
         ...scored,
         association: associationName,
         documentEligible: memberEligibleForList(member),
-        assessmentStatus: 'VERIFIED' as const,
-        missingAssessmentFields: [],
         member,
       }
     })
@@ -297,37 +272,12 @@ export default function StaffPriorityListPage() {
   }, [association, assessed, classification, program, rosterForSelection, selectedRequestId, source])
 
   const selectedRequest = requests.find((item) => item.id === selectedRequestId)
-  const readyAssessmentCount = selectedRequest
+  const readyMemberCount = selectedRequest
     ? membersOnAssociations(selectedRequest.association).filter((member) => {
         const assessment = findAssessment(assessed, member)
         return Boolean(assessment && completeAssessment(assessment))
       }).length
     : 0
-
-  const assessmentInitialValues = useMemo<StaffBeneficiary | undefined>(() => {
-    if (!assessmentMember) return undefined
-    const existing = assessed.find((beneficiary) => beneficiary.memberId === assessmentMember.id)
-      ?? assessed.find((beneficiary) => beneficiary.id === assessmentMember.id)
-    if (existing) return existing
-    return {
-      id: crypto.randomUUID(),
-      memberId: assessmentMember.id,
-      name: assessmentMember.name,
-      association: assessmentMember.associationName || 'Unassigned',
-      familySize: assessmentMember.familySize,
-      monthlyIncome: 0,
-      workingHouseholdMembers: 0,
-      age: assessmentMember.age || undefined,
-      vulnerability: assessmentMember.vulnerability,
-      verification: 'PENDING',
-      employmentStatus: '',
-      housingCondition: '',
-      vulnerabilityIndicators: [
-        ...(assessmentMember.isPwd ? ['PWD Member (Person with Disability)'] : []),
-        ...(assessmentMember.isSenior ? ['Elderly Member (60+)'] : []),
-      ],
-    }
-  }, [assessed, assessmentMember])
 
   const pagination = usePagination(generated, PAGE_SIZE_DEFAULT, `${classification}-${association}-${program}`, 'records')
 
@@ -363,20 +313,6 @@ export default function StaffPriorityListPage() {
       ),
     },
     {
-      key: 'assessmentStatus',
-      header: 'Assessment Status',
-      render: (r) => (
-        <div className="max-w-48">
-          <Badge variant={r.assessmentStatus === 'VERIFIED' ? 'success' : r.assessmentStatus === 'INCOMPLETE' ? 'warning' : 'neutral'}>
-            {r.assessmentStatus}
-          </Badge>
-          {r.missingAssessmentFields.length ? (
-            <p className="mt-1 text-xs text-gray-500">Missing: {r.missingAssessmentFields.join(', ')}</p>
-          ) : null}
-        </div>
-      ),
-    },
-    {
       key: 'scoredBy',
       header: 'Scored By',
       render: (r) =>
@@ -399,16 +335,6 @@ export default function StaffPriorityListPage() {
           </span>
         ),
     },
-    {
-      key: 'assessmentAction',
-      header: 'Assessment',
-      render: (r) => (
-        <Button size="sm" variant="outline" onClick={() => setAssessmentMember(r.member)}>
-          <ClipboardCheck className="h-3.5 w-3.5" />
-          {r.assessmentStatus === 'MISSING' ? 'Complete Assessment' : 'Update Assessment'}
-        </Button>
-      ),
-    },
   ]
 
   return (
@@ -422,7 +348,7 @@ export default function StaffPriorityListPage() {
       <main className="flex-1 overflow-y-auto p-4 sm:p-5 md:p-6">
         <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
           <p className="max-w-3xl text-sm text-gray-500">
-            Members need eligible documents and a complete Staff-verified household assessment before ML scoring. Select a request, complete any missing assessments, then generate its assistance list.
+            Members are prepared for ML scoring in Verify Qualification. Select a request, then generate its prioritized assistance list.
           </p>
           <div className="flex flex-wrap items-center gap-2">
             <label className="text-xs font-semibold uppercase text-gray-500">
@@ -446,7 +372,7 @@ export default function StaffPriorityListPage() {
                 ))}
               </select>
             </label>
-          <Button onClick={handleGenerate} disabled={generating || !selectedRequestId || readyAssessmentCount === 0}>
+          <Button onClick={handleGenerate} disabled={generating || !selectedRequestId || readyMemberCount === 0}>
             {generating ? (
               <Loader2 className="h-4 w-4 animate-spin" />
             ) : (
@@ -459,9 +385,9 @@ export default function StaffPriorityListPage() {
         {generationMessage ? (
           <p className="mb-4 rounded-lg border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-800">{generationMessage}</p>
         ) : null}
-        {selectedRequestId && readyAssessmentCount === 0 ? (
+        {selectedRequestId && readyMemberCount === 0 ? (
           <p className="mb-4 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
-            Complete and verify at least one eligible member assessment to enable generation.
+            Verify at least one eligible member in Verify Qualification to enable generation.
           </p>
         ) : null}
         <div className="rounded-lg border border-gray-200 bg-white shadow-sm">
@@ -508,38 +434,6 @@ export default function StaffPriorityListPage() {
           />
         </div>
         {selected && <ScoreExplanation row={selected} onClose={() => setSelected(null)} />}
-        <StaffBeneficiaryFormModal
-          open={Boolean(assessmentMember)}
-          onClose={() => setAssessmentMember(null)}
-          title="Complete Household Assessment"
-          initialValues={assessmentInitialValues}
-          identityReadOnly
-          onSave={(input: StaffBeneficiaryFormInput) => {
-            if (!assessmentMember) return
-            const existing = findAssessment(assessed, assessmentMember)
-            const record: StaffBeneficiary = {
-              ...(existing ?? {}),
-              id: existing?.id ?? crypto.randomUUID(),
-              memberId: assessmentMember.id,
-              name: assessmentMember.name.trim(),
-              association: assessmentMember.associationName || input.association,
-              familySize: input.familySize,
-              monthlyIncome: input.monthlyIncome,
-              workingHouseholdMembers: input.workingHouseholdMembers,
-              age: input.age,
-              employmentStatus: input.employmentStatus,
-              housingCondition: input.housingCondition,
-              vulnerability: input.vulnerability,
-              verification: input.verification,
-              vulnerabilityIndicators: existing?.vulnerabilityIndicators ?? [
-                ...(assessmentMember.isPwd ? ['PWD Member (Person with Disability)'] : []),
-                ...(assessmentMember.isSenior ? ['Elderly Member (60+)'] : []),
-              ],
-            }
-            if (existing) updateStaffBeneficiary(record)
-            else addStaffBeneficiary(record)
-          }}
-        />
       </main>
     </>
   )
