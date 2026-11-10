@@ -37,6 +37,7 @@ export interface SupportingDocument {
   verifiedBy?: string
   verifiedAt?: string
   dataUrl?: string
+  storagePath?: string
   rejectionReason?: string
 }
 

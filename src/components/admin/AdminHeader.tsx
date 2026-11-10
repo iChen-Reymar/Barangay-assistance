@@ -22,7 +22,7 @@ export function AdminHeader({
       searchPlaceholder={searchPlaceholder}
       userName={displayName}
       userInitials={initials}
-      notificationsPath="/admin/access-requests"
+      notificationsPath="/admin/people?view=access"
       notificationCount={pendingRequests.length}
     />
   )

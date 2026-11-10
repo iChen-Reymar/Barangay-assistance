@@ -15,7 +15,7 @@ import type { ReviewableAssistanceItem } from '../../types/approval'
 import type { RequestStatus } from '../../data/mockData'
 import { getGeneratedAssistanceList, subscribeGeneratedAssistanceList } from '../../services/aiProcessing'
 
-export default function AssistanceRequestsPage() {
+export default function AssistanceRequestsPage({ embedded = false }: { embedded?: boolean }) {
   const [items, setItems] = useState<ReviewableAssistanceItem[]>(() => getAssistanceItems())
   const [generated, setGenerated] = useState(() => getGeneratedAssistanceList())
   const [statusFilter, setStatusFilter] = useState<'All' | RequestStatus>('All')
@@ -33,8 +33,8 @@ export default function AssistanceRequestsPage() {
 
   return (
     <>
-      <AdminHeader title="Assistance Requests Monitoring" />
-      <main className="flex-1 overflow-y-auto p-4 sm:p-5 md:p-6">
+      {!embedded ? <AdminHeader title="Assistance Requests Monitoring" /> : null}
+      <div className={embedded ? '' : 'flex-1 overflow-y-auto p-4 sm:p-5 md:p-6'}>
         <div className="rounded-lg border border-gray-200 bg-white shadow-sm">
           <ResponsiveToolbar>
             <select
@@ -94,6 +94,7 @@ export default function AssistanceRequestsPage() {
                   <AssistanceRequestRowActions
                     item={row}
                     onView={setViewItem}
+                    showTextDetails={false}
                   />
                 ),
               },
@@ -107,7 +108,7 @@ export default function AssistanceRequestsPage() {
             onPageChange={pagination.setCurrentPage}
           />
         </div>
-      </main>
+      </div>
 
       <RequestDetailsModal
         open={!!viewItem}

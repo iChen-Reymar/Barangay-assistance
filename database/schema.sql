@@ -199,6 +199,7 @@ create table if not exists public.request_documents (
   verified_by text,
   verified_at text,
   data_url text,
+  storage_path text,
   payload jsonb not null default '{}'::jsonb
 );
 
@@ -417,6 +418,7 @@ alter table public.assistance_requests add column if not exists monthly_income t
 alter table public.assistance_requests add column if not exists vulnerability_score integer;
 alter table public.assistance_requests add column if not exists payload jsonb not null default '{}'::jsonb;
 alter table public.request_documents add column if not exists data_url text;
+alter table public.request_documents add column if not exists storage_path text;
 alter table public.request_documents add column if not exists payload jsonb not null default '{}'::jsonb;
 alter table public.qualification_checks add column if not exists payload jsonb not null default '{}'::jsonb;
 alter table public.request_decisions add column if not exists payload jsonb not null default '{}'::jsonb;
@@ -1079,5 +1081,51 @@ create policy privacy_settings_write_admin on public.privacy_settings for all to
   with check (public.current_app_role() = 'admin');
 
 drop policy if exists public_account_request on public.users;
+
+-- Private request files. New uploads store only this object path in
+-- request_documents; existing data_url rows remain readable during migration.
+insert into storage.buckets (id, name, public, file_size_limit)
+values ('request-documents', 'request-documents', false, 5242880)
+on conflict (id) do update
+set public = excluded.public,
+    file_size_limit = excluded.file_size_limit;
+
+drop policy if exists request_documents_storage_insert on storage.objects;
+create policy request_documents_storage_insert on storage.objects for insert to authenticated
+  with check (
+    bucket_id = 'request-documents'
+    and (storage.foldername(name))[1] = auth.uid()::text
+  );
+
+drop policy if exists request_documents_storage_read on storage.objects;
+create policy request_documents_storage_read on storage.objects for select to authenticated
+  using (
+    bucket_id = 'request-documents'
+    and (
+      (storage.foldername(name))[1] = auth.uid()::text
+      or public.current_app_role() in ('admin', 'staff')
+    )
+  );
+
+drop policy if exists request_documents_storage_update on storage.objects;
+create policy request_documents_storage_update on storage.objects for update to authenticated
+  using (
+    bucket_id = 'request-documents'
+    and (
+      (storage.foldername(name))[1] = auth.uid()::text
+      or public.current_app_role() = 'staff'
+    )
+  )
+  with check (bucket_id = 'request-documents');
+
+drop policy if exists request_documents_storage_delete on storage.objects;
+create policy request_documents_storage_delete on storage.objects for delete to authenticated
+  using (
+    bucket_id = 'request-documents'
+    and (
+      (storage.foldername(name))[1] = auth.uid()::text
+      or public.current_app_role() = 'admin'
+    )
+  );
 -- Public account requests go through the rate-limited Express endpoint. There
 -- is intentionally no anonymous direct-write policy on the users table.

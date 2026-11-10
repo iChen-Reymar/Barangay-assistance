@@ -54,6 +54,7 @@ export function getAssociationAssistanceItems(associationName: string): Reviewab
 }
 
 export function submitAssociationAssistanceRequest(input: {
+  id?: string
   association: string
   program: string
   memberCount: number
@@ -67,7 +68,8 @@ export function submitAssociationAssistanceRequest(input: {
     name: string
     type: string
     fileSize: string
-    dataUrl: string
+    dataUrl?: string
+    storagePath?: string
   }>
 }): ReviewableAssistanceItem {
   const now = new Date()
@@ -75,7 +77,7 @@ export function submitAssociationAssistanceRequest(input: {
   const existing = readItems()
 
   const item: ReviewableAssistanceItem = {
-    id: `REQ-${crypto.randomUUID()}`,
+    id: input.id ?? `REQ-${crypto.randomUUID()}`,
     source: 'assistance',
     association: input.association.trim(),
     requestType: input.program.trim(),

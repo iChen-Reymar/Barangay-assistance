@@ -3,6 +3,7 @@ import { Outlet } from 'react-router-dom'
 import { DashboardLayoutProvider } from './DashboardLayoutContext'
 import { DashboardSidebar, type NavItem } from './DashboardSidebar'
 import { pullFromDatabase } from '../../services/databaseSync'
+import { SyncStatusIndicator } from './SyncStatusIndicator'
 
 interface DashboardLayoutProps {
   navItems: NavItem[]
@@ -52,6 +53,7 @@ export default function DashboardLayout({ navItems, user, logoutPath, settingsPa
         <div className="flex h-screen min-w-0 flex-col overflow-hidden lg:ml-64">
           <Outlet />
         </div>
+        <SyncStatusIndicator />
       </div>
     </DashboardLayoutProvider>
   )

@@ -8,8 +8,12 @@ interface ProtectedRouteProps {
 }
 
 export function ProtectedRoute({ allowedRoles, children }: ProtectedRouteProps) {
-  const { user } = useAuth()
+  const { user, authReady } = useAuth()
   const location = useLocation()
+
+  if (!authReady) {
+    return <div className="flex min-h-screen items-center justify-center bg-gray-50 text-sm text-gray-500">Checking your session...</div>
+  }
 
   if (!user) {
     return <Navigate to="/login" replace state={{ from: location.pathname }} />
@@ -27,7 +31,11 @@ interface PublicOnlyRouteProps {
 }
 
 export function PublicOnlyRoute({ children }: PublicOnlyRouteProps) {
-  const { user } = useAuth()
+  const { user, authReady } = useAuth()
+
+  if (!authReady) {
+    return <div className="flex min-h-screen items-center justify-center bg-gray-50 text-sm text-gray-500">Checking your session...</div>
+  }
 
   if (user) {
     return <Navigate to={roleToDashboardPath(user.role)} replace />

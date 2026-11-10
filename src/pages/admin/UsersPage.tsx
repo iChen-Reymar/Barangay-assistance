@@ -1,4 +1,4 @@
-﻿import { useEffect, useState } from 'react'
+﻿import { useEffect, useMemo, useState } from 'react'
 import { Plus } from 'lucide-react'
 import { AdminHeader } from '../../components/admin/AdminHeader'
 import { Badge } from '../../components/ui/Badge'
@@ -11,10 +11,12 @@ import { buildChanges, logAuditEvent } from '../../services/auditStorage'
 import {
   createManagedUser,
   removeUser,
+  sendUserPasswordReset,
   updateManagedUser,
   updateUserRole,
 } from '../../services/authStorage'
 import type { StoredUser, UserRole } from '../../types/auth'
+import { recoveryEmailError } from '../../services/passwordRecovery'
 
 const roleOptions: { value: UserRole; label: string }[] = [
   { value: 'admin', label: 'Administrator' },
@@ -38,7 +40,7 @@ function statusVariant(status: StoredUser['status']) {
   return 'warning' as const
 }
 
-export default function UsersPage() {
+export default function UsersPage({ embedded = false }: { embedded?: boolean }) {
   const { user, profile, allUsers, refreshUsers } = useAuth()
   const actorName = profile?.fullName ?? user?.fullName ?? 'Administrator'
   const actorEmail = profile?.email ?? user?.email
@@ -46,9 +48,13 @@ export default function UsersPage() {
   const [formOpen, setFormOpen] = useState(false)
   const [removeTarget, setRemoveTarget] = useState<StoredUser | null>(null)
   const [editTarget, setEditTarget] = useState<StoredUser | null>(null)
+  const [resetTarget, setResetTarget] = useState<StoredUser | null>(null)
   const [saving, setSaving] = useState(false)
   const [message, setMessage] = useState('')
   const [error, setError] = useState('')
+  const [authAdministration, setAuthAdministration] = useState(false)
+  const [search, setSearch] = useState('')
+  const [roleFilter, setRoleFilter] = useState<'all' | UserRole>('all')
   const [editForm, setEditForm] = useState({
     firstName: '',
     lastName: '',
@@ -66,6 +72,22 @@ export default function UsersPage() {
   })
 
   useEffect(() => subscribeAssociationStorage(() => setAssociations(getAssociations())), [])
+  useEffect(() => {
+    void fetch('/api/health')
+      .then((response) => response.json())
+      .then((body: { authAdministration?: boolean }) => setAuthAdministration(Boolean(body.authAdministration)))
+      .catch(() => setAuthAdministration(false))
+  }, [])
+
+  const visibleUsers = useMemo(() => {
+    const term = search.trim().toLowerCase()
+    return allUsers.filter((account) => {
+      if (roleFilter !== 'all' && account.role !== roleFilter) return false
+      if (!term) return true
+      return [account.fullName, account.email, account.associationName, account.roleLabel]
+        .some((value) => String(value || '').toLowerCase().includes(term))
+    })
+  }, [allUsers, roleFilter, search])
 
   function audit(description: string, changes: ReturnType<typeof buildChanges>) {
     logAuditEvent({
@@ -184,18 +206,45 @@ export default function UsersPage() {
     setRemoveTarget(null)
   }
 
+  async function handlePasswordReset() {
+    if (!resetTarget) return
+    setError('')
+    setSaving(true)
+    const target = resetTarget
+    const result = await sendUserPasswordReset(target.email)
+    setSaving(false)
+    if (!result.success) {
+      setError(result.error ?? 'Could not send the password reset email.')
+      setResetTarget(null)
+      return
+    }
+    setMessage(`A password reset link was sent to ${target.email}.`)
+    audit(`Sent a password reset link to ${target.fullName}.`, buildChanges([
+      { key: 'passwordReset', label: 'Password reset', oldValue: 'Not requested', newValue: 'Email sent' },
+    ]))
+    setResetTarget(null)
+  }
+
   return (
     <>
-      <AdminHeader title="Manage Users" />
-      <main className="flex-1 overflow-y-auto p-4 sm:p-5 md:p-6">
+      {!embedded ? <AdminHeader title="Manage Users" /> : null}
+      <div className={embedded ? '' : 'flex-1 overflow-y-auto p-4 sm:p-5 md:p-6'}>
         <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
           <p className="max-w-2xl text-sm text-gray-500">
-            Add people, edit a name or email, change or reset a password, or change whether an account is an administrator, barangay staff, or association head.
+            {authAdministration
+              ? 'Add people, update account details, or change whether someone is an administrator, barangay staff, or association head.'
+              : 'Update profile names, permissions, and association access. Login credentials remain protected by Supabase Auth.'}
           </p>
-          <Button onClick={() => { setError(''); setFormOpen(true) }}>
-            <Plus className="h-4 w-4" />
-            Add User
-          </Button>
+          {authAdministration ? (
+            <Button onClick={() => { setError(''); setFormOpen(true) }}>
+              <Plus className="h-4 w-4" />
+              Add User
+            </Button>
+          ) : (
+            <p className="rounded-lg bg-blue-50 px-3 py-2 text-xs text-blue-700">
+              New users register through Request Access, then appear in the Access requests tab.
+            </p>
+          )}
         </div>
 
         {message ? (
@@ -208,6 +257,24 @@ export default function UsersPage() {
             {error}
           </div>
         ) : null}
+
+        <div className="mb-3 flex flex-col gap-2 sm:flex-row">
+          <input
+            type="search"
+            value={search}
+            onChange={(event) => setSearch(event.target.value)}
+            placeholder="Search name, email, role, or association"
+            className={`${fieldClass} sm:max-w-md`}
+          />
+          <select
+            value={roleFilter}
+            onChange={(event) => setRoleFilter(event.target.value as 'all' | UserRole)}
+            className={`${fieldClass} sm:w-48`}
+          >
+            <option value="all">All permissions</option>
+            {roleOptions.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
+          </select>
+        </div>
 
         <div className="overflow-x-auto rounded-lg border border-gray-200 bg-white shadow-sm">
           <table className="w-full min-w-[720px] text-sm">
@@ -222,8 +289,9 @@ export default function UsersPage() {
               </tr>
             </thead>
             <tbody>
-              {allUsers.map((account) => {
+              {visibleUsers.map((account) => {
                 const isSelf = account.id === user?.id
+                const canEmailReset = !recoveryEmailError(account.email)
                 return (
                   <tr key={account.id} className="border-b border-gray-50">
                     <td className="px-4 py-3 font-medium text-gray-900">
@@ -261,20 +329,34 @@ export default function UsersPage() {
                         <Button
                           size="sm"
                           variant="outline"
-                          disabled={isSelf}
-                          onClick={() => { setError(''); setRemoveTarget(account) }}
+                          disabled={!canEmailReset}
+                          title={canEmailReset ? 'Send a secure password reset email' : 'This username does not have a deliverable email address'}
+                          onClick={() => { setError(''); setResetTarget(account) }}
                         >
-                          Remove
+                          Reset password
                         </Button>
+                        {authAdministration ? (
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            disabled={isSelf}
+                            onClick={() => { setError(''); setRemoveTarget(account) }}
+                          >
+                            Remove
+                          </Button>
+                        ) : null}
                       </div>
                     </td>
                   </tr>
                 )
               })}
+              {visibleUsers.length === 0 ? (
+                <tr><td colSpan={6} className="px-4 py-10 text-center text-sm text-gray-500">No users match the current filters.</td></tr>
+              ) : null}
             </tbody>
           </table>
         </div>
-      </main>
+      </div>
 
       <Modal
         open={formOpen}
@@ -361,22 +443,47 @@ export default function UsersPage() {
           </div>
           <label className="block text-sm">
             <span className="mb-1 block text-xs font-semibold uppercase text-gray-500">Email</span>
-            <input required type="email" value={editForm.email} onChange={(event) => setEditForm({ ...editForm, email: event.target.value })} className={fieldClass} />
+            <input required disabled={!authAdministration} type="email" value={editForm.email} onChange={(event) => setEditForm({ ...editForm, email: event.target.value })} className={`${fieldClass} disabled:bg-gray-50 disabled:text-gray-500`} />
+            {!authAdministration ? <span className="mt-1 block text-xs text-gray-500">Login email changes require optional Supabase Auth administration.</span> : null}
           </label>
-          <label className="block text-sm">
-            <span className="mb-1 block text-xs font-semibold uppercase text-gray-500">New password</span>
-            <input
-              type="password"
-              value={editForm.password}
-              onChange={(event) => setEditForm({ ...editForm, password: event.target.value })}
-              placeholder="Leave blank to keep the current password"
-              className={fieldClass}
-            />
-            <span className="mt-1 block text-xs text-gray-500">
-              Use at least 8 characters. Passwords are managed by Supabase Auth and are never stored in browser data.
-            </span>
-          </label>
+          {authAdministration ? (
+            <label className="block text-sm">
+              <span className="mb-1 block text-xs font-semibold uppercase text-gray-500">New password</span>
+              <input
+                type="password"
+                value={editForm.password}
+                onChange={(event) => setEditForm({ ...editForm, password: event.target.value })}
+                placeholder="Leave blank to keep the current password"
+                className={fieldClass}
+              />
+              <span className="mt-1 block text-xs text-gray-500">
+                Use at least 8 characters. Passwords are managed by Supabase Auth and are never stored in browser data.
+              </span>
+            </label>
+          ) : (
+            <div className="rounded-lg border border-gray-200 bg-gray-50 px-3 py-3 text-xs leading-5 text-gray-600">
+              Passwords cannot be changed by another account in publishable-key mode. The user can change their own password from account settings.
+            </div>
+          )}
         </form>
+      </Modal>
+
+      <Modal
+        open={resetTarget !== null}
+        onClose={() => { if (!saving) setResetTarget(null) }}
+        title="Send Password Reset"
+        footer={
+          <div className="flex justify-end gap-2">
+            <Button variant="outline" disabled={saving} onClick={() => setResetTarget(null)}>Cancel</Button>
+            <Button disabled={saving} onClick={handlePasswordReset}>{saving ? 'Sending...' : 'Send reset link'}</Button>
+          </div>
+        }
+      >
+        <p className="text-sm leading-6 text-gray-600">
+          {resetTarget
+            ? `Supabase will email ${resetTarget.email} a secure link to choose a new password. Their current password will remain active until they complete the reset.`
+            : ''}
+        </p>
       </Modal>
 
       <Modal

@@ -11,6 +11,7 @@ import { initializeProgramStorage } from '../services/programStorage'
 import {
   approveUser,
   changeUserPassword,
+  clearLocalSession,
   clearSession,
   formatDepartment,
   getAllUsers,
@@ -33,9 +34,12 @@ import type {
   SessionUser,
   StoredUser,
 } from '../types/auth'
+import { AUTH_EXPIRED_EVENT } from '../services/authenticatedFetch'
+import { supabase } from '../lib/supabase'
 
 export function AuthProvider({ children }: { children: ReactNode }) {
-  const [user, setUser] = useState<SessionUser | null>(() => getSession())
+  const [user, setUser] = useState<SessionUser | null>(null)
+  const [authReady, setAuthReady] = useState(false)
   const [pendingRequests, setPendingRequests] = useState<StoredUser[]>(() => getPendingUsers())
   const [allUsers, setAllUsers] = useState<StoredUser[]>(() => getAllUsers())
 
@@ -52,10 +56,60 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     initializeMemberStorage()
   }, [])
 
+  useEffect(() => {
+    let active = true
+    void supabase.auth.getSession().then(async ({ data, error }) => {
+      if (!active) return
+      const appSession = getSession()
+      const valid = !error && data.session?.user?.id && appSession?.id === data.session.user.id
+      const recoveringPassword = window.location.pathname === '/reset-password'
+      if (valid) setUser(appSession)
+      else if (recoveringPassword && data.session) setUser(null)
+      else if (appSession || data.session) {
+        clearLocalSession()
+        await supabase.auth.signOut({ scope: 'local' })
+      }
+      if (active) setAuthReady(true)
+    })
+
+    const { data: authListener } = supabase.auth.onAuthStateChange((event) => {
+      if (!active) return
+      if (event === 'SIGNED_OUT' || event === 'PASSWORD_RECOVERY') {
+        clearLocalSession(event !== 'PASSWORD_RECOVERY')
+        setUser(null)
+        setPendingRequests([])
+        setAllUsers([])
+      }
+    })
+    return () => {
+      active = false
+      authListener.subscription.unsubscribe()
+    }
+  }, [])
+
+  useEffect(() => {
+    const handleExpiredSession = () => {
+      clearSession()
+      setUser(null)
+      setPendingRequests([])
+      setAllUsers([])
+    }
+    window.addEventListener(AUTH_EXPIRED_EVENT, handleExpiredSession)
+    return () => window.removeEventListener(AUTH_EXPIRED_EVENT, handleExpiredSession)
+  }, [])
+
   const refreshUsers = useCallback(() => {
     setPendingRequests(getPendingUsers())
     setAllUsers(getAllUsers())
   }, [])
+
+  useEffect(() => {
+    const handleUserStorage = (event: StorageEvent) => {
+      if (event.key === 'barangay_users') refreshUsers()
+    }
+    window.addEventListener('storage', handleUserStorage)
+    return () => window.removeEventListener('storage', handleUserStorage)
+  }, [refreshUsers])
 
   const enterDashboard = useCallback(() => {
     const session = getSession()
@@ -278,6 +332,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const value = useMemo(
     () => ({
       user,
+      authReady,
       profile,
       pendingRequests,
       allUsers,
@@ -292,7 +347,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       changePassword,
       refreshUsers,
     }),
-    [user, profile, pendingRequests, allUsers, login, enterDashboard, logout, submitRequest, submitAssociationHeadRequestHandler, approveRequest, rejectRequest, updateProfile, changePassword, refreshUsers],
+    [user, authReady, profile, pendingRequests, allUsers, login, enterDashboard, logout, submitRequest, submitAssociationHeadRequestHandler, approveRequest, rejectRequest, updateProfile, changePassword, refreshUsers],
   )
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>

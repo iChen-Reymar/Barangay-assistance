@@ -27,6 +27,7 @@ import {
   downloadSupportingDocument,
   type DocumentPreview,
 } from '../../services/supportingDocumentService'
+import { downloadRequestDocument, resolveRequestDocumentUrl } from '../../services/documentStorage'
 import type { AssociationMember } from '../../data/associationMockData'
 import type { StaffBeneficiary } from '../../data/staffMockData'
 import type {
@@ -333,7 +334,7 @@ export function MemberQualificationModal({
       ? members.map((member) => ({ kind: 'member', id: member.id, member }))
       : beneficiaries.map((beneficiary) => ({ kind: 'beneficiary', id: beneficiary.id, beneficiary }))
 
-  function openDocument(request: ReviewableAssistanceItem, doc: SupportingDocument) {
+  async function openDocument(request: ReviewableAssistanceItem, doc: SupportingDocument) {
     setPreviewRequest(request)
     if (doc.type === 'Personal Information' && person) {
       setDocumentPreview({
@@ -356,6 +357,24 @@ export function MemberQualificationModal({
           `Status: ${doc.status.toUpperCase()}`,
         ],
       })
+      return
+    }
+    if (doc.storagePath) {
+      try {
+        const url = await resolveRequestDocumentUrl(doc)
+        const resolved = url ? { ...doc, dataUrl: url } : doc
+        setDocumentPreview(buildDocumentPreview(resolved, {
+          association: request.association,
+          requestId: request.id,
+          requestType: request.requestType,
+        }))
+      } catch {
+        setDocumentPreview(buildDocumentPreview(doc, {
+          association: request.association,
+          requestId: request.id,
+          requestType: request.requestType,
+        }))
+      }
       return
     }
     setDocumentPreview(
@@ -406,6 +425,10 @@ export function MemberQualificationModal({
           }
           if (documentPreview.document.dataUrl) {
             downloadDataUrl(documentPreview.document.dataUrl, documentPreview.document.name)
+            return
+          }
+          if (documentPreview.document.storagePath) {
+            void downloadRequestDocument(documentPreview.document)
             return
           }
           downloadSupportingDocument(documentPreview.document, {

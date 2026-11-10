@@ -9,6 +9,8 @@ import LoginPage from './pages/LoginPage'
 import RequestAccessPage from './pages/RequestAccessPage'
 import StaffRequestAccessPage from './pages/StaffRequestAccessPage'
 import RegisterAssociationHeadPage from './pages/RegisterAssociationHeadPage'
+import ResetPasswordPage from './pages/ResetPasswordPage'
+import ForgotPasswordPage from './pages/ForgotPasswordPage'
 import DashboardPage from './pages/admin/DashboardPage'
 import AssociationsPage from './pages/admin/AssociationsPage'
 import ProgramsPage from './pages/admin/ProgramsPage'
@@ -16,9 +18,7 @@ import RecommendationsPage from './pages/admin/RecommendationsPage'
 import ReportsPage from './pages/admin/ReportsPage'
 import AdminAidRecordsPage from './pages/admin/AidRecordsPage'
 import AuditLogsPage from './pages/admin/AuditLogsPage'
-import UsersPage from './pages/admin/UsersPage'
-import AccessRequestsPage from './pages/admin/AccessRequestsPage'
-import AdminAssistanceRequestsPage from './pages/admin/AssistanceRequestsPage'
+import PeopleRequestsPage from './pages/admin/PeopleRequestsPage'
 import SettingsPage from './pages/admin/SettingsPage'
 import AssociationDashboardPage from './pages/association/DashboardPage'
 import MembersPage from './pages/association/MembersPage'
@@ -53,6 +53,8 @@ export default function App() {
         <Route path="/request-access" element={<RequestAccessPage />} />
         <Route path="/request-access/staff" element={<StaffRequestAccessPage />} />
         <Route path="/register/association-head" element={<RegisterAssociationHeadPage />} />
+        <Route path="/reset-password" element={<ResetPasswordPage />} />
+        <Route path="/forgot-password" element={<ForgotPasswordPage />} />
 
         <Route
           path="/admin"
@@ -69,9 +71,10 @@ export default function App() {
           <Route path="reports" element={<ReportsPage />} />
           <Route path="aid-records" element={<AdminAidRecordsPage />} />
           <Route path="audit-logs" element={<AuditLogsPage />} />
-          <Route path="users" element={<UsersPage />} />
-          <Route path="access-requests" element={<AccessRequestsPage />} />
-          <Route path="assistance-requests" element={<AdminAssistanceRequestsPage />} />
+          <Route path="people" element={<PeopleRequestsPage />} />
+          <Route path="users" element={<Navigate to="/admin/people?view=users" replace />} />
+          <Route path="access-requests" element={<Navigate to="/admin/people?view=access" replace />} />
+          <Route path="assistance-requests" element={<Navigate to="/admin/people?view=assistance" replace />} />
           <Route path="settings" element={<SettingsPage />} />
         </Route>
 

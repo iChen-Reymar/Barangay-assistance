@@ -1,5 +1,7 @@
 import { clearSupabaseAuthStorage, supabase } from '../lib/supabase'
-import { writeStoreWithoutSync } from './databaseSync'
+import { authenticatedFetch } from './authenticatedFetch'
+import { clearRoleScopedCache, writeStoreWithoutSync } from './databaseSync'
+import { setRememberSession } from './sessionPersistence'
 import type { ReviewInput } from '../types/approval'
 import {
   roleLabelToRole,
@@ -66,11 +68,9 @@ export async function createManagedUser(input: {
     return { success: false, error: 'An account with this email already exists.' }
   }
 
-  const { data } = await supabase.auth.getSession()
-  if (!data.session?.access_token) return { success: false, error: 'Sign in as an administrator first.' }
-  const response = await fetch('/api/users', {
+  const response = await authenticatedFetch('/api/users', {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${data.session.access_token}` },
+    headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(input),
   })
   const body = await response.json().catch(() => ({})) as { error?: string; user?: StoredUser }
@@ -105,15 +105,10 @@ export async function updateManagedUser(
     return { success: false, error: 'An account with this email already exists.' }
   }
 
-  const { data: sessionData } = await supabase.auth.getSession()
-  const token = sessionData.session?.access_token || readAccessToken()
-  if (!token) return { success: false, error: 'Sign in as an administrator first.' }
-
-  const response = await fetch(`/api/users/${userId}`, {
+  const response = await authenticatedFetch(`/api/users/${userId}`, {
     method: 'PATCH',
     headers: {
       'Content-Type': 'application/json',
-      Authorization: `Bearer ${token}`,
     },
     body: JSON.stringify({ firstName, lastName, email, password }),
   })
@@ -148,11 +143,9 @@ export async function updateUserRole(
     return { success: false, error: 'At least one administrator must remain.' }
   }
 
-  const { data } = await supabase.auth.getSession()
-  if (!data.session?.access_token) return { success: false, error: 'Sign in as an administrator first.' }
-  const response = await fetch(`/api/users/${userId}/role`, {
+  const response = await authenticatedFetch(`/api/users/${userId}/role`, {
     method: 'PATCH',
-    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${data.session.access_token}` },
+    headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ role }),
   })
   const body = await response.json().catch(() => ({})) as { error?: string }
@@ -187,11 +180,8 @@ export async function removeUser(
     return { success: false, error: 'At least one administrator must remain.' }
   }
 
-  const { data } = await supabase.auth.getSession()
-  if (!data.session?.access_token) return { success: false, error: 'Sign in as an administrator first.' }
-  const response = await fetch(`/api/users/${userId}`, {
+  const response = await authenticatedFetch(`/api/users/${userId}`, {
     method: 'DELETE',
-    headers: { Authorization: `Bearer ${data.session.access_token}` },
   })
   const body = await response.json().catch(() => ({})) as { error?: string }
   if (!response.ok) return { success: false, error: body.error || 'Could not remove the user.' }
@@ -285,14 +275,15 @@ export function setSession(user: SessionUser, rememberMe: boolean) {
   }
 }
 
-const ACCESS_TOKEN_KEY = 'supabase_access_token'
-
-export function clearSession() {
+export function clearLocalSession(includeSupabase = true) {
   sessionStorage.removeItem(SESSION_KEY)
   localStorage.removeItem(SESSION_KEY)
-  sessionStorage.removeItem(ACCESS_TOKEN_KEY)
-  localStorage.removeItem(ACCESS_TOKEN_KEY)
-  clearSupabaseAuthStorage()
+  if (includeSupabase) clearSupabaseAuthStorage()
+  clearRoleScopedCache()
+}
+
+export function clearSession() {
+  clearLocalSession()
   void supabase.auth.signOut({ scope: 'local' })
 }
 
@@ -302,16 +293,6 @@ function roleFromLabel(value: string | undefined): UserRole | null {
   if (text.includes('staff')) return 'staff'
   if (text.includes('association')) return 'association'
   return null
-}
-
-function saveAccessToken(token: string, rememberMe: boolean) {
-  sessionStorage.setItem(ACCESS_TOKEN_KEY, token)
-  if (rememberMe) localStorage.setItem(ACCESS_TOKEN_KEY, token)
-  else localStorage.removeItem(ACCESS_TOKEN_KEY)
-}
-
-function readAccessToken() {
-  return sessionStorage.getItem(ACCESS_TOKEN_KEY) ?? localStorage.getItem(ACCESS_TOKEN_KEY)
 }
 
 function metadataValue(bag: Record<string, unknown> | undefined, names: string[]) {
@@ -370,9 +351,9 @@ async function fetchVisibleUsers(userId?: string) {
 }
 
 export async function restoreUsersFromSession() {
-  const token = readAccessToken()
-  if (token) {
-    const { data } = await supabase.auth.getUser(token)
+  const { data: sessionData } = await supabase.auth.getSession()
+  if (sessionData.session) {
+    const { data } = await supabase.auth.getUser()
     const visible = await fetchVisibleUsers(data.user?.id)
     if (visible.length > 0) {
       const merged = new Map(readUsers().map((user) => [user.email.toLowerCase(), user]))
@@ -414,6 +395,7 @@ export async function login(email: string, password: string, rememberMe: boolean
   }
 
   const authEmail = loginEmail(email)
+  setRememberSession(rememberMe)
   const { data, error } = await supabase.auth.signInWithPassword({
     email: authEmail,
     password,
@@ -429,7 +411,6 @@ export async function login(email: string, password: string, rememberMe: boolean
     }
   }
 
-  saveAccessToken(data.session.access_token, rememberMe)
   const visible = await fetchVisibleUsers(data.user.id)
   const signedInEmail = authEmail.toLowerCase()
   const fromTable = visible.find((user) => user.email.toLowerCase() === signedInEmail)
@@ -737,6 +718,17 @@ export async function changeUserPassword(
   })
   if (verificationError) return { success: false, error: 'Current password is incorrect.' }
   const { error } = await supabase.auth.updateUser({ password: input.newPassword })
+  if (error) return { success: false, error: error.message }
+  return { success: true }
+}
+
+export async function sendUserPasswordReset(email: string): Promise<{ success: boolean; error?: string }> {
+  const normalizedEmail = email.trim().toLowerCase()
+  if (!normalizedEmail.includes('@')) return { success: false, error: 'This account does not have a valid email address.' }
+
+  const { error } = await supabase.auth.resetPasswordForEmail(normalizedEmail, {
+    redirectTo: `${window.location.origin}/reset-password`,
+  })
   if (error) return { success: false, error: error.message }
   return { success: true }
 }

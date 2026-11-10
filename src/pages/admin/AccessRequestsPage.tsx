@@ -12,7 +12,7 @@ import { formatDate, formatDepartment, getReviewedAccessRequests } from '../../s
 import type { DecisionType } from '../../types/approval'
 import type { StoredUser } from '../../types/auth'
 
-export default function AccessRequestsPage() {
+export default function AccessRequestsPage({ embedded = false }: { embedded?: boolean }) {
   const { pendingRequests, approveRequest, allUsers, refreshUsers } = useAuth()
   const [decisionModal, setDecisionModal] = useState<{
     type: DecisionType
@@ -75,8 +75,8 @@ export default function AccessRequestsPage() {
 
   return (
     <>
-      <AdminHeader title="Access Requests" searchPlaceholder="Search pending access requests..." />
-      <main className="flex-1 overflow-y-auto p-4 sm:p-5 md:p-6">
+      {!embedded ? <AdminHeader title="Access Requests" searchPlaceholder="Search pending access requests..." /> : null}
+      <div className={embedded ? '' : 'flex-1 overflow-y-auto p-4 sm:p-5 md:p-6'}>
         <div className="mb-6 rounded-lg border border-gray-200 bg-white shadow-sm">
           <div className="border-b border-gray-200 px-4 py-4 md:px-5">
             <h2 className="text-base font-bold text-gray-900">Pending Access Requests</h2>
@@ -133,7 +133,7 @@ export default function AccessRequestsPage() {
             )}
           </div>
         </div>
-      </main>
+      </div>
 
       <ApprovalDecisionModal
         open={!!decisionModal}

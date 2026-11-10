@@ -10,6 +10,7 @@ import type { AssistanceProgram } from '../../data/programsMockData'
 import { useAuth } from '../../context/useAuth'
 import { buildChanges, logAuditEvent } from '../../services/auditStorage'
 import { useAssociationDisplayUser } from '../../hooks/useAssociationDisplayUser'
+import { uploadRequestDocument } from '../../services/documentStorage'
 
 export default function AssistanceRequestPage() {
   const { user, profile } = useAuth()
@@ -27,6 +28,7 @@ export default function AssistanceRequestPage() {
   const [supportingInfo, setSupportingInfo] = useState('')
   const [documents, setDocuments] = useState<File[]>([])
   const [uploadError, setUploadError] = useState('')
+  const [submitting, setSubmitting] = useState(false)
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
@@ -40,18 +42,23 @@ export default function AssistanceRequestPage() {
       setUploadError(`${oversized.name} exceeds the 5 MB file limit.`)
       return
     }
-    const uploadedDocuments = await Promise.all(documents.map(async (file) => ({
-      name: file.name,
-      type: file.type || 'application/octet-stream',
-      fileSize: `${(file.size / 1024).toFixed(1)} KB`,
-      dataUrl: await new Promise<string>((resolve, reject) => {
-        const reader = new FileReader()
-        reader.onload = () => resolve(String(reader.result ?? ''))
-        reader.onerror = () => reject(new Error(`Unable to read ${file.name}.`))
-        reader.readAsDataURL(file)
-      }),
-    })))
+    setSubmitting(true)
+    const requestId = `REQ-${crypto.randomUUID()}`
+    let uploadedDocuments
+    try {
+      uploadedDocuments = await Promise.all(documents.map(async (file) => ({
+        name: file.name,
+        type: file.type || 'application/octet-stream',
+        fileSize: `${(file.size / 1024).toFixed(1)} KB`,
+        storagePath: await uploadRequestDocument(requestId, file),
+      })))
+    } catch (error) {
+      setSubmitting(false)
+      setUploadError(error instanceof Error ? error.message : 'The supporting documents could not be uploaded.')
+      return
+    }
     const submittedRequest = submitAssociationAssistanceRequest({
+      id: requestId,
       association: associationName,
       program,
       memberCount: Number(memberCount),
@@ -83,6 +90,7 @@ export default function AssistanceRequestPage() {
     setRequestedAssistance('')
     setSupportingInfo('')
     setDocuments([])
+    setSubmitting(false)
   }
 
   return (
@@ -194,7 +202,9 @@ export default function AssistanceRequestPage() {
                 {uploadError ? <p className="mt-1 text-xs font-medium text-red-600">{uploadError}</p> : null}
               </div>
 
-              <Button type="submit" className="w-full">Submit Request</Button>
+              <Button type="submit" className="w-full" disabled={submitting}>
+                {submitting ? 'Uploading documents...' : 'Submit Request'}
+              </Button>
             </form>
           )}
         </div>

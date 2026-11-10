@@ -10,7 +10,7 @@
     "ml": "python ml-service/app.py",
     "ml:train": "python ml-service/train.py",
     "account:reset": "node scripts/reset-account-password.mjs",
-    "test": "node --test server/security.test.mjs && python -m unittest discover -s ml-service -p test_*.py",
+    "test": "node --test server/security.test.mjs server/frontend-auth.test.mjs && python -m unittest discover -s ml-service -p test_*.py",
     "build": "tsc -b && vite build",
     "lint": "eslint .",
     "preview": "vite preview"

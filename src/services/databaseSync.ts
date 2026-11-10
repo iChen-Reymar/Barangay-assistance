@@ -1,6 +1,10 @@
+import { supabase } from '../lib/supabase'
+import { authenticatedFetch } from './authenticatedFetch'
+import { publishSyncStatus, registerSyncRetry } from './syncStatus'
+
 const VERSION_KEY = 'barangay_store_version'
 const VERSION = 'supabase-records-2'
-const SKIP_KEYS = new Set(['barangay_session', 'barangay_client_ip', VERSION_KEY])
+const SKIP_KEYS = new Set(['barangay_session', 'barangay_client_ip', 'barangay_sync_outbox', VERSION_KEY])
 const RECORD_IDS: Partial<Record<string, (record: Record<string, unknown>, index: number) => string>> = {
   barangay_users: (record) => String(record.id ?? ''),
   barangay_associations: (record) => String(record.id ?? ''),
@@ -19,7 +23,11 @@ const RECORD_IDS: Partial<Record<string, (record: Record<string, unknown>, index
 let hydrating = false
 let installed = false
 let rejectedBootstrapToken = ''
+let bootstrapPromise: Promise<void> | null = null
 const syncQueues = new Map<string, Promise<void>>()
+const failedSyncJobs = new Map<number, () => Promise<void>>()
+let syncJobId = 0
+let activeSyncJobs = 0
 
 function shouldSync(key: string) {
   return key.startsWith('barangay_') && !SKIP_KEYS.has(key)
@@ -55,27 +63,47 @@ function recordMap(key: string, value: unknown) {
   return records
 }
 
+class SyncRequestError extends Error {
+  retryable: boolean
+
+  constructor(message: string, retryable: boolean, cause?: unknown) {
+    super(message, cause === undefined ? undefined : { cause })
+    this.retryable = retryable
+  }
+}
+
+async function retryableRequest(url: string, init: RequestInit) {
+  let lastError = 'Database synchronization failed.'
+  for (let attempt = 0; attempt < 3; attempt += 1) {
+    try {
+      const response = await authenticatedFetch(url, init)
+      if (response.ok) return
+      const body = await response.json().catch(() => ({})) as { error?: string }
+      lastError = body.error || `Database request failed (${response.status}).`
+      if (response.status < 500 && response.status !== 429) throw new SyncRequestError(lastError, false)
+    } catch (error) {
+      lastError = error instanceof Error ? error.message : lastError
+      if (error instanceof SyncRequestError && !error.retryable) throw error
+      if (attempt === 2) throw new SyncRequestError(lastError, false, error)
+    }
+    await new Promise((resolve) => window.setTimeout(resolve, 400 * (2 ** attempt)))
+  }
+  throw new Error(lastError)
+}
+
 async function putRecord(key: string, id: string, payload: unknown) {
-  const response = await fetch(`/api/records/${encodeURIComponent(key)}/${encodeURIComponent(id)}`, {
+  await retryableRequest(`/api/records/${encodeURIComponent(key)}/${encodeURIComponent(id)}`, {
     method: 'PUT',
     headers: await authHeaders(true),
     body: JSON.stringify({ payload }),
   })
-  if (!response.ok && response.status !== 401) {
-    const body = await response.json().catch(() => ({})) as { error?: string }
-    console.error(body.error || `Could not save ${key}/${id}.`)
-  }
 }
 
 async function deleteRecord(key: string, id: string) {
-  const response = await fetch(`/api/records/${encodeURIComponent(key)}/${encodeURIComponent(id)}`, {
+  await retryableRequest(`/api/records/${encodeURIComponent(key)}/${encodeURIComponent(id)}`, {
     method: 'DELETE',
     headers: await authHeaders(),
   })
-  if (!response.ok && response.status !== 401) {
-    const body = await response.json().catch(() => ({})) as { error?: string }
-    console.error(body.error || `Could not delete ${key}/${id}.`)
-  }
 }
 
 async function syncStoreChange(key: string, previousRaw: string | null, nextRaw: string | null) {
@@ -104,12 +132,40 @@ async function syncStoreChange(key: string, previousRaw: string | null, nextRaw:
 }
 
 function queueStoreChange(key: string, previousRaw: string | null, nextRaw: string | null) {
+  const id = ++syncJobId
+  const execute = async () => {
+    activeSyncJobs += 1
+    publishSyncStatus({ phase: 'syncing', pending: activeSyncJobs + failedSyncJobs.size })
+    try {
+      await syncStoreChange(key, previousRaw, nextRaw)
+      failedSyncJobs.delete(id)
+      activeSyncJobs -= 1
+      publishSyncStatus(failedSyncJobs.size > 0
+        ? { phase: 'failed', pending: failedSyncJobs.size, error: 'Some changes could not be saved.' }
+        : activeSyncJobs > 0
+          ? { phase: 'syncing', pending: activeSyncJobs }
+          : { phase: 'saved', pending: 0 })
+    } catch (error) {
+      activeSyncJobs -= 1
+      failedSyncJobs.set(id, execute)
+      const message = error instanceof Error ? error.message : 'Database synchronization failed.'
+      console.error(`Database synchronization failed for ${key}.`, error)
+      publishSyncStatus({ phase: 'failed', pending: failedSyncJobs.size, error: message })
+    }
+  }
   const pending = syncQueues.get(key) ?? Promise.resolve()
-  const next = pending.then(() => syncStoreChange(key, previousRaw, nextRaw)).catch((error) => {
-    console.error(`Database synchronization failed for ${key}.`, error)
-  })
+  const next = pending.then(execute)
   syncQueues.set(key, next)
 }
+
+async function retryFailedSyncJobs() {
+  const jobs = [...failedSyncJobs.values()]
+  if (jobs.length === 0) return
+  publishSyncStatus({ phase: 'syncing', pending: jobs.length })
+  for (const job of jobs) await job()
+}
+
+registerSyncRetry(retryFailedSyncJobs)
 
 export function installDatabaseSync() {
   if (installed || typeof window === 'undefined') return
@@ -136,7 +192,7 @@ export function writeStoreWithoutSync(key: string, value: string) {
   hydrating = false
 }
 
-export async function pullFromDatabase() {
+async function performDatabasePull() {
   installDatabaseSync()
   if (localStorage.getItem(VERSION_KEY) !== VERSION) {
     localStorage.removeItem('barangay_session')
@@ -154,9 +210,7 @@ export async function pullFromDatabase() {
   if (rejectedBootstrapToken === accessToken) return
 
   try {
-    const response = await fetch('/api/bootstrap', {
-      headers: { Authorization: `Bearer ${accessToken}` },
-    })
+    const response = await authenticatedFetch('/api/bootstrap')
     if (response.status === 401) {
       rejectedBootstrapToken = accessToken
       return
@@ -197,4 +251,22 @@ export async function pullFromDatabase() {
     // The sign-in screen can still load the account.
   }
 }
-import { supabase } from '../lib/supabase'
+
+export function clearRoleScopedCache() {
+  hydrating = true
+  for (let index = localStorage.length - 1; index >= 0; index -= 1) {
+    const key = localStorage.key(index)
+    if (key?.startsWith('barangay_') && key !== VERSION_KEY && key !== 'barangay_remember_session') {
+      localStorage.removeItem(key)
+    }
+  }
+  hydrating = false
+}
+
+export function pullFromDatabase() {
+  if (bootstrapPromise) return bootstrapPromise
+  bootstrapPromise = performDatabasePull().finally(() => {
+    bootstrapPromise = null
+  })
+  return bootstrapPromise
+}

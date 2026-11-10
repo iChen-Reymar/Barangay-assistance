@@ -343,6 +343,7 @@ async function saveRequests(rows) {
       verified_by: doc.verifiedBy ?? null,
       verified_at: doc.verifiedAt ?? null,
       data_url: doc.dataUrl ?? null,
+      storage_path: doc.storagePath ?? null,
     }))
     const checks = (row.qualifications ?? []).map((check) => ({
       id: String(check.id).startsWith(`${row.id}:`) ? check.id : `${row.id}:${check.id}`,
@@ -536,35 +537,30 @@ function storedRecords(rows) {
 }
 
 async function loadStores(actor) {
-  const users = await rowsOf('users')
-  const associations = await rowsOf('associations')
-  const members = await rowsOf('association_members')
-  const memberDocuments = await rowsOf('member_documents')
-  const notifications = await rowsOf('notifications')
-  const beneficiaries = await rowsOf('beneficiaries')
-  let aidRecords = []
-  try {
-    aidRecords = await rowsOf('aid_records')
-  } catch (error) {
+  const optionalAidRecords = rowsOf('aid_records').catch((error) => {
     const message = String(error?.message || '')
-    if (!/does not exist|schema cache|Could not find the table|relation/i.test(message)) throw error
-  }
-  const programs = await rowsOf('assistance_programs')
-  const requests = await rowsOf('assistance_requests')
-  const documents = await rowsOf('request_documents')
-  const checks = await rowsOf('qualification_checks')
-  const decisions = await rowsOf('request_decisions')
-  const generated = await rowsOf('generated_assistance_list', 'rank_no')
-  const priority = await rowsOf('priority_list', 'rank_no')
-  const audits = await rowsOf('audit_logs')
-  const changes = await rowsOf('audit_changes')
-  const reports = await rowsOf('report_history')
-  let profiles = await rowsOf('association_profiles')
+    if (/does not exist|schema cache|Could not find the table|relation/i.test(message)) return []
+    throw error
+  })
+  const [
+    users, associations, members, memberDocuments, notifications, beneficiaries,
+    aidRecords, programs, requests, documents, checks, decisions, generated,
+    priority, audits, changes, reports, initialProfiles, privacy,
+  ] = await Promise.all([
+    rowsOf('users'), rowsOf('associations'), rowsOf('association_members'),
+    rowsOf('member_documents'), rowsOf('notifications'), rowsOf('beneficiaries'),
+    optionalAidRecords, rowsOf('assistance_programs'), rowsOf('assistance_requests'),
+    rowsOf('request_documents'), rowsOf('qualification_checks'), rowsOf('request_decisions'),
+    rowsOf('generated_assistance_list', 'rank_no'), rowsOf('priority_list', 'rank_no'),
+    rowsOf('audit_logs'), rowsOf('audit_changes'), rowsOf('report_history'),
+    rowsOf('association_profiles'), rowsOf('privacy_settings'),
+  ])
+  let profiles = initialProfiles
   if (actor?.role === 'association') {
     const association = String(actor.association_name || '').trim().toLowerCase()
     profiles = profiles.filter((row) => String(row.name || '').trim().toLowerCase() === association)
   }
-  const privacyRows = (await rowsOf('privacy_settings')).filter((row) => row.id === 'default')
+  const privacyRows = privacy.filter((row) => row.id === 'default')
 
   const stores = []
   const push = (key, value) => stores.push({ key, payload: JSON.stringify(value) })
@@ -698,7 +694,7 @@ async function loadStores(actor) {
       documents: documents.filter((doc) => doc.request_id === row.id).map((doc) => ({
         id: doc.id, name: doc.name, type: doc.file_type, uploadedAt: doc.uploaded_at, fileSize: doc.file_size,
         status: doc.status, verifiedBy: doc.verified_by ?? undefined, verifiedAt: doc.verified_at ?? undefined,
-        dataUrl: doc.data_url ?? undefined,
+        dataUrl: doc.data_url ?? undefined, storagePath: doc.storage_path ?? undefined,
       })),
       qualifications: checks.filter((check) => check.request_id === row.id).map((check) => ({
         id: check.id, criterion: check.criterion, description: check.description, status: check.status,
@@ -802,11 +798,6 @@ async function connectSupabase() {
   systemSupabase = createClient(supabaseUrl, supabaseKey, {
     auth: { persistSession: false, autoRefreshToken: false },
   })
-  const { error } = await systemSupabase.from('users').select('id').limit(1)
-  if (error) {
-    systemSupabase = null
-    throw new Error(`${error.message} Run database/schema.sql in the Supabase SQL editor, then restart.`)
-  }
 }
 
 const app = express()
@@ -866,6 +857,7 @@ app.get('/api/health', (_req, res) => {
     ok: Boolean(systemSupabase),
     database: 'supabase',
     writes: usingSecretKey ? 'service-role' : 'authenticated-rls',
+    authAdministration: usingSecretKey,
   })
 })
 
@@ -1116,8 +1108,8 @@ app.delete('/api/users/:id', async (req, res) => {
 })
 
 app.patch('/api/users/:id', async (req, res) => {
-  if (!systemSupabase || !usingSecretKey) {
-    res.status(503).json({ error: 'Supabase is not ready to update login accounts.' })
+  if (!systemSupabase) {
+    res.status(503).json({ error: 'Supabase is not connected.' })
     return
   }
   if (!(await requireAdmin(req, res))) return
@@ -1142,6 +1134,12 @@ app.patch('/api/users/:id', async (req, res) => {
     if (existingError) throw new Error(existingError.message)
     if (!existing) {
       res.status(404).json({ error: 'User not found.' })
+      return
+    }
+    if (!usingSecretKey && (email !== String(existing.email || '').toLowerCase() || password)) {
+      res.status(503).json({
+        error: 'Changing another login email or password requires the optional Supabase server secret. You can still update the user name and role.',
+      })
       return
     }
     const { data: duplicate, error: duplicateError } = await supabase.from('users').select('id').eq('email', email).neq('id', id).maybeSingle()
@@ -1169,6 +1167,14 @@ app.patch('/api/users/:id', async (req, res) => {
     }).eq('id', id)
     if (saved.error) {
       res.status(400).json({ error: saved.error.message })
+      return
+    }
+
+    if (!usingSecretKey) {
+      res.json({
+        ok: true,
+        user: { id, email, fullName, firstName, lastName, passwordChanged: false },
+      })
       return
     }
 
@@ -1621,6 +1627,23 @@ async function callMl(path, body) {
   }
   return { status: response.status, payload }
 }
+
+app.get('/api/ml-health', async (_req, res) => {
+  try {
+    const { status, payload } = await callMl('/api/health')
+    if (status < 200 || status >= 300) {
+      res.status(503).json({ ok: false, service: 'barangay-vulnerability-ml' })
+      return
+    }
+    res.json({
+      ok: true,
+      service: 'barangay-vulnerability-ml',
+      modelLoaded: Boolean(payload?.modelLoaded),
+    })
+  } catch {
+    res.status(503).json({ ok: false, service: 'barangay-vulnerability-ml' })
+  }
+})
 
 // The client builds `${ML_BASE}/api/...`, so with the default ML_BASE=/api/ml it
 // requests /api/ml/api/score. Mounting strips that prefix and forwards what is

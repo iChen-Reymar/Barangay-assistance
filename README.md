@@ -115,11 +115,27 @@ Run the complete `database/schema.sql` in the Supabase SQL Editor before the
 first production login. The publishable-key deployment depends on its RLS write
 policies and pending-account trigger.
 
+In Supabase **Authentication > URL Configuration**, add the production recovery
+URL to the allowed redirect URLs:
+
+```text
+https://barangay-assistance.vercel.app/reset-password
+```
+
+Admin password resets send a secure Supabase recovery email and do not require
+the server secret key. Accounts using an internal `@buruun.local` username need
+a real email address before an email recovery link can be delivered.
+
+The schema also creates a private `request-documents` Storage bucket with RLS.
+New assistance-request uploads are stored there and loaded through short-lived
+signed URLs. Existing `data_url` records remain readable for compatibility, so
+the migration can be applied without losing previously submitted documents.
+
 Verify the deployment with:
 
 ```text
 https://barangay-assistance.vercel.app/api/health
-https://barangay-assistance.vercel.app/api/ml/api/health
+https://barangay-assistance.vercel.app/api/ml-health
 ```
 
 ## Security notes

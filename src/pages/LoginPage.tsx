@@ -1,5 +1,5 @@
 ﻿import { useState, type FormEvent } from 'react'
-import { Link, useNavigate } from 'react-router-dom'
+import { Link, useLocation, useNavigate } from 'react-router-dom'
 import { AuthBrandingPanel } from '../components/auth/AuthBrandingPanel'
 import { FormField } from '../components/auth/FormField'
 import { LockIcon, MailIcon } from '../components/auth/fieldIcons'
@@ -10,6 +10,7 @@ import { pullFromDatabase } from '../services/databaseSync'
 
 function LoginForm() {
   const navigate = useNavigate()
+  const location = useLocation()
   const { login, enterDashboard } = useAuth()
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
@@ -24,11 +25,10 @@ function LoginForm() {
     setSigningIn(true)
     const result = await login(email, password, rememberMe)
     if (result.success && result.redirectTo) {
-      await pullFromDatabase()
-      showToast('Signed in successfully')
-      await new Promise((resolve) => window.setTimeout(resolve, 700))
       enterDashboard()
       navigate(result.redirectTo)
+      showToast('Signed in successfully')
+      void pullFromDatabase()
       return
     }
     setSigningIn(false)
@@ -47,6 +47,11 @@ function LoginForm() {
           </p>
 
           <form onSubmit={handleSubmit} className="space-y-5">
+            {(location.state as { passwordReset?: boolean } | null)?.passwordReset ? (
+              <div className="rounded-lg border border-green-200 bg-green-50 px-4 py-3 text-sm text-green-800">
+                Password updated. Sign in with your new password.
+              </div>
+            ) : null}
             {error && (
               <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
                 {error}
@@ -86,9 +91,9 @@ function LoginForm() {
                 />
                 <span className="text-sm text-gray-600">Remember me</span>
               </label>
-              <a href="#" className="text-sm font-semibold text-primary hover:underline">
+              <Link to="/forgot-password" className="text-sm font-semibold text-primary hover:underline">
                 Forgot Password?
-              </a>
+              </Link>
             </div>
 
             <button

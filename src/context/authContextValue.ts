@@ -25,6 +25,7 @@ import type {
  */
 export interface AuthContextValue {
   user: SessionUser | null
+  authReady: boolean
   profile: StoredUser | null
   pendingRequests: StoredUser[]
   allUsers: StoredUser[]

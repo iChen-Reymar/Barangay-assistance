@@ -17,9 +17,9 @@ import { formatDecisionDate } from '../../services/decisionStorage'
 import { formatDate } from '../../services/authStorage'
 import {
   buildDocumentPreview,
-  downloadSupportingDocument,
   type DocumentPreview,
 } from '../../services/supportingDocumentService'
+import { downloadRequestDocument, resolveRequestDocumentUrl } from '../../services/documentStorage'
 import type {
   DocumentStatus,
   QualificationStatus,
@@ -66,6 +66,7 @@ export function RequestDetailsPanel({
 }: RequestDetailsPanelProps) {
   const [activeTab, setActiveTab] = useState<Tab>('Details')
   const [documentPreview, setDocumentPreview] = useState<DocumentPreview | null>(null)
+  const [documentError, setDocumentError] = useState('')
   const details = item.details
   const documentContext = {
     association: item.association,
@@ -79,16 +80,27 @@ export function RequestDetailsPanel({
   const passedChecks = qualifications.filter((q) => q.status === 'passed').length
   const pendingChecks = qualifications.filter((q) => q.status === 'pending').length
 
-  function handleViewDocument(docId: string) {
+  async function handleViewDocument(docId: string) {
     const doc = documents.find((row) => row.id === docId)
     if (!doc) return
-    setDocumentPreview(buildDocumentPreview(doc, documentContext))
+    setDocumentError('')
+    try {
+      const url = await resolveRequestDocumentUrl(doc)
+      setDocumentPreview(buildDocumentPreview(url ? { ...doc, dataUrl: url } : doc, documentContext))
+    } catch (error) {
+      setDocumentError(error instanceof Error ? error.message : 'The document could not be opened.')
+    }
   }
 
-  function handleDownloadDocument(docId: string) {
+  async function handleDownloadDocument(docId: string) {
     const doc = documents.find((row) => row.id === docId)
     if (!doc) return
-    downloadSupportingDocument(doc, documentContext)
+    setDocumentError('')
+    try {
+      await downloadRequestDocument(doc)
+    } catch (error) {
+      setDocumentError(error instanceof Error ? error.message : 'The document could not be downloaded.')
+    }
   }
 
   return (
@@ -214,6 +226,7 @@ export function RequestDetailsPanel({
 
       {activeTab === 'Documents' && (
         <section>
+          {documentError ? <div className="mb-3 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">{documentError}</div> : null}
           <h4 className="mb-3 flex items-center gap-2 text-sm font-bold text-gray-900">
             <FileText className="h-4 w-4 text-primary" />
             Supporting Documents ({verifiedDocs} of {documents.length} verified)
@@ -358,7 +371,9 @@ export function RequestDetailsPanel({
         preview={documentPreview}
         onDownload={() => {
           if (!documentPreview) return
-          downloadSupportingDocument(documentPreview.document, documentContext)
+          void downloadRequestDocument(documentPreview.document).catch((error) => {
+            setDocumentError(error instanceof Error ? error.message : 'The document could not be downloaded.')
+          })
         }}
       />
     </div>
