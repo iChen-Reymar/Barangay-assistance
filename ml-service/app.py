@@ -164,6 +164,11 @@ def model_info():
 
 @app.post("/api/train")
 def train():
+    if os.environ.get("VERCEL"):
+        return jsonify({
+            "ok": False,
+            "error": "Model retraining is disabled on the read-only Vercel runtime. Train locally and deploy the updated artifacts.",
+        }), 501
     records = _normalise_records(request.get_json(silent=True))
     with _lock:
         result = _train_and_persist(records)

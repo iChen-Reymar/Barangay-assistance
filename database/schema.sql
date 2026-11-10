@@ -726,6 +726,60 @@ as $$
   select association_name from public.users where id = auth.uid()::text and status = 'approved'
 $$;
 
+create or replace function public.current_app_email()
+returns text
+language sql
+stable
+security definer
+set search_path = public
+as $$
+  select email from public.users where id = auth.uid()::text and status = 'approved'
+$$;
+
+-- Publishable-key account registration. The trigger deliberately forces every
+-- self-registration to PENDING and accepts only Staff or Association Head roles;
+-- callers cannot create an approved account or an Administrator through Auth
+-- metadata. Admin approval remains a separate application workflow.
+create or replace function public.create_pending_app_profile()
+returns trigger
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  metadata jsonb := coalesce(new.raw_user_meta_data, '{}'::jsonb) - 'password';
+  requested_role text := lower(coalesce(metadata ->> 'role', ''));
+  display_name text := btrim(coalesce(metadata ->> 'full_name', metadata ->> 'fullName', new.email, ''));
+  requested_association text := nullif(btrim(coalesce(metadata ->> 'associationName', metadata ->> 'association_name', '')), '');
+begin
+  if requested_role not in ('staff', 'association') then
+    return new;
+  end if;
+
+  insert into public.users (id, email, full_name, role, status, association_name, payload)
+  values (
+    new.id::text,
+    lower(coalesce(new.email, '')),
+    display_name,
+    requested_role,
+    'pending',
+    case
+      when exists (select 1 from public.associations item where lower(item.name) = lower(requested_association))
+        then requested_association
+      else null
+    end,
+    metadata || jsonb_build_object('status', 'pending', 'role', requested_role)
+  )
+  on conflict (id) do nothing;
+  return new;
+end
+$$;
+
+drop trigger if exists create_pending_app_profile_after_signup on auth.users;
+create trigger create_pending_app_profile_after_signup
+  after insert on auth.users
+  for each row execute function public.create_pending_app_profile();
+
 do $$
 declare
   table_name text;
@@ -828,14 +882,201 @@ create policy notifications_read on public.notifications for select to authentic
   );
 
 drop policy if exists audit_logs_read on public.audit_logs;
-create policy audit_logs_read on public.audit_logs for select to authenticated using (public.current_app_role() = 'admin');
+create policy audit_logs_read on public.audit_logs for select to authenticated
+  using (public.current_app_role() = 'admin' or lower(user_email) = lower(coalesce(public.current_app_email(), '')));
 drop policy if exists audit_changes_read on public.audit_changes;
-create policy audit_changes_read on public.audit_changes for select to authenticated using (public.current_app_role() = 'admin');
+create policy audit_changes_read on public.audit_changes for select to authenticated
+  using (
+    public.current_app_role() = 'admin'
+    or exists (
+      select 1 from public.audit_logs item
+      where item.id = audit_log_id
+        and lower(item.user_email) = lower(coalesce(public.current_app_email(), ''))
+    )
+  );
 drop policy if exists report_history_read on public.report_history;
 create policy report_history_read on public.report_history for select to authenticated
   using (public.current_app_role() = 'admin' or user_id = auth.uid()::text);
 drop policy if exists privacy_settings_read on public.privacy_settings;
 create policy privacy_settings_read on public.privacy_settings for select to authenticated using (public.current_app_role() = 'admin');
+
+-- Authenticated writes used when the Express API runs with the Supabase
+-- publishable key. Express still validates role transitions and payloads; these
+-- policies provide the database authorization boundary for the caller's JWT.
+drop policy if exists users_write_admin on public.users;
+create policy users_write_admin on public.users for all to authenticated
+  using (public.current_app_role() = 'admin')
+  with check (public.current_app_role() = 'admin');
+
+drop policy if exists associations_write_admin on public.associations;
+create policy associations_write_admin on public.associations for all to authenticated
+  using (public.current_app_role() = 'admin')
+  with check (public.current_app_role() = 'admin');
+
+drop policy if exists association_profiles_write on public.association_profiles;
+create policy association_profiles_write on public.association_profiles for all to authenticated
+  using (
+    public.current_app_role() = 'admin'
+    or lower(name) = lower(coalesce(public.current_app_association(), ''))
+  )
+  with check (
+    public.current_app_role() = 'admin'
+    or lower(name) = lower(coalesce(public.current_app_association(), ''))
+  );
+
+drop policy if exists association_members_write on public.association_members;
+create policy association_members_write on public.association_members for all to authenticated
+  using (
+    public.current_app_role() in ('admin', 'staff')
+    or lower(association_name) = lower(coalesce(public.current_app_association(), ''))
+  )
+  with check (
+    public.current_app_role() in ('admin', 'staff')
+    or lower(association_name) = lower(coalesce(public.current_app_association(), ''))
+  );
+
+drop policy if exists member_documents_write on public.member_documents;
+create policy member_documents_write on public.member_documents for all to authenticated
+  using (
+    public.current_app_role() in ('admin', 'staff')
+    or exists (
+      select 1 from public.association_members member
+      where member.id = member_id
+        and lower(member.association_name) = lower(coalesce(public.current_app_association(), ''))
+    )
+  )
+  with check (
+    public.current_app_role() in ('admin', 'staff')
+    or exists (
+      select 1 from public.association_members member
+      where member.id = member_id
+        and lower(member.association_name) = lower(coalesce(public.current_app_association(), ''))
+    )
+  );
+
+drop policy if exists aid_records_write on public.aid_records;
+create policy aid_records_write on public.aid_records for all to authenticated
+  using (
+    public.current_app_role() in ('admin', 'staff')
+    or lower(association_name) = lower(coalesce(public.current_app_association(), ''))
+  )
+  with check (
+    public.current_app_role() in ('admin', 'staff')
+    or lower(association_name) = lower(coalesce(public.current_app_association(), ''))
+  );
+
+drop policy if exists beneficiaries_write_staff on public.beneficiaries;
+create policy beneficiaries_write_staff on public.beneficiaries for all to authenticated
+  using (public.current_app_role() in ('admin', 'staff'))
+  with check (public.current_app_role() in ('admin', 'staff'));
+
+drop policy if exists assistance_programs_write_admin on public.assistance_programs;
+create policy assistance_programs_write_admin on public.assistance_programs for all to authenticated
+  using (public.current_app_role() = 'admin')
+  with check (public.current_app_role() = 'admin');
+
+drop policy if exists assistance_requests_insert_association on public.assistance_requests;
+create policy assistance_requests_insert_association on public.assistance_requests for insert to authenticated
+  with check (
+    public.current_app_role() = 'association'
+    and status = 'PENDING'
+    and lower(association_name) = lower(coalesce(public.current_app_association(), ''))
+  );
+drop policy if exists assistance_requests_update_staff on public.assistance_requests;
+create policy assistance_requests_update_staff on public.assistance_requests for update to authenticated
+  using (public.current_app_role() = 'staff')
+  with check (public.current_app_role() = 'staff');
+
+drop policy if exists request_documents_write on public.request_documents;
+drop policy if exists request_documents_write_staff on public.request_documents;
+create policy request_documents_write_staff on public.request_documents for all to authenticated
+  using (public.current_app_role() = 'staff')
+  with check (public.current_app_role() = 'staff');
+drop policy if exists request_documents_insert_association on public.request_documents;
+create policy request_documents_insert_association on public.request_documents for insert to authenticated
+  with check (
+    public.current_app_role() = 'association'
+    and status = 'uploaded'
+    and exists (
+      select 1 from public.assistance_requests item
+      where item.id = request_id
+        and lower(item.association_name) = lower(coalesce(public.current_app_association(), ''))
+    )
+  );
+
+drop policy if exists qualification_checks_write on public.qualification_checks;
+drop policy if exists qualification_checks_write_staff on public.qualification_checks;
+create policy qualification_checks_write_staff on public.qualification_checks for all to authenticated
+  using (public.current_app_role() = 'staff')
+  with check (public.current_app_role() = 'staff');
+drop policy if exists qualification_checks_insert_association on public.qualification_checks;
+create policy qualification_checks_insert_association on public.qualification_checks for insert to authenticated
+  with check (
+    public.current_app_role() = 'association'
+    and status = 'pending'
+    and exists (
+      select 1 from public.assistance_requests item
+      where item.id = request_id
+        and lower(item.association_name) = lower(coalesce(public.current_app_association(), ''))
+    )
+  );
+
+drop policy if exists generated_assistance_list_write_staff on public.generated_assistance_list;
+create policy generated_assistance_list_write_staff on public.generated_assistance_list for all to authenticated
+  using (public.current_app_role() = 'staff')
+  with check (public.current_app_role() = 'staff');
+
+drop policy if exists priority_list_write_staff on public.priority_list;
+create policy priority_list_write_staff on public.priority_list for all to authenticated
+  using (public.current_app_role() = 'staff')
+  with check (public.current_app_role() = 'staff');
+
+drop policy if exists notifications_write on public.notifications;
+create policy notifications_write on public.notifications for all to authenticated
+  using (
+    public.current_app_role() in ('admin', 'staff')
+    or user_id = auth.uid()::text
+    or lower(association_name) = lower(coalesce(public.current_app_association(), ''))
+  )
+  with check (
+    public.current_app_role() in ('admin', 'staff')
+    or user_id = auth.uid()::text
+    or lower(association_name) = lower(coalesce(public.current_app_association(), ''))
+  );
+
+drop policy if exists audit_logs_write on public.audit_logs;
+create policy audit_logs_write on public.audit_logs for all to authenticated
+  using (public.current_app_role() = 'admin' or lower(user_email) = lower(coalesce(public.current_app_email(), '')))
+  with check (public.current_app_role() = 'admin' or lower(user_email) = lower(coalesce(public.current_app_email(), '')));
+
+drop policy if exists audit_changes_write on public.audit_changes;
+create policy audit_changes_write on public.audit_changes for all to authenticated
+  using (
+    public.current_app_role() = 'admin'
+    or exists (
+      select 1 from public.audit_logs item
+      where item.id = audit_log_id
+        and lower(item.user_email) = lower(coalesce(public.current_app_email(), ''))
+    )
+  )
+  with check (
+    public.current_app_role() = 'admin'
+    or exists (
+      select 1 from public.audit_logs item
+      where item.id = audit_log_id
+        and lower(item.user_email) = lower(coalesce(public.current_app_email(), ''))
+    )
+  );
+
+drop policy if exists report_history_write on public.report_history;
+create policy report_history_write on public.report_history for all to authenticated
+  using (public.current_app_role() = 'admin' or user_id = auth.uid()::text)
+  with check (public.current_app_role() = 'admin' or user_id = auth.uid()::text);
+
+drop policy if exists privacy_settings_write_admin on public.privacy_settings;
+create policy privacy_settings_write_admin on public.privacy_settings for all to authenticated
+  using (public.current_app_role() = 'admin')
+  with check (public.current_app_role() = 'admin');
 
 drop policy if exists public_account_request on public.users;
 -- Public account requests go through the rate-limited Express endpoint. There

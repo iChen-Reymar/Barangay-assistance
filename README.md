@@ -33,7 +33,9 @@ List generation does not release money or distribute aid. Actual scheduling and 
 ### Configuration
 
 1. Copy `.env.example` to `.env`.
-2. Add your Supabase URL, publishable key, and server-only secret key.
+2. Add your Supabase URL and publishable key. The server secret key is optional:
+   authenticated reads and writes use each signed-in user's JWT with the RLS
+   policies in `database/schema.sql` when no secret is configured.
 3. In the Supabase SQL Editor, run `database/schema.sql`.
 4. Install JavaScript dependencies:
 
@@ -70,9 +72,63 @@ npm run build     # TypeScript and production web build
 npm run lint      # ESLint
 ```
 
+## Vercel deployment
+
+Deploy this repository as two Vercel projects. This keeps the React/Express
+application and the Python/scikit-learn runtime independently deployable while
+both remain on Vercel.
+
+### 1. Web and API project
+
+- Import the repository with the root directory set to `.`.
+- Keep the production domain `https://barangay-assistance.vercel.app`.
+- Configure these Production and Preview environment variables:
+
+  ```env
+  VITE_SUPABASE_URL=https://your-project.supabase.co
+  VITE_SUPABASE_PUBLISHABLE_KEY=your-publishable-key
+  APP_ORIGINS=https://barangay-assistance.vercel.app
+  ML_URL=https://your-ml-project.vercel.app
+  ML_INTERNAL_TOKEN=one-long-random-shared-value
+  ```
+
+The root `vercel.json` builds Vite, preserves SPA routes, and sends `/api/*` to
+the Express serverless function. `SUPABASE_SECRET_KEY` is not required for the
+normal RLS-backed workflow.
+
+### 2. ML project
+
+- Import the same repository again as a separate Vercel project.
+- Set its root directory to `ml-service`.
+- Configure the same `ML_INTERNAL_TOKEN` value used by the web/API project.
+- Deploy it and copy its production URL into the web/API project's `ML_URL`.
+- Redeploy the web/API project after changing `ML_URL`.
+
+The committed trained artifacts are read by the serverless scorer. Vercel has a
+read-only, ephemeral application filesystem, so `/api/train` is disabled there.
+Run `npm run ml:train` locally and deploy the updated artifacts when retraining
+is required.
+
+### 3. Supabase
+
+Run the complete `database/schema.sql` in the Supabase SQL Editor before the
+first production login. The publishable-key deployment depends on its RLS write
+policies and pending-account trigger.
+
+Verify the deployment with:
+
+```text
+https://barangay-assistance.vercel.app/api/health
+https://barangay-assistance.vercel.app/api/ml/api/health
+```
+
 ## Security notes
 
 - Never expose `SUPABASE_SECRET_KEY` or commit `.env`.
+- `SUPABASE_SECRET_KEY` is optional for normal requests, shared data, Staff
+  validation, and generated-list workflows. Creating, deleting, or resetting
+  another Supabase Auth login still requires that key; users can submit their
+  own pending account registration without it.
 - Rotate any secret copied into chat, logs, screenshots, or public documents.
 - `database/schema.sql` contains role- and association-scoped RLS policies; rerun it after policy changes.
 - Configure `APP_ORIGINS` to the exact deployed web origins.

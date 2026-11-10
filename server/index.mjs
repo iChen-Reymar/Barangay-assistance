@@ -2,6 +2,7 @@ import cors from 'cors'
 import express from 'express'
 import fs from 'node:fs'
 import path from 'node:path'
+import { AsyncLocalStorage } from 'node:async_hooks'
 import { createClient } from '@supabase/supabase-js'
 import { fileURLToPath } from 'node:url'
 
@@ -30,13 +31,34 @@ const supabaseUrl = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL ||
 const supabaseKey = process.env.SUPABASE_SECRET_KEY || process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.VITE_SUPABASE_PUBLISHABLE_KEY || ''
 const usingSecretKey = Boolean(process.env.SUPABASE_SECRET_KEY || process.env.SUPABASE_SERVICE_ROLE_KEY)
 const apiPort = Number(process.env.API_PORT || 3001)
+const vercelOrigins = [process.env.VERCEL_URL, process.env.VERCEL_PROJECT_PRODUCTION_URL]
+  .filter(Boolean)
+  .map((host) => `https://${String(host).replace(/^https?:\/\//, '')}`)
 const allowedOrigins = new Set(
   (process.env.APP_ORIGINS || 'http://localhost:5173,http://127.0.0.1:5173')
     .split(',')
     .map((value) => value.trim())
     .filter(Boolean),
 )
-let supabase = null
+for (const origin of vercelOrigins) allowedOrigins.add(origin)
+let systemSupabase = null
+let connectionPromise = null
+const databaseContext = new AsyncLocalStorage()
+const supabase = new Proxy({}, {
+  get(_target, property) {
+    const client = databaseContext.getStore() || systemSupabase
+    if (!client) throw new Error('Supabase is not connected.')
+    const value = client[property]
+    return typeof value === 'function' ? value.bind(client) : value
+  },
+})
+
+function authenticatedClient(token) {
+  return createClient(supabaseUrl, supabaseKey, {
+    auth: { persistSession: false, autoRefreshToken: false },
+    global: { headers: { Authorization: `Bearer ${token}` } },
+  })
+}
 
 function linkedText(value) {
   if (value == null) return null
@@ -777,12 +799,12 @@ async function connectSupabase() {
   if (!supabaseUrl || !supabaseKey) {
     throw new Error('Add VITE_SUPABASE_URL and VITE_SUPABASE_PUBLISHABLE_KEY to .env.')
   }
-  supabase = createClient(supabaseUrl, supabaseKey, {
+  systemSupabase = createClient(supabaseUrl, supabaseKey, {
     auth: { persistSession: false, autoRefreshToken: false },
   })
-  const { error } = await supabase.from('users').select('id').limit(1)
+  const { error } = await systemSupabase.from('users').select('id').limit(1)
   if (error) {
-    supabase = null
+    systemSupabase = null
     throw new Error(`${error.message} Run database/schema.sql in the Supabase SQL editor, then restart.`)
   }
 }
@@ -805,6 +827,19 @@ app.use(cors({
   allowedHeaders: ['Content-Type', 'Authorization'],
 }))
 app.use(express.json({ limit: '8mb' }))
+app.use((req, _res, next) => {
+  if (usingSecretKey || !systemSupabase) {
+    next()
+    return
+  }
+  const header = String(req.headers.authorization || '')
+  const token = header.startsWith('Bearer ') ? header.slice(7).trim() : ''
+  if (!token) {
+    next()
+    return
+  }
+  databaseContext.run(authenticatedClient(token), next)
+})
 
 const accessRequestAttempts = new Map()
 function limitAccessRequests(req, res, next) {
@@ -821,12 +856,21 @@ function limitAccessRequests(req, res, next) {
   next()
 }
 
+function initializeServer() {
+  if (!connectionPromise) connectionPromise = connectSupabase()
+  return connectionPromise
+}
+
 app.get('/api/health', (_req, res) => {
-  res.json({ ok: Boolean(supabase), database: 'supabase', writes: usingSecretKey })
+  res.json({
+    ok: Boolean(systemSupabase),
+    database: 'supabase',
+    writes: usingSecretKey ? 'service-role' : 'authenticated-rls',
+  })
 })
 
 async function authenticate(req, res) {
-  if (!supabase) {
+  if (!systemSupabase) {
     res.status(503).json({ error: 'Supabase is not connected.' })
     return null
   }
@@ -898,7 +942,7 @@ function scopeStoresForActor(stores, actor) {
 app.get('/api/bootstrap', async (req, res) => {
   const actor = await authenticate(req, res)
   if (!actor) return
-  if (!supabase) {
+  if (!systemSupabase) {
     res.status(503).json({ error: 'Supabase is not connected.' })
     return
   }
@@ -940,7 +984,7 @@ async function requireAdmin(req, res) {
 }
 
 app.post('/api/users', async (req, res) => {
-  if (!supabase || !usingSecretKey) {
+  if (!systemSupabase || !usingSecretKey) {
     res.status(503).json({ error: 'Supabase is not ready to create login accounts.' })
     return
   }
@@ -1035,6 +1079,10 @@ app.patch('/api/users/:id/role', async (req, res) => {
 })
 
 app.delete('/api/users/:id', async (req, res) => {
+  if (!usingSecretKey) {
+    res.status(503).json({ error: 'Deleting a Supabase Auth login requires the optional server secret key.' })
+    return
+  }
   const actor = await requireRole(req, res, ['admin'])
   if (!actor) return
   const id = String(req.params.id || '')
@@ -1068,7 +1116,7 @@ app.delete('/api/users/:id', async (req, res) => {
 })
 
 app.patch('/api/users/:id', async (req, res) => {
-  if (!supabase || !usingSecretKey) {
+  if (!systemSupabase || !usingSecretKey) {
     res.status(503).json({ error: 'Supabase is not ready to update login accounts.' })
     return
   }
@@ -1185,7 +1233,7 @@ app.patch('/api/users/:id', async (req, res) => {
 })
 
 app.post('/api/association-users', async (req, res) => {
-  if (!supabase || !usingSecretKey) {
+  if (!systemSupabase || !usingSecretKey) {
     res.status(503).json({ error: 'Supabase is not ready to create login accounts.' })
     return
   }
@@ -1271,7 +1319,7 @@ app.post('/api/association-users', async (req, res) => {
 })
 
 app.post('/api/access-requests', limitAccessRequests, async (req, res) => {
-  if (!supabase || !usingSecretKey) {
+  if (!systemSupabase) {
     res.status(503).json({ error: 'Account registration is not available.' })
     return
   }
@@ -1284,12 +1332,25 @@ app.post('/api/access-requests', limitAccessRequests, async (req, res) => {
     res.status(400).json({ error: 'Name, valid email, role, and a password of at least 8 characters are required.' })
     return
   }
-  const created = await supabase.auth.admin.createUser({
-    email,
-    password,
-    email_confirm: true,
-    user_metadata: { role, full_name: fullName, status: 'pending' },
-  })
+  const metadata = {
+    ...requested,
+    password: undefined,
+    role,
+    full_name: fullName,
+    status: 'pending',
+  }
+  const created = usingSecretKey
+    ? await supabase.auth.admin.createUser({
+        email,
+        password,
+        email_confirm: true,
+        user_metadata: metadata,
+      })
+    : await supabase.auth.signUp({
+        email,
+        password,
+        options: { data: metadata },
+      })
   if (created.error || !created.data.user) {
     res.status(400).json({ error: created.error?.message || 'Could not create the access request.' })
     return
@@ -1304,14 +1365,20 @@ app.post('/api/access-requests', limitAccessRequests, async (req, res) => {
     status: 'pending',
     createdAt: new Date().toISOString(),
   }
-  try {
-    await saveUserRow(user)
-  } catch (error) {
-    await supabase.auth.admin.deleteUser(created.data.user.id)
-    res.status(500).json({ error: error.message })
-    return
+  if (usingSecretKey) {
+    try {
+      await saveUserRow(user)
+    } catch (error) {
+      await supabase.auth.admin.deleteUser(created.data.user.id)
+      res.status(500).json({ error: error.message })
+      return
+    }
   }
-  res.status(201).json({ ok: true, user })
+  res.status(201).json({
+    ok: true,
+    user,
+    emailConfirmationRequired: !usingSecretKey && !created.data.session,
+  })
 })
 
 const recordResources = {
@@ -1574,17 +1641,18 @@ app.use('/api/ml', async (req, res) => {
   }
 })
 
-if (process.env.NODE_ENV !== 'test') {
+if (process.env.NODE_ENV !== 'test' && !process.env.VERCEL) {
   app.listen(apiPort, () => {
     console.log(`API listening on http://localhost:${apiPort}`)
     console.log(`ML service expected at ${mlUrl} (proxied under /api/ml)`)
   })
 
-  connectSupabase()
+  initializeServer()
     .then(() => {
       console.log('Supabase ready.')
       if (!usingSecretKey) {
-        console.log('Saves are blocked by row security. Add SUPABASE_SECRET_KEY to .env, then restart.')
+        console.log('Using authenticated Supabase RLS mode (no server secret configured).')
+        console.log('Auth Admin operations such as creating or deleting another login remain unavailable.')
       }
     })
     .catch((error) => {
@@ -1593,4 +1661,4 @@ if (process.env.NODE_ENV !== 'test') {
     })
 }
 
-export { app, canWriteResource, payloadIdentity, requestWriteError, scopeStoresForActor }
+export { app, canWriteResource, initializeServer, payloadIdentity, requestWriteError, scopeStoresForActor }
