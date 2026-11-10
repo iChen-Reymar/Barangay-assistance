@@ -96,6 +96,11 @@ The root `vercel.json` builds Vite, preserves SPA routes, and sends `/api/*` to
 the Express serverless function. `SUPABASE_SECRET_KEY` is not required for the
 normal RLS-backed workflow.
 
+`config/supabase-public.mjs` contains only the browser-safe Supabase URL and
+publishable key so GitHub-triggered deployments remain functional before Vercel
+variables are configured. Project environment variables override this fallback.
+Never add a secret or service-role key to that file.
+
 ### 2. ML project
 
 - Import the same repository again as a separate Vercel project.

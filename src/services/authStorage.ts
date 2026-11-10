@@ -390,10 +390,6 @@ function loginEmail(value: string) {
 }
 
 export async function login(email: string, password: string, rememberMe: boolean): Promise<LoginResult> {
-  if (!import.meta.env.VITE_SUPABASE_URL || !import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY) {
-    return { success: false, error: 'Supabase is not configured.' }
-  }
-
   const authEmail = loginEmail(email)
   setRememberSession(rememberMe)
   const { data, error } = await supabase.auth.signInWithPassword({
@@ -477,10 +473,6 @@ export async function login(email: string, password: string, rememberMe: boolean
 }
 
 async function saveAccessRequest(user: StoredUser, password: string): Promise<{ success: boolean; error?: string }> {
-  if (!import.meta.env.VITE_SUPABASE_URL || !import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY) {
-    return { success: false, error: 'Supabase is not configured.' }
-  }
-
   const response = await fetch('/api/access-requests', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
