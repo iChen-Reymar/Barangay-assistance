@@ -41,6 +41,22 @@ export function verifiedMembersForAssistance(
   })
 }
 
+export function membersWithoutCompleteStaffAssessment(
+  members: AssociationMember[],
+  assessments: StaffBeneficiary[],
+  associationName: string,
+) {
+  const verifiedIds = new Set(
+    verifiedMembersForAssistance(members, assessments, associationName).map((member) => member.id),
+  )
+  return members.filter((member) => {
+    const belongsTo = member.associationName?.trim() ?? ''
+    return Boolean(member.name.trim())
+      && sameAssociation(belongsTo, associationName)
+      && !verifiedIds.has(member.id)
+  })
+}
+
 export function generatedRowsForVerifiedMembers<T extends { beneficiaryId: string; requestId?: string }>(
   rows: T[],
   requestId: string,

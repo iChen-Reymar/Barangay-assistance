@@ -12,7 +12,7 @@ export interface AssociationNotification {
   rejectedBy?: string
   reason?: string
   requestId?: string
-  event?: 'submitted' | 'review' | 'generated' | 'approved' | 'rejected'
+  event?: 'submitted' | 'review' | 'generated' | 'approved' | 'rejected' | 'members_excluded'
 }
 
 const STORAGE_KEY = 'barangay_association_notifications'
@@ -218,6 +218,48 @@ export function notifyWorkflowEvent(input: {
     createdAt: now.toISOString(),
     read: false,
     type: input.type ?? 'info',
+  }
+  writeAll([notification, ...readAll()])
+  return notification
+}
+
+export function notifyMembersExcluded(input: {
+  associationName: string
+  requestId: string
+  memberNames: string[]
+}) {
+  const memberNames = [...new Set(input.memberNames.map((name) => name.trim()).filter(Boolean))]
+    .sort((left, right) => left.localeCompare(right))
+  if (!memberNames.length) return null
+
+  const now = new Date()
+  const count = memberNames.length
+  const notification: AssociationNotification = {
+    id: crypto.randomUUID(),
+    associationName: input.associationName,
+    recipientUserId: headUserIdFor(input.associationName),
+    requestId: input.requestId,
+    event: 'members_excluded',
+    message: `${count} member${count === 1 ? '' : 's'} for request ${input.requestId} ${count === 1 ? 'is' : 'are'} not ready for assistance-list generation.`,
+    reason: `Incomplete Member Qualification Data or missing Staff verification: ${memberNames.join(', ')}.`,
+    time: now.toLocaleString('en-US', {
+      month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit',
+    }),
+    createdAt: now.toISOString(),
+    read: false,
+    type: 'warning',
+  }
+  const existing = readAll().find(
+    (item) => item.requestId === input.requestId && item.event === 'members_excluded',
+  )
+  if (existing) {
+    const updated = {
+      ...existing,
+      ...notification,
+      id: existing.id,
+    }
+    writeAll(readAll().map((item) => item.id === existing.id ? updated : item))
+    return updated
   }
   writeAll([notification, ...readAll()])
   return notification

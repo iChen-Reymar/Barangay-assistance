@@ -34,8 +34,10 @@ import {
   completeStaffAssessment,
   findCompleteStaffAssessment,
   generatedRowsForVerifiedMembers,
+  membersWithoutCompleteStaffAssessment,
   verifiedMembersForAssistance,
 } from '../../services/assistanceListEligibility'
+import { notifyMembersExcluded } from '../../services/associationNotificationStorage'
 
 const REVIEWABLE_ITEMS_KEY = 'barangay_reviewable_items'
 
@@ -172,6 +174,14 @@ export default function StaffPriorityListPage() {
           && Boolean(beneficiary.memberId)
           && eligibleMembers.has(beneficiary.memberId as string),
       )
+      const excludedMembers = membersWithoutCompleteStaffAssessment(roster, assessed, request.association)
+      if (excludedMembers.length > 0) {
+        notifyMembersExcluded({
+          associationName: request.association,
+          requestId: request.id,
+          memberNames: excludedMembers.map((member) => member.name),
+        })
+      }
       if (measured.length === 0) {
         setGenerationMessage('No members are ready. Open Verify Qualification and prepare at least one member for generation.')
         return

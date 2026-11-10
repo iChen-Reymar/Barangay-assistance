@@ -8,7 +8,11 @@ class MemoryStorage {
   removeItem(key) { this.values.delete(key) }
 }
 
-globalThis.window = {}
+globalThis.window = {
+  dispatchEvent() {},
+  addEventListener() {},
+  removeEventListener() {},
+}
 globalThis.localStorage = new MemoryStorage()
 globalThis.sessionStorage = new MemoryStorage()
 
@@ -16,6 +20,7 @@ const persistence = await import('../src/services/sessionPersistence.ts')
 const recovery = await import('../src/services/passwordRecovery.ts')
 const workflow = await import('../src/services/assistanceWorkflow.ts')
 const eligibility = await import('../src/services/assistanceListEligibility.ts')
+const associationNotifications = await import('../src/services/associationNotificationStorage.ts')
 
 test('non-remembered Supabase sessions stay in session storage', () => {
   persistence.setRememberSession(false)
@@ -84,6 +89,8 @@ test('assistance lists retain only linked members with complete verified assessm
 
   const eligible = eligibility.verifiedMembersForAssistance(members, assessments, 'ERPAT')
   assert.deepEqual(eligible.map((member) => member.id), ['ruperto'])
+  const excluded = eligibility.membersWithoutCompleteStaffAssessment(members, assessments, 'ERPAT')
+  assert.deepEqual(excluded.map((member) => member.id), ['pending', 'unlinked', 'incomplete'])
 
   const generated = eligibility.generatedRowsForVerifiedMembers([
     { beneficiaryId: 'ruperto', requestId: 'request-1' },
@@ -122,4 +129,25 @@ test('regenerating one request replaces only that request rows', () => {
     'request-a',
   )
   assert.deepEqual(combined, [newRequestA, requestB])
+})
+
+test('excluded-member warnings are association scoped and updated per request', () => {
+  localStorage.removeItem('barangay_association_notifications')
+  associationNotifications.notifyMembersExcluded({
+    associationName: 'ERPAT',
+    requestId: 'asst-1',
+    memberNames: ['PENDING MEMBER', 'INCOMPLETE MEMBER'],
+  })
+  associationNotifications.notifyMembersExcluded({
+    associationName: 'ERPAT',
+    requestId: 'asst-1',
+    memberNames: ['PENDING MEMBER'],
+  })
+
+  const erpat = associationNotifications.getAssociationNotifications('ERPAT')
+  assert.equal(erpat.length, 1)
+  assert.equal(erpat[0].event, 'members_excluded')
+  assert.match(erpat[0].reason, /PENDING MEMBER/)
+  assert.doesNotMatch(erpat[0].reason, /INCOMPLETE MEMBER/)
+  assert.deepEqual(associationNotifications.getAssociationNotifications('OTHER ASSOCIATION'), [])
 })
