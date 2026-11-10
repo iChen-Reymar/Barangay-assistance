@@ -169,12 +169,28 @@ export default function StaffPriorityListPage() {
     setGenerating(true)
     setGenerationMessage('')
     try {
-      const requestDocumentsReady = (request.documents ?? []).length > 0
-        && (request.documents ?? []).every((document) => document.status === 'verified')
-      const qualificationsReady = (request.qualifications ?? []).length > 0
-        && (request.qualifications ?? []).every((check) => check.status === 'passed' || check.status === 'not_applicable')
+      const requestDocuments = request.documents ?? []
+      const qualifications = request.qualifications ?? []
+      const unverifiedDocuments = requestDocuments.filter((document) => document.status !== 'verified')
+      const incompleteQualifications = qualifications.filter(
+        (check) => check.status !== 'passed' && check.status !== 'not_applicable',
+      )
+      const requestDocumentsReady = requestDocuments.length > 0 && unverifiedDocuments.length === 0
+      const qualificationsReady = qualifications.length > 0 && incompleteQualifications.length === 0
       if (!requestDocumentsReady || !qualificationsReady) {
-        setGenerationMessage('Verify every request document and complete all qualification checks before generating the final list.')
+        const blockers = [
+          requestDocuments.length === 0
+            ? 'No request documents are attached.'
+            : unverifiedDocuments.length > 0
+              ? `${unverifiedDocuments.length} request document${unverifiedDocuments.length === 1 ? '' : 's'} still need verification.`
+              : '',
+          qualifications.length === 0
+            ? 'No qualification checks are configured.'
+            : incompleteQualifications.length > 0
+              ? `${incompleteQualifications.length} qualification check${incompleteQualifications.length === 1 ? '' : 's'} are incomplete.`
+              : '',
+        ].filter(Boolean)
+        setGenerationMessage(blockers.join(' '))
         return
       }
       let reviewedRequest = getItemById(request.id)
@@ -197,7 +213,7 @@ export default function StaffPriorityListPage() {
           && eligibleMembers.has(beneficiary.memberId || beneficiary.id),
       )
       if (measured.length === 0) {
-        setGenerationMessage('No members for this request have a complete, verified household assessment yet.')
+        setGenerationMessage('No members are ready. Open Verify Qualification and mark a member qualification as verified.')
         return
       }
       setAssociation(request.association)

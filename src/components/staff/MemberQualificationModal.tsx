@@ -94,6 +94,50 @@ function personName(person: ReviewPerson) {
   return person.kind === 'member' ? person.member.name : person.beneficiary.name
 }
 
+function memberReadinessError(member: AssociationMember) {
+  const missing: string[] = []
+  if (member.familySize < 1) missing.push('family size')
+  if ((member.monthlyIncome ?? 0) <= 0) missing.push('monthly income')
+  if (member.workingHouseholdMembers === undefined) missing.push('working household members')
+  if (member.age < 1) missing.push('age')
+  if (!member.employmentStatus?.trim()) missing.push('employment status')
+  if (!member.housingCondition?.trim()) missing.push('housing condition')
+  return missing.length
+    ? `Complete ${missing.join(', ')} in Manage Association Members before verifying this qualification.`
+    : ''
+}
+
+function prepareMemberForGeneration(
+  member: AssociationMember,
+  existing: StaffBeneficiary | undefined,
+  reviewerName: string,
+) {
+  const record: StaffBeneficiary = {
+    ...(existing ?? {}),
+    id: existing?.id ?? crypto.randomUUID(),
+    memberId: member.id,
+    name: member.name.trim(),
+    association: member.associationName || 'Unassigned',
+    familySize: member.familySize,
+    monthlyIncome: member.monthlyIncome ?? 0,
+    workingHouseholdMembers: member.workingHouseholdMembers ?? 0,
+    age: member.age,
+    contactNumber: member.contactNumber,
+    address: member.address,
+    employmentStatus: member.employmentStatus,
+    housingCondition: member.housingCondition,
+    vulnerability: member.vulnerability,
+    verification: 'VERIFIED',
+    vulnerabilityIndicators: existing?.vulnerabilityIndicators ?? [
+      ...(member.isPwd ? ['PWD Member (Person with Disability)'] : []),
+      ...(member.isSenior ? ['Elderly Member (60+)'] : []),
+    ],
+  }
+  if (existing) updateStaffBeneficiary(record)
+  else addStaffBeneficiary(record)
+  verifyMemberRecord(member.id, reviewerName)
+}
+
 function isMasterlistDocument(doc: SupportingDocument) {
   return /masterlist/i.test(doc.name) || doc.type.trim().toLowerCase() === 'member list'
 }
@@ -537,6 +581,7 @@ function PersonReview({
   reviewerName: string
   assessment?: StaffBeneficiary
 }) {
+  const [readinessMessage, setReadinessMessage] = useState('')
   const verified = person.kind === 'member'
     ? person.member.staffVerified === true && assessment?.verification === 'VERIFIED'
     : person.beneficiary.verification === 'VERIFIED'
@@ -550,6 +595,33 @@ function PersonReview({
       return
     }
     verifyStaffBeneficiary(person.beneficiary.id)
+  }
+
+  function prepareCurrentMember() {
+    if (person.kind !== 'member') return false
+    const error = memberReadinessError(person.member)
+    if (error) {
+      setReadinessMessage(error)
+      return false
+    }
+    const currentAssessment = getStaffBeneficiaries().find(
+      (row) => row.memberId === person.member.id || row.id === person.member.id,
+    )
+    prepareMemberForGeneration(person.member, currentAssessment, reviewerName)
+    setReadinessMessage('Member verified and ready for assistance-list generation.')
+    return true
+  }
+
+  function verifyQualificationAndPrepare(
+    itemId: string,
+    checkId: string,
+    status: QualificationStatus,
+    notes?: string,
+  ) {
+    if (status === 'passed' && person.kind === 'member') {
+      if (!prepareCurrentMember()) return
+    }
+    onVerifyQualification(itemId, checkId, status, notes)
   }
 
   return (
@@ -574,6 +646,11 @@ function PersonReview({
       {person.kind === 'member' && verified && verifiedBy && verifiedAt ? (
         <p className="text-xs text-green-700">
           Qualification verified by {verifiedBy} on {formatDate(verifiedAt)}.
+        </p>
+      ) : null}
+      {readinessMessage ? (
+        <p className={`rounded-lg border px-3 py-2 text-sm ${readinessMessage.startsWith('Member verified') ? 'border-green-200 bg-green-50 text-green-800' : 'border-amber-200 bg-amber-50 text-amber-800'}`}>
+          {readinessMessage}
         </p>
       ) : null}
       {person.kind === 'beneficiary' && !verified ? (
@@ -628,8 +705,21 @@ function PersonReview({
         {requests.length === 0 ? (
           <EmptyNote>No qualification checks are linked to this association.</EmptyNote>
         ) : (
-          <RequestQualifications requests={requests} onVerifyQualification={onVerifyQualification} />
+          <RequestQualifications requests={requests} onVerifyQualification={verifyQualificationAndPrepare} />
         )}
+        {person.kind === 'member'
+          && !verified
+          && requests.flatMap((request) => request.qualifications ?? []).length > 0
+          && requests.flatMap((request) => request.qualifications ?? []).every(
+            (check) => check.status === 'passed' || check.status === 'not_applicable',
+          ) ? (
+            <div className="mt-3 flex justify-end border-t border-gray-100 pt-3">
+              <Button size="sm" onClick={prepareCurrentMember}>
+                <CheckCircle className="h-4 w-4" />
+                Prepare Member for Generation
+              </Button>
+            </div>
+          ) : null}
       </section>
     </div>
   )
