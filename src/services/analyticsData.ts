@@ -120,21 +120,24 @@ export function getDistributionStatusChartData(): ChartSegment[] {
   }))
 }
 
-export function getDistributionByProgramChartData(): BarChartItem[] {
-  const byProgram = new Map<string, number>()
+export function getDistributionByAssociationChartData(): BarChartItem[] {
+  const byAssociation = new Map<string, { label: string; count: number }>()
 
   for (const row of getGeneratedAssistanceList()) {
-    const program = normalizeProgramName(row.program)
-    byProgram.set(program, (byProgram.get(program) ?? 0) + 1)
+    const association = row.association.trim() || 'Unassigned Association'
+    const key = association.toLocaleLowerCase()
+    const current = byAssociation.get(key) ?? { label: association, count: 0 }
+    current.count += 1
+    byAssociation.set(key, current)
   }
 
-  return [...byProgram.entries()]
-    .sort((a, b) => b[1] - a[1])
+  return [...byAssociation.values()]
+    .sort((left, right) => right.count - left.count || left.label.localeCompare(right.label))
     .slice(0, 6)
-    .map(([label, value]) => ({
-      label: shortenLabel(label),
-      value,
-      suffix: ' beneficiaries',
+    .map(({ label, count }) => ({
+      label,
+      value: count,
+      suffix: count === 1 ? ' beneficiary' : ' beneficiaries',
       color: '#16a34a',
     }))
 }
