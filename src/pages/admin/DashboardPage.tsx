@@ -126,7 +126,11 @@ export default function DashboardPage() {
             />
           </div>
 
-          <div className="rounded-lg border border-gray-200 bg-white shadow-sm">
+          <Link
+            to="/admin/people?view=assistance"
+            aria-label="Open assistance requests"
+            className="rounded-lg border border-gray-200 bg-white shadow-sm focus:outline-none focus:ring-2 focus:ring-primary/30"
+          >
             <div className="border-b border-gray-200 px-5 py-4">
               <h2 className="text-sm font-bold text-gray-900">Recent Assistance Requests</h2>
             </div>
@@ -158,7 +162,7 @@ export default function DashboardPage() {
                 </tbody>
               </table>
             </div>
-          </div>
+          </Link>
         </div>
 
         <div className="grid gap-6 lg:grid-cols-2">
