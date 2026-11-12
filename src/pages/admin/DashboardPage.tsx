@@ -130,7 +130,7 @@ export default function DashboardPage() {
                       <td colSpan={4} className="px-4 py-6 text-center text-sm text-gray-500">No AI-generated results yet.</td>
                     </tr>
                   ) : generated.slice(0, 5).map((row) => (
-                    <tr key={`${row.rank}-${row.name}`} className="border-b border-gray-50 hover:bg-gray-50">
+                    <tr key={row.id} className="border-b border-gray-50 hover:bg-gray-50">
                       <td className="px-4 py-3 font-medium text-gray-900">{row.name}</td>
                       <td className="px-4 py-3"><ScoreDisplay score={row.score} /></td>
                       <td className="px-4 py-3 text-gray-600">{row.program}</td>

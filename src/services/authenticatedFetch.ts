@@ -1,6 +1,7 @@
 import { supabase } from '../lib/supabase'
 
 export const AUTH_EXPIRED_EVENT = 'barangay:auth-expired'
+let expiredSessionAnnounced = false
 
 async function accessToken(forceRefresh = false) {
   if (forceRefresh) {
@@ -24,6 +25,8 @@ function withToken(init: RequestInit, token: string) {
 }
 
 function announceExpiredSession() {
+  if (expiredSessionAnnounced) return
+  expiredSessionAnnounced = true
   if (typeof window !== 'undefined') window.dispatchEvent(new Event(AUTH_EXPIRED_EVENT))
 }
 
@@ -39,7 +42,10 @@ export async function authenticatedFetch(input: RequestInfo | URL, init: Request
   }
 
   let response = await fetch(input, withToken(init, token))
-  if (response.status !== 401) return response
+  if (response.status !== 401) {
+    expiredSessionAnnounced = false
+    return response
+  }
 
   const refreshedToken = await accessToken(true)
   if (!refreshedToken) {
@@ -49,5 +55,6 @@ export async function authenticatedFetch(input: RequestInfo | URL, init: Request
 
   response = await fetch(input, withToken(init, refreshedToken))
   if (response.status === 401) announceExpiredSession()
+  else expiredSessionAnnounced = false
   return response
 }

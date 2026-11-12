@@ -66,10 +66,26 @@ function recordMap(key: string, value: unknown) {
 
 class SyncRequestError extends Error {
   retryable: boolean
+  status?: number
 
-  constructor(message: string, retryable: boolean, cause?: unknown) {
+  constructor(message: string, retryable: boolean, cause?: unknown, status?: number) {
     super(message, cause === undefined ? undefined : { cause })
     this.retryable = retryable
+    this.status = status
+  }
+}
+
+function isAuthenticationSyncError(error: unknown) {
+  return error instanceof SyncRequestError && error.status === 401
+}
+
+function publishCurrentQueueStatus() {
+  if (failedSyncJobs.size > 0) {
+    publishSyncStatus({ phase: 'failed', pending: failedSyncJobs.size, error: 'Some changes could not be saved.' })
+  } else if (activeSyncJobs > 0) {
+    publishSyncStatus({ phase: 'syncing', pending: activeSyncJobs })
+  } else {
+    publishSyncStatus({ phase: 'idle', pending: 0 })
   }
 }
 
@@ -81,7 +97,9 @@ async function retryableRequest(url: string, init: RequestInit) {
       if (response.ok) return
       const body = await response.json().catch(() => ({})) as { error?: string }
       lastError = body.error || `Database request failed (${response.status}).`
-      if (response.status < 500 && response.status !== 429) throw new SyncRequestError(lastError, false)
+      if (response.status < 500 && response.status !== 429) {
+        throw new SyncRequestError(lastError, false, undefined, response.status)
+      }
     } catch (error) {
       lastError = error instanceof Error ? error.message : lastError
       if (error instanceof SyncRequestError && !error.retryable) throw error
@@ -108,7 +126,8 @@ export async function synchronizeRecordNow(key: string, id: string, payload: unk
     latestSyncErrors.delete(key)
   } catch (error) {
     const syncError = error instanceof Error ? error : new Error('Database synchronization failed.')
-    latestSyncErrors.set(key, syncError)
+    if (isAuthenticationSyncError(error)) latestSyncErrors.delete(key)
+    else latestSyncErrors.set(key, syncError)
     throw syncError
   }
 }
@@ -169,6 +188,12 @@ function queueStoreChange(key: string, previousRaw: string | null, nextRaw: stri
           : { phase: 'saved', pending: 0 })
     } catch (error) {
       activeSyncJobs -= 1
+      if (isAuthenticationSyncError(error)) {
+        failedSyncJobs.delete(id)
+        latestSyncErrors.delete(key)
+        publishCurrentQueueStatus()
+        return
+      }
       failedSyncJobs.set(id, execute)
       const message = error instanceof Error ? error.message : 'Database synchronization failed.'
       latestSyncErrors.set(key, error instanceof Error ? error : new Error(message))
@@ -189,6 +214,12 @@ async function retryFailedSyncJobs() {
 }
 
 registerSyncRetry(retryFailedSyncJobs)
+
+export function discardFailedSynchronizations() {
+  failedSyncJobs.clear()
+  latestSyncErrors.clear()
+  publishCurrentQueueStatus()
+}
 
 export function installDatabaseSync() {
   if (installed || typeof window === 'undefined') return

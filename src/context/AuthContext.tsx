@@ -36,6 +36,7 @@ import type {
 } from '../types/auth'
 import { AUTH_EXPIRED_EVENT } from '../services/authenticatedFetch'
 import { supabase } from '../lib/supabase'
+import { discardFailedSynchronizations } from '../services/databaseSync'
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<SessionUser | null>(null)
@@ -75,6 +76,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const { data: authListener } = supabase.auth.onAuthStateChange((event) => {
       if (!active) return
       if (event === 'SIGNED_OUT' || event === 'PASSWORD_RECOVERY') {
+        discardFailedSynchronizations()
         clearLocalSession(event !== 'PASSWORD_RECOVERY')
         setUser(null)
         setPendingRequests([])
@@ -89,6 +91,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     const handleExpiredSession = () => {
+      discardFailedSynchronizations()
       clearSession()
       setUser(null)
       setPendingRequests([])
