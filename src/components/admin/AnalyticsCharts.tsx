@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { Link } from 'react-router-dom'
 import { HorizontalBarChart } from '../charts/HorizontalBarChart'
 import { SegmentDonutChart } from '../charts/SegmentDonutChart'
 import {
@@ -11,7 +12,7 @@ import {
 } from '../../services/analyticsData'
 import { subscribeDecisionStorage } from '../../services/decisionStorage'
 
-export function AnalyticsCharts() {
+export function AnalyticsCharts({ requestStatusHref }: { requestStatusHref?: string }) {
   const [, setTick] = useState(0)
 
   useEffect(() => {
@@ -22,22 +23,37 @@ export function AnalyticsCharts() {
   const programMatch = getProgramMatchChartData()
   const distributionStatus = getDistributionStatusChartData()
   const distributionByProgram = getDistributionByProgramChartData()
+  const requestStatusContent = (
+    <>
+      <div className="mb-4">
+        <h2 className="text-sm font-bold text-gray-900">Request Status</h2>
+        <p className="mt-0.5 text-xs text-gray-500">
+          Breakdown of assistance requests by current review status.
+        </p>
+      </div>
+      <SegmentDonutChart
+        segments={requestStatus}
+        centerValue={getRequestStatusTotal()}
+        centerLabel="Total Requests"
+      />
+    </>
+  )
 
   return (
     <div className="grid gap-4 sm:gap-6 lg:grid-cols-3">
-      <div className="rounded-lg border border-gray-200 bg-white p-4 shadow-sm sm:p-5">
-        <div className="mb-4">
-          <h2 className="text-sm font-bold text-gray-900">Request Status</h2>
-          <p className="mt-0.5 text-xs text-gray-500">
-            Breakdown of assistance requests by current review status.
-          </p>
+      {requestStatusHref ? (
+        <Link
+          to={requestStatusHref}
+          aria-label="Open assistance requests"
+          className="rounded-lg border border-gray-200 bg-white p-4 shadow-sm transition-colors hover:border-green-300 hover:bg-green-50/30 focus:outline-none focus:ring-2 focus:ring-primary/30 sm:p-5"
+        >
+          {requestStatusContent}
+        </Link>
+      ) : (
+        <div className="rounded-lg border border-gray-200 bg-white p-4 shadow-sm sm:p-5">
+          {requestStatusContent}
         </div>
-        <SegmentDonutChart
-          segments={requestStatus}
-          centerValue={getRequestStatusTotal()}
-          centerLabel="Total Requests"
-        />
-      </div>
+      )}
 
       <div className="rounded-lg border border-gray-200 bg-white p-4 shadow-sm sm:p-5">
         <div className="mb-4">

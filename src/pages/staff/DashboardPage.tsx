@@ -63,7 +63,7 @@ export default function StaffDashboardPage() {
         </div>
 
         <div className="mb-6">
-          <AnalyticsCharts />
+          <AnalyticsCharts requestStatusHref="/staff/assistance-requests" />
         </div>
 
         <div className="grid gap-6 lg:grid-cols-2">
