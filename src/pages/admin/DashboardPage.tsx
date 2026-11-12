@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { Building2, Users, Clock, CheckCircle, AlertTriangle } from 'lucide-react'
+import { Link } from 'react-router-dom'
 import { AdminHeader } from '../../components/admin/AdminHeader'
 import { StatCard } from '../../components/ui/StatCard'
 import { AnalyticsCharts } from '../../components/admin/AnalyticsCharts'
@@ -161,7 +162,11 @@ export default function DashboardPage() {
         </div>
 
         <div className="grid gap-6 lg:grid-cols-2">
-          <div className="rounded-lg border border-gray-200 bg-white shadow-sm">
+          <Link
+            to="/admin/recommendations"
+            aria-label="Open AI-generated recommendations"
+            className="rounded-lg border border-gray-200 bg-white shadow-sm focus:outline-none focus:ring-2 focus:ring-primary/30"
+          >
             <div className="border-b border-gray-200 px-5 py-4">
               <h2 className="text-sm font-bold text-gray-900">Recent AI Recommendations</h2>
             </div>
@@ -193,7 +198,7 @@ export default function DashboardPage() {
                 </tbody>
               </table>
             </div>
-          </div>
+          </Link>
 
           <div className="rounded-lg border border-gray-200 bg-white p-4 shadow-sm sm:p-5">
             <h2 className="mb-4 text-sm font-bold text-gray-900">Recent Activity Log</h2>
