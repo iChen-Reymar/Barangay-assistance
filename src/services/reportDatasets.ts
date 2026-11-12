@@ -201,22 +201,64 @@ function programSheet(): ReportSheet {
   }
 }
 
-function aiSheet(): ReportSheet {
-  const rows = getGeneratedAssistanceList().slice().sort((left, right) => left.rank - right.rank)
-  return {
-    name: 'AI Assessment',
-    headers: ['Rank', 'Name', 'Association', 'Score', 'Classification', 'Program', 'Models Agree', 'Why'],
-    rows: rows.map((row) => [
-      row.rank,
-      row.name,
-      row.association,
-      row.score,
-      row.classification,
-      row.program,
-      row.modelAgreement === undefined ? '' : yesNo(row.modelAgreement),
-      row.reason,
-    ]),
+const aiAssessmentHeaders = ['Rank', 'Name', 'Association', 'Score', 'Classification', 'Program', 'Models Agree', 'Why']
+
+function aiSheets(): ReportSheet[] {
+  const rows = getGeneratedAssistanceList()
+  if (rows.length === 0) return [emptySheet('AI Assessment', aiAssessmentHeaders)]
+
+  const requests = new Map(getAssistanceItems().map((request) => [request.id, request]))
+  const groups = new Map<string, { requestId?: string; generatedAt: string; rows: typeof rows }>()
+  for (const row of rows) {
+    const key = row.requestId || 'legacy-unlinked'
+    const group = groups.get(key) ?? {
+      requestId: row.requestId,
+      generatedAt: row.generatedAt,
+      rows: [],
+    }
+    group.rows.push(row)
+    if (row.generatedAt > group.generatedAt) group.generatedAt = row.generatedAt
+    groups.set(key, group)
   }
+
+  return [...groups.values()]
+    .sort((left, right) => {
+      if (!left.requestId) return 1
+      if (!right.requestId) return -1
+      return right.generatedAt.localeCompare(left.generatedAt)
+    })
+    .map((group) => {
+      const request = group.requestId ? requests.get(group.requestId) : undefined
+      const first = group.rows[0]
+      const association = request?.association || first?.association || 'Unassigned'
+      const program = request?.program || request?.requestType || first?.program || 'Assistance'
+      const date = request?.date || new Date(group.generatedAt).toLocaleDateString('en-PH', {
+        month: 'short',
+        day: 'numeric',
+        year: 'numeric',
+      })
+      const name = group.requestId
+        ? `${association} — ${program} — ${date} (${group.requestId})`
+        : 'Legacy / Unlinked Results'
+
+      return {
+        name,
+        headers: aiAssessmentHeaders,
+        rows: group.rows
+          .slice()
+          .sort((left, right) => left.rank - right.rank || right.score - left.score)
+          .map((row) => [
+            row.rank,
+            row.name,
+            row.association,
+            row.score,
+            row.classification,
+            row.program,
+            row.modelAgreement === undefined ? '' : yesNo(row.modelAgreement),
+            row.reason,
+          ]),
+      }
+    })
 }
 
 function auditSheet(): ReportSheet {
@@ -256,16 +298,36 @@ export function datasetForReport(entry: ReportHistoryEntry): ReportDataset {
     vulnerability: () => withSummary('Vulnerability Report', [vulnerabilitySheet()]),
     assistance: () => withSummary('Assistance Report', [requestSheet('Requests', false), programSheet(), aidReceivedSheet()]),
     approved: () => withSummary('Generated Assistance List Report', [requestSheet('Generated Lists', true)]),
-    ai_scoring: () => withSummary('AI Assessment Report', [aiSheet()]),
+    ai_scoring: () => withSummary('AI Assessment Report by Generated Request', aiSheets()),
     audit: () => withSummary('Audit Log Report', [auditSheet()]),
   }
   return builders[entry.reportType]()
 }
 
 export function workbookSheets(dataset: ReportDataset): WorkbookSheet[] {
-  return dataset.sheets.map((sheet) => ({
-    name: sheet.name.slice(0, 31),
-    headers: sheet.headers,
-    rows: sheet.rows,
-  }))
+  const usedNames = new Set<string>()
+  const invalidCharacters = '\\/:*?[]'
+
+  return dataset.sheets.map((sheet, index) => {
+    const cleaned = [...sheet.name]
+      .map((character) => invalidCharacters.includes(character) ? ' ' : character)
+      .join('')
+      .replace(/\s+/g, ' ')
+      .replace(/^'+|'+$/g, '')
+      .trim() || `Sheet ${index + 1}`
+    let name = cleaned.slice(0, 31)
+    let duplicateNumber = 2
+    while (usedNames.has(name.toLocaleLowerCase())) {
+      const suffix = ` (${duplicateNumber})`
+      name = `${cleaned.slice(0, 31 - suffix.length)}${suffix}`
+      duplicateNumber += 1
+    }
+    usedNames.add(name.toLocaleLowerCase())
+
+    return {
+      name,
+      headers: sheet.headers,
+      rows: sheet.rows,
+    }
+  })
 }

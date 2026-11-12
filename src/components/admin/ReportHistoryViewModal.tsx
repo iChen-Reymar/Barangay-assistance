@@ -44,7 +44,11 @@ export function ReportHistoryViewModal({
         {preview.sheets.length > 1 ? (
           <label className="block max-w-md">
             <span className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-gray-500">
-              {preview.entry.reportType === 'beneficiary' ? 'Association' : 'Report section'}
+              {preview.entry.reportType === 'beneficiary'
+                ? 'Association'
+                : preview.entry.reportType === 'ai_scoring'
+                  ? 'Generated request'
+                  : 'Report section'}
             </span>
             <select
               value={selectedSheetIndex}
