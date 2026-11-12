@@ -8,7 +8,7 @@ interface ReportHistoryViewModalProps {
   open: boolean
   onClose: () => void
   preview: ReportPreview | null
-  onDownload: (format: ReportFormat) => void
+  onDownload: (format: ReportFormat, reportSectionId?: string) => void
 }
 
 const PREVIEW_LIMIT = 8
@@ -32,13 +32,21 @@ export function ReportHistoryViewModal({
   const sheet = preview.sheets[selectedSheetIndex]
   const shown = sheet ? sheet.rows.slice(0, PREVIEW_LIMIT) : []
   const hiddenCount = sheet ? Math.max(sheet.rows.length - shown.length, 0) : 0
+  const selectsGeneratedRequest = preview.entry.reportType === 'ai_scoring'
+  const selectedReportSectionId = selectsGeneratedRequest ? sheet?.id : undefined
 
   return (
     <Modal open={open} onClose={onClose} title={preview.title} size="xl">
       <div className="space-y-4">
         <div className="rounded-lg border border-gray-100 bg-gray-50 px-4 py-3 text-sm text-gray-600">
-          <p>{preview.summary.join(' · ')}</p>
-          <p className="mt-1">Review the rows below, then download the full report.</p>
+          <p>
+            {selectsGeneratedRequest && sheet
+              ? `${preview.summary[0]} · ${sheet.rows.length} record${sheet.rows.length === 1 ? '' : 's'} for the selected request`
+              : preview.summary.join(' · ')}
+          </p>
+          <p className="mt-1">
+            Review the rows below, then download {selectsGeneratedRequest ? 'the selected request report' : 'the full report'}.
+          </p>
         </div>
 
         {preview.sheets.length > 1 ? (
@@ -125,13 +133,13 @@ export function ReportHistoryViewModal({
           <Button type="button" variant="outline" onClick={onClose}>
             Close
           </Button>
-          <Button type="button" onClick={() => onDownload('PDF')}>
+          <Button type="button" onClick={() => onDownload('PDF', selectedReportSectionId)}>
             Download PDF
           </Button>
-          <Button type="button" variant="outline" onClick={() => onDownload('EXCEL')}>
+          <Button type="button" variant="outline" onClick={() => onDownload('EXCEL', selectedReportSectionId)}>
             Download Excel
           </Button>
-          <Button type="button" variant="outline" onClick={() => onDownload('CSV')}>
+          <Button type="button" variant="outline" onClick={() => onDownload('CSV', selectedReportSectionId)}>
             Download CSV
           </Button>
         </div>

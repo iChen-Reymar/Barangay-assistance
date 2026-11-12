@@ -59,9 +59,10 @@ function extensionForFormat(format: ReportFormat): string {
   return 'csv'
 }
 
-function buildFileName(template: ReportTemplate, format: ReportFormat): string {
+function buildFileName(template: ReportTemplate, format: ReportFormat, reportSectionId?: string): string {
   const stamp = formatExportDateStamp()
-  return `${template.slug}_${stamp}.${extensionForFormat(format)}`
+  const section = reportSectionId?.trim().replace(/[^a-zA-Z0-9-]+/g, '-').replace(/^-+|-+$/g, '')
+  return `${template.slug}${section ? `_${section}` : ''}_${stamp}.${extensionForFormat(format)}`
 }
 
 function createHistoryEntry(
@@ -69,16 +70,18 @@ function createHistoryEntry(
   generatedBy: string,
   format: ReportFormat,
   userId?: string,
+  reportSectionId?: string,
 ): ReportHistoryEntry {
   const timestamp = new Date().toISOString()
   return {
     id: crypto.randomUUID(),
-    name: buildFileName(template, format),
+    name: buildFileName(template, format, reportSectionId),
     generatedBy,
     userId: userId || undefined,
     date: formatAuditDate(timestamp),
     format,
     reportType: template.reportType,
+    reportSectionId,
   }
 }
 
@@ -100,8 +103,9 @@ export function exportReportFromTemplate(
   generatedBy: string,
   format: ReportFormat,
   userId?: string,
+  reportSectionId?: string,
 ): ReportHistoryEntry {
-  const entry = prependHistory(createHistoryEntry(template, generatedBy, format, userId))
+  const entry = prependHistory(createHistoryEntry(template, generatedBy, format, userId, reportSectionId))
   downloadHistoryReport(entry)
   return entry
 }

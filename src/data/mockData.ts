@@ -216,6 +216,7 @@ export interface ReportHistoryEntry {
   date: string
   format: ReportFormat
   reportType: ReportHistoryType
+  reportSectionId?: string
 }
 
 export const reportHistory: ReportHistoryEntry[] = []

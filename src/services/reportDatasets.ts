@@ -9,6 +9,7 @@ import { getPrivacySettings, maskEmail, maskIp, maskPhone } from './privacyStora
 import type { WorkbookSheet } from '../utils/xlsxExport'
 
 export type ReportSheet = {
+  id?: string
   name: string
   headers: string[]
   rows: (string | number)[][]
@@ -203,7 +204,7 @@ function programSheet(): ReportSheet {
 
 const aiAssessmentHeaders = ['Rank', 'Name', 'Association', 'Score', 'Classification', 'Program', 'Models Agree', 'Why']
 
-function aiSheets(): ReportSheet[] {
+function aiSheets(selectedRequestId?: string): ReportSheet[] {
   const rows = getGeneratedAssistanceList()
   if (rows.length === 0) return [emptySheet('AI Assessment', aiAssessmentHeaders)]
 
@@ -221,7 +222,13 @@ function aiSheets(): ReportSheet[] {
     groups.set(key, group)
   }
 
-  return [...groups.values()]
+  const selectedGroups = [...groups.entries()]
+    .filter(([id]) => !selectedRequestId || id === selectedRequestId)
+    .map(([, group]) => group)
+
+  if (selectedGroups.length === 0) return [emptySheet('AI Assessment', aiAssessmentHeaders)]
+
+  return selectedGroups
     .sort((left, right) => {
       if (!left.requestId) return 1
       if (!right.requestId) return -1
@@ -242,6 +249,7 @@ function aiSheets(): ReportSheet[] {
         : 'Legacy / Unlinked Results'
 
       return {
+        id: group.requestId || 'legacy-unlinked',
         name,
         headers: aiAssessmentHeaders,
         rows: group.rows
@@ -298,7 +306,10 @@ export function datasetForReport(entry: ReportHistoryEntry): ReportDataset {
     vulnerability: () => withSummary('Vulnerability Report', [vulnerabilitySheet()]),
     assistance: () => withSummary('Assistance Report', [requestSheet('Requests', false), programSheet(), aidReceivedSheet()]),
     approved: () => withSummary('Generated Assistance List Report', [requestSheet('Generated Lists', true)]),
-    ai_scoring: () => withSummary('AI Assessment Report by Generated Request', aiSheets()),
+    ai_scoring: () => withSummary(
+      'AI Assessment Report by Generated Request',
+      aiSheets(entry.reportSectionId),
+    ),
     audit: () => withSummary('Audit Log Report', [auditSheet()]),
   }
   return builders[entry.reportType]()

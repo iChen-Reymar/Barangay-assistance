@@ -102,8 +102,8 @@ export default function ReportsPage() {
     }))
   }
 
-  function handleExport(template: ReportTemplate, format: ReportFormat) {
-    const entry = exportReportFromTemplate(template, generatedBy, format, user?.id)
+  function handleExport(template: ReportTemplate, format: ReportFormat, reportSectionId?: string) {
+    const entry = exportReportFromTemplate(template, generatedBy, format, user?.id, reportSectionId)
     setStatusMessage(`Exported ${entry.name} and saved it to Report History.`)
     logReportAction(`Exported ${template.title} as ${format} (${entry.name}).`)
   }
@@ -118,15 +118,15 @@ export default function ReportsPage() {
     setStatusMessage(`Downloaded ${entry.name}.`)
   }
 
-  function handleDownloadFromModal(format: ReportFormat) {
+  function handleDownloadFromModal(format: ReportFormat, reportSectionId?: string) {
     if (viewTemplate) {
-      handleExport(viewTemplate, format)
+      handleExport(viewTemplate, format, reportSectionId)
       return
     }
     if (!viewPreview) return
     const extension = format === 'PDF' ? 'pdf' : format === 'EXCEL' ? 'xlsx' : 'csv'
     const name = viewPreview.entry.name.replace(/\.(pdf|xlsx|csv)$/i, `.${extension}`)
-    downloadHistoryReport({ ...viewPreview.entry, format, name })
+    downloadHistoryReport({ ...viewPreview.entry, format, name, reportSectionId })
     setStatusMessage(`Downloaded ${name}.`)
   }
 
