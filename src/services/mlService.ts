@@ -221,7 +221,7 @@ export const FEATURE_LABELS: Record<string, string> = {
   employment_unemployed: 'Employment: unemployed',
   housing_concrete: 'Housing: concrete',
   housing_light_materials: 'Housing: light materials',
-  housing_temporary: 'Housing: temporary',
+  housing_temporary: 'Housing: renter',
   housing_makeshift_salvaged: 'Housing: makeshift or salvaged',
   has_elderly: 'Elderly member present',
   has_pwd: 'PWD member present',

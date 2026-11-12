@@ -72,7 +72,7 @@ export const associationStats = {
 
 export type BeneficiaryStatus = 'ACTIVE' | 'INACTIVE'
 
-export type HousingType = 'Concrete' | 'Light Materials' | 'Temporary/Salvaged'
+export type HousingType = 'Concrete' | 'Light Materials' | 'Renter'
 
 export interface Beneficiary {
   id: string
@@ -87,7 +87,7 @@ export interface Beneficiary {
   status: BeneficiaryStatus
 }
 
-export const housingTypes: HousingType[] = ['Concrete', 'Light Materials', 'Temporary/Salvaged']
+export const housingTypes: HousingType[] = ['Concrete', 'Light Materials', 'Renter']
 
 export interface PriorityListEntry {
   id: string

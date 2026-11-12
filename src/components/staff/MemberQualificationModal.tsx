@@ -245,7 +245,7 @@ function MemberReview({
             </label>
             <label className="text-xs font-semibold uppercase text-gray-500">Housing Condition
               <select required value={form.housingCondition} onChange={(event) => setForm((current) => ({ ...current, housingCondition: event.target.value }))} className={inputClass}>
-                <option value="">Select condition</option><option>Concrete</option><option>Light Materials</option><option>Temporary</option><option>Makeshift / Salvaged</option>
+                <option value="">Select condition</option><option>Concrete</option><option>Light Materials</option><option>Renter</option><option>Makeshift / Salvaged</option>
               </select>
             </label>
           </div>

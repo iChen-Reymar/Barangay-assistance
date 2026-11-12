@@ -109,7 +109,9 @@ def encode(record: dict) -> dict[str, float]:
     housing_flags = {
         "housing_concrete": 1.0 if housing_raw == "concrete" else 0.0,
         "housing_light_materials": 1.0 if housing_raw == "light materials" else 0.0,
-        "housing_temporary": 1.0 if housing_raw == "temporary" else 0.0,
+        # Keep legacy "Temporary" records compatible with the trained feature
+        # while new forms use the clearer "Renter" label.
+        "housing_temporary": 1.0 if housing_raw in {"renter", "temporary", "temporary/salvaged"} else 0.0,
         "housing_makeshift_salvaged": 1.0 if housing_raw == "makeshift / salvaged" else 0.0,
     }
 
@@ -153,5 +155,5 @@ def human_readable(record: dict) -> list[str]:
     if encoded["no_prior_aid"]:
         parts.append("no prior assistance")
     if encoded["housing_temporary"] or encoded["housing_makeshift_salvaged"]:
-        parts.append("substandard housing")
+        parts.append("rented or substandard housing")
     return parts

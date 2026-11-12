@@ -21,6 +21,7 @@ const recovery = await import('../src/services/passwordRecovery.ts')
 const workflow = await import('../src/services/assistanceWorkflow.ts')
 const eligibility = await import('../src/services/assistanceListEligibility.ts')
 const associationNotifications = await import('../src/services/associationNotificationStorage.ts')
+const housingCondition = await import('../src/utils/housingCondition.ts')
 
 test('non-remembered Supabase sessions stay in session storage', () => {
   persistence.setRememberSession(false)
@@ -53,6 +54,12 @@ test('password recovery rejects internal addresses and weak passwords', () => {
   assert.equal(recovery.newPasswordError('long-password', 'long-password'), '')
 })
 
+test('legacy temporary housing values normalize to renter', () => {
+  assert.equal(housingCondition.normalizeHousingCondition('Temporary'), 'Renter')
+  assert.equal(housingCondition.normalizeHousingCondition('Temporary/Salvaged'), 'Renter')
+  assert.equal(housingCondition.normalizeHousingCondition('Concrete'), 'Concrete')
+})
+
 test('final list generation requires the persisted Staff-review transition', () => {
   assert.match(workflow.listGenerationTransitionError('PENDING'), /enter Staff review/)
   assert.equal(workflow.listGenerationTransitionError('UNDER REVIEW'), null)
@@ -77,7 +84,7 @@ test('assistance lists retain only linked members with complete verified assessm
     workingHouseholdMembers: 1,
     age: 61,
     employmentStatus: 'Self-Employed',
-    housingCondition: 'Temporary',
+    housingCondition: 'Renter',
     verification: 'VERIFIED',
   }
   const assessments = [

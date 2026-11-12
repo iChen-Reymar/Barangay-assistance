@@ -171,7 +171,7 @@ export default function AddBeneficiaryPage() {
                   <option>Concrete</option>
                   <option>Light Materials</option>
                   <option>Makeshift / Salvaged</option>
-                  <option>Temporary</option>
+                  <option>Renter</option>
                 </select>
               </div>
             </div>

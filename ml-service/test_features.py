@@ -21,7 +21,7 @@ class FeatureEncodingTests(unittest.TestCase):
             "workingHouseholdMembers": 2,
             "age": 42,
             "employmentStatus": "seasonal worker",
-            "housingCondition": "temporary",
+            "housingCondition": "renter",
             "vulnerabilityIndicators": [INDICATOR_PWD],
         }
         first = {**household, "name": "BENEFICIARY-0001", "association": "Association A"}

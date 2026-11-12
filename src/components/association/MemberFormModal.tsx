@@ -234,7 +234,7 @@ export function MemberFormModal({
               <label className="mb-1 block text-xs font-semibold text-gray-600">Housing condition</label>
               <select required value={form.housingCondition ?? ''} onChange={(e) => setForm((prev) => ({ ...prev, housingCondition: e.target.value }))} className="w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary">
                 <option value="">Select condition</option>
-                <option>Concrete</option><option>Light Materials</option><option>Temporary</option><option>Makeshift / Salvaged</option>
+                <option>Concrete</option><option>Light Materials</option><option>Renter</option><option>Makeshift / Salvaged</option>
               </select>
             </div>
           </div>

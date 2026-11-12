@@ -4,6 +4,7 @@ import {
 } from '../data/associationMockData'
 import { notifyDocumentRejected } from './associationNotificationStorage'
 import { ensureAssociationFromUser } from './associationStorage'
+import { normalizeHousingCondition } from '../utils/housingCondition'
 
 const MEMBERS_KEY = 'barangay_association_members'
 const DETAILS_KEY = 'barangay_association_details'
@@ -13,7 +14,10 @@ function readMembers(): AssociationMember[] {
   const raw = localStorage.getItem(MEMBERS_KEY)
   if (!raw) return []
   try {
-    return JSON.parse(raw) as AssociationMember[]
+    return (JSON.parse(raw) as AssociationMember[]).map((member) => ({
+      ...member,
+      housingCondition: normalizeHousingCondition(member.housingCondition),
+    }))
   } catch {
     return []
   }

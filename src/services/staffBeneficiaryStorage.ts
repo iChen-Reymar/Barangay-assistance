@@ -1,4 +1,5 @@
 import { type StaffBeneficiary } from '../data/staffMockData'
+import { normalizeHousingCondition } from '../utils/housingCondition'
 
 const STORAGE_KEY = 'barangay_staff_beneficiaries'
 const UPDATED_EVENT = 'staff-beneficiaries-updated'
@@ -7,7 +8,10 @@ function readBeneficiaries(): StaffBeneficiary[] {
   const raw = localStorage.getItem(STORAGE_KEY)
   if (!raw) return []
   try {
-    return JSON.parse(raw) as StaffBeneficiary[]
+    return (JSON.parse(raw) as StaffBeneficiary[]).map((beneficiary) => ({
+      ...beneficiary,
+      housingCondition: normalizeHousingCondition(beneficiary.housingCondition),
+    }))
   } catch {
     return []
   }

@@ -248,7 +248,7 @@ export function StaffBeneficiaryFormModal({
               <option value="">Select condition</option>
               <option>Concrete</option>
               <option>Light Materials</option>
-              <option>Temporary</option>
+              <option>Renter</option>
               <option>Makeshift / Salvaged</option>
             </select>
           </div>

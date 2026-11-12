@@ -52,7 +52,7 @@ LAST_NAMES = [
     "Quintero", "Rivera", "Sandoval", "Tolentino", "Ubaldo", "Verde", "Zamora",
 ]
 
-HOUSING_OPTIONS = ["Concrete", "Light Materials", "Temporary", "Makeshift / Salvaged"]
+HOUSING_OPTIONS = ["Concrete", "Light Materials", "Renter", "Makeshift / Salvaged"]
 EMPLOYMENT_OPTIONS = ["Employed", "Self-Employed", "Seasonal Worker", "Unemployed"]
 
 
