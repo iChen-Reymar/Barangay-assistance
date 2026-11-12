@@ -41,39 +41,55 @@ function emptySheet(name: string, headers: string[]): ReportSheet {
   return { name, headers, rows: [] }
 }
 
-function beneficiarySheet(): ReportSheet {
+const beneficiaryHeaders = [
+  'Name',
+  'Age',
+  'Family Size',
+  'Address',
+  'Contact Number',
+  'Senior',
+  'PWD',
+  'Vulnerability',
+  'Membership',
+  'Assistance',
+  'Verified',
+]
+
+function beneficiarySheets(): ReportSheet[] {
   const members = sortedMembers()
-  return {
-    name: 'Beneficiaries',
-    headers: [
-      'Name',
-      'Association',
-      'Age',
-      'Family Size',
-      'Address',
-      'Contact Number',
-      'Senior',
-      'PWD',
-      'Vulnerability',
-      'Membership',
-      'Assistance',
-      'Verified',
-    ],
-    rows: members.map((member) => [
-      member.name,
-      member.associationName ?? '',
-      member.age,
-      member.familySize,
-      member.address,
-      phone(member.contactNumber),
-      yesNo(member.isSenior),
-      yesNo(member.isPwd),
-      member.vulnerability,
-      member.membershipStatus,
-      member.assistanceStatus,
-      member.staffVerified ? 'Verified' : 'Unverified',
-    ]),
+  if (members.length === 0) return [emptySheet('Beneficiaries', beneficiaryHeaders)]
+
+  const groups = new Map<string, { association: string; members: typeof members }>()
+  for (const member of members) {
+    const association = member.associationName?.trim() || 'Unassigned Association'
+    const key = association.toLocaleLowerCase()
+    const group = groups.get(key) ?? { association, members: [] }
+    group.members.push(member)
+    groups.set(key, group)
   }
+
+  return [...groups.values()]
+    .sort((left, right) => left.association.localeCompare(right.association))
+    .map((group) => ({
+      name: group.association,
+      headers: beneficiaryHeaders,
+      rows: group.members
+        .slice()
+        .sort((left, right) => left.name.localeCompare(right.name))
+        .map((member) => [
+          member.name,
+          member.age,
+          member.familySize,
+          member.address,
+          phone(member.contactNumber),
+          yesNo(member.isSenior),
+          yesNo(member.isPwd),
+          member.vulnerability,
+          member.membershipStatus,
+          member.assistanceStatus,
+          member.staffVerified ? 'Verified' : 'Unverified',
+        ]),
+    }))
 }
 
 function vulnerabilitySheet(): ReportSheet {
@@ -236,7 +252,7 @@ export function datasetForReport(entry: ReportHistoryEntry): ReportDataset {
     return withSummary('Program Status Report', [programSheet()])
   }
   const builders: Record<ReportHistoryType, () => ReportDataset> = {
-    beneficiary: () => withSummary('Beneficiary Report', [beneficiarySheet()]),
+    beneficiary: () => withSummary('Beneficiary Report by Association', beneficiarySheets()),
     vulnerability: () => withSummary('Vulnerability Report', [vulnerabilitySheet()]),
     assistance: () => withSummary('Assistance Report', [requestSheet('Requests', false), programSheet(), aidReceivedSheet()]),
     approved: () => withSummary('Generated Assistance List Report', [requestSheet('Generated Lists', true)]),
