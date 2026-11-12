@@ -10,6 +10,7 @@ import { getAuditLogs, subscribeAuditLogs } from '../../services/auditStorage'
 import { getAssociations, subscribeAssociationStorage } from '../../services/associationStorage'
 import { getAssistanceItems, subscribeDecisionStorage } from '../../services/decisionStorage'
 import { getGeneratedAssistanceList, subscribeGeneratedAssistanceList } from '../../services/aiProcessing'
+import type { GeneratedAssistanceRow } from '../../services/aiProcessing'
 import { getStaffBeneficiaries, subscribeStaffBeneficiaryStorage } from '../../services/staffBeneficiaryStorage'
 
 function asLevel(value: string): VulnerabilityLevel {
@@ -21,6 +22,55 @@ function matchStatus(score: number): MatchStatus {
   if (score >= 80) return 'HIGH MATCH'
   if (score >= 60) return 'MEDIUM MATCH'
   return 'MODERATE MATCH'
+}
+
+interface AssociationRecommendationSummary {
+  id: string
+  association: string
+  program: string
+  qualifiedMembers: number
+  highestScore: number
+  generatedAt: string
+}
+
+function summarizeRecommendations(rows: GeneratedAssistanceRow[]): AssociationRecommendationSummary[] {
+  const summaries = new Map<string, AssociationRecommendationSummary & { beneficiaryIds: Set<string> }>()
+
+  for (const row of rows) {
+    const association = row.association.trim() || 'Unassigned'
+    const program = row.program.trim() || 'Assistance'
+    const id = `${row.requestId ?? 'legacy'}|${association.toLowerCase()}|${program.toLowerCase()}`
+    const current = summaries.get(id) ?? {
+      id,
+      association,
+      program,
+      qualifiedMembers: 0,
+      highestScore: row.score,
+      generatedAt: row.generatedAt,
+      beneficiaryIds: new Set<string>(),
+    }
+
+    current.beneficiaryIds.add(row.beneficiaryId)
+    current.qualifiedMembers = current.beneficiaryIds.size
+    current.highestScore = Math.max(current.highestScore, row.score)
+    if (row.generatedAt > current.generatedAt) current.generatedAt = row.generatedAt
+    summaries.set(id, current)
+  }
+
+  return [...summaries.values()]
+    .map((summary) => ({
+      id: summary.id,
+      association: summary.association,
+      program: summary.program,
+      qualifiedMembers: summary.qualifiedMembers,
+      highestScore: summary.highestScore,
+      generatedAt: summary.generatedAt,
+    }))
+    .sort((left, right) =>
+      right.generatedAt.localeCompare(left.generatedAt)
+      || left.association.localeCompare(right.association)
+      || left.program.localeCompare(right.program),
+    )
 }
 
 export default function DashboardPage() {
@@ -42,6 +92,7 @@ export default function DashboardPage() {
   const beneficiaries = getStaffBeneficiaries()
   const requests = getAssistanceItems()
   const generated = getGeneratedAssistanceList()
+  const recommendationSummaries = summarizeRecommendations(generated)
   const activity = getAuditLogs().slice(0, 5)
   const high = beneficiaries.filter((row) => row.vulnerability === 'HIGH').length
   const medium = beneficiaries.filter((row) => row.vulnerability === 'MEDIUM').length
@@ -119,22 +170,24 @@ export default function DashboardPage() {
                 <thead>
                   <tr className="border-b border-gray-100 bg-gray-50 text-left text-xs font-semibold uppercase text-gray-500">
                     <th className="px-4 py-3">Association</th>
-                    <th className="px-4 py-3">AI Score</th>
+                    <th className="px-4 py-3">Qualified Members</th>
                     <th className="px-4 py-3">Recommended Program</th>
+                    <th className="px-4 py-3">Highest AI Score</th>
                     <th className="px-4 py-3">Match Status</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {generated.length === 0 ? (
+                  {recommendationSummaries.length === 0 ? (
                     <tr>
-                      <td colSpan={4} className="px-4 py-6 text-center text-sm text-gray-500">No AI-generated results yet.</td>
+                      <td colSpan={5} className="px-4 py-6 text-center text-sm text-gray-500">No AI-generated results yet.</td>
                     </tr>
-                  ) : generated.slice(0, 5).map((row) => (
-                    <tr key={row.id} className="border-b border-gray-50 hover:bg-gray-50">
-                      <td className="px-4 py-3 font-medium text-gray-900">{row.name}</td>
-                      <td className="px-4 py-3"><ScoreDisplay score={row.score} /></td>
-                      <td className="px-4 py-3 text-gray-600">{row.program}</td>
-                      <td className="px-4 py-3"><MatchBadge status={matchStatus(row.score)} /></td>
+                  ) : recommendationSummaries.slice(0, 5).map((summary) => (
+                    <tr key={summary.id} className="border-b border-gray-50 hover:bg-gray-50">
+                      <td className="px-4 py-3 font-medium text-gray-900">{summary.association}</td>
+                      <td className="px-4 py-3 text-gray-600">{summary.qualifiedMembers}</td>
+                      <td className="px-4 py-3 text-gray-600">{summary.program}</td>
+                      <td className="px-4 py-3"><ScoreDisplay score={summary.highestScore} /></td>
+                      <td className="px-4 py-3"><MatchBadge status={matchStatus(summary.highestScore)} /></td>
                     </tr>
                   ))}
                 </tbody>
