@@ -30,7 +30,7 @@ export function StatCard({ label, value, icon: Icon, href }: StatCardProps) {
       <Link
         to={href}
         aria-label={`Open ${label}`}
-        className="rounded-lg border border-gray-200 bg-white p-3 shadow-sm transition-colors hover:border-green-300 hover:bg-green-50/30 focus:outline-none focus:ring-2 focus:ring-primary/30 sm:p-4"
+        className="rounded-lg border border-gray-200 bg-white p-3 shadow-sm focus:outline-none focus:ring-2 focus:ring-primary/30 sm:p-4"
       >
         {content}
       </Link>
