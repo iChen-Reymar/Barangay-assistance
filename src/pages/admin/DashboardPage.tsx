@@ -60,7 +60,7 @@ export default function DashboardPage() {
         </div>
 
         <div className="mb-4 sm:mb-6">
-          <AnalyticsCharts />
+          <AnalyticsCharts requestStatusHref="/admin/people?view=assistance" />
         </div>
 
         <div className="mb-4 grid gap-4 sm:mb-6 sm:gap-6 lg:grid-cols-2">
