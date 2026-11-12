@@ -28,7 +28,8 @@ export function ReportHistoryViewModal({
 
   if (!preview) return null
 
-  const sheet = preview.sheets[Math.min(sheetIndex, Math.max(preview.sheets.length - 1, 0))]
+  const selectedSheetIndex = Math.min(sheetIndex, Math.max(preview.sheets.length - 1, 0))
+  const sheet = preview.sheets[selectedSheetIndex]
   const shown = sheet ? sheet.rows.slice(0, PREVIEW_LIMIT) : []
   const hiddenCount = sheet ? Math.max(sheet.rows.length - shown.length, 0) : 0
 
@@ -41,22 +42,22 @@ export function ReportHistoryViewModal({
         </div>
 
         {preview.sheets.length > 1 ? (
-          <div className="flex flex-wrap gap-2">
-            {preview.sheets.map((item, index) => (
-              <button
-                key={item.name}
-                type="button"
-                onClick={() => setSheetIndex(index)}
-                className={`rounded-full px-3 py-1.5 text-sm font-medium ${
-                  index === sheetIndex
-                    ? 'bg-primary text-white'
-                    : 'border border-gray-200 bg-white text-gray-700 hover:bg-gray-50'
-                }`}
-              >
-                {item.name} ({item.rows.length})
-              </button>
-            ))}
-          </div>
+          <label className="block max-w-md">
+            <span className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-gray-500">
+              {preview.entry.reportType === 'beneficiary' ? 'Association' : 'Report section'}
+            </span>
+            <select
+              value={selectedSheetIndex}
+              onChange={(event) => setSheetIndex(Number(event.target.value))}
+              className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2.5 text-sm font-medium text-gray-800 shadow-sm outline-none focus:border-primary focus:ring-2 focus:ring-primary/20"
+            >
+              {preview.sheets.map((item, index) => (
+                <option key={item.name} value={index}>
+                  {item.name} ({item.rows.length})
+                </option>
+              ))}
+            </select>
+          </label>
         ) : sheet ? (
           <h3 className="text-sm font-semibold text-gray-900">
             {sheet.name} ({sheet.rows.length})
