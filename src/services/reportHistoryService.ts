@@ -133,6 +133,10 @@ export function downloadHistoryReport(entry: ReportHistoryEntry): void {
     downloadPdfReport(entry.name, {
       title: dataset.title,
       details,
+      signatureBlocks: [
+        { name: 'Marianita B. Paradela', role: 'Punong Barangay' },
+        { placeholder: 'Name and Signature', role: 'Association Head' },
+      ],
       sections: dataset.sheets.map((sheet) => ({
         heading: sheet.name,
         headers: sheet.headers,

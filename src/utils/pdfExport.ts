@@ -75,6 +75,13 @@ export type PdfReport = {
   title: string
   details: string[]
   sections: PdfTableSection[]
+  signatureBlocks?: PdfSignatureBlock[]
+}
+
+export type PdfSignatureBlock = {
+  name?: string
+  placeholder?: string
+  role: string
 }
 
 function pdfLiteral(value: string): string {
@@ -147,6 +154,18 @@ export function downloadPdfReport(filename: string, report: PdfReport): void {
     )
   }
 
+  function centeredText(
+    value: string,
+    centerX: number,
+    y: number,
+    size: number,
+    font: 'F1' | 'F2',
+    color = '0 0 0',
+  ) {
+    const estimatedWidth = value.length * size * (font === 'F2' ? 0.55 : 0.5)
+    text(value, centerX - estimatedWidth / 2, y, size, font, color)
+  }
+
   function paintHeader() {
     text(report.title, margin, cursorY - 14, 16, 'F2', '0.12 0.34 0.18')
     cursorY -= 22
@@ -200,8 +219,34 @@ export function downloadPdfReport(filename: string, report: PdfReport): void {
     cursorY -= 14
   }
 
+  function paintSignatures(blocks: PdfSignatureBlock[]) {
+    if (blocks.length === 0) return
+    ensure(112)
+    cursorY -= 4
+    text('APPROVAL AND CERTIFICATION', margin, cursorY - 12, 11, 'F2', '0.12 0.34 0.18')
+    cursorY -= 27
+    text('Certified correct and approved by:', margin, cursorY - 8, 8, 'F1', '0.35 0.35 0.35')
+    cursorY -= 38
+
+    const gap = 54
+    const blockWidth = (contentWidth - gap * (blocks.length - 1)) / blocks.length
+    blocks.forEach((block, index) => {
+      const left = margin + index * (blockWidth + gap)
+      const center = left + blockWidth / 2
+      commands.push(
+        '0.45 0.45 0.45 RG',
+        '0.8 w',
+        `${left} ${cursorY} m ${left + blockWidth} ${cursorY} l S`,
+      )
+      centeredText(block.name?.trim() || block.placeholder || 'Name and Signature', center, cursorY - 15, 9, 'F2')
+      centeredText(block.role, center, cursorY - 29, 8, 'F1', '0.35 0.35 0.35')
+    })
+    cursorY -= 48
+  }
+
   paintHeader()
   for (const section of report.sections) paintTable(section)
+  paintSignatures(report.signatureBlocks ?? [])
   if (commands.length > 0) streams.push(commands.join('\n'))
 
   const fontObjectId = 3 + streams.length * 2
