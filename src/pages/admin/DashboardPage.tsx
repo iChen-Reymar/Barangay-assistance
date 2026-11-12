@@ -52,11 +52,11 @@ export default function DashboardPage() {
       <AdminHeader title="Barangay Captain Dashboard" />
       <main className="flex-1 overflow-y-auto p-4 sm:p-5 md:p-6">
         <div className="mb-4 grid grid-cols-2 gap-3 sm:mb-6 sm:gap-4 lg:grid-cols-5">
-          <StatCard label="Total Associations" value={associations.length} icon={Building2} />
-          <StatCard label="Total Beneficiaries" value={beneficiaries.length} icon={Users} />
-          <StatCard label="Pending Requests" value={requests.filter((row) => row.status === 'PENDING' || row.status === 'UNDER REVIEW').length} icon={Clock} />
-          <StatCard label="Generated Lists" value={generated.length} icon={CheckCircle} />
-          <StatCard label="High Vulnerability" value={high} icon={AlertTriangle} />
+          <StatCard label="Total Associations" value={associations.length} icon={Building2} href="/admin/associations" />
+          <StatCard label="Total Beneficiaries" value={beneficiaries.length} icon={Users} href="/admin/recommendations" />
+          <StatCard label="Pending Requests" value={requests.filter((row) => row.status === 'PENDING' || row.status === 'UNDER REVIEW').length} icon={Clock} href="/admin/people?view=assistance" />
+          <StatCard label="Generated Lists" value={generated.length} icon={CheckCircle} href="/admin/recommendations" />
+          <StatCard label="High Vulnerability" value={high} icon={AlertTriangle} href="/admin/recommendations" />
         </div>
 
         <div className="mb-4 sm:mb-6">

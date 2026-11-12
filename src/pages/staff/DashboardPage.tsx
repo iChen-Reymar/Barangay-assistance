@@ -55,11 +55,11 @@ export default function StaffDashboardPage() {
       />
       <main className="flex-1 overflow-y-auto p-4 sm:p-5 md:p-6">
         <div className="mb-6 grid grid-cols-2 gap-4 lg:grid-cols-5">
-          <StatCard label="Total Beneficiaries" value={beneficiaries.length} icon={Users} />
-          <StatCard label="Assessed Beneficiaries" value={beneficiaries.filter((row) => row.vulnerability).length} icon={Shield} />
-          <StatCard label="High Vulnerability" value={beneficiaries.filter((row) => row.vulnerability === 'HIGH').length} icon={AlertTriangle} />
-          <StatCard label="Pending Verification" value={pendingCount} icon={Clock} />
-          <StatCard label="Generated Lists" value={generatedCount} icon={CheckCircle} />
+          <StatCard label="Total Beneficiaries" value={beneficiaries.length} icon={Users} href="/staff/vulnerability-assessment" />
+          <StatCard label="Assessed Beneficiaries" value={beneficiaries.filter((row) => row.vulnerability).length} icon={Shield} href="/staff/vulnerability-assessment" />
+          <StatCard label="High Vulnerability" value={beneficiaries.filter((row) => row.vulnerability === 'HIGH').length} icon={AlertTriangle} href="/staff/vulnerability-assessment" />
+          <StatCard label="Pending Verification" value={pendingCount} icon={Clock} href="/staff/verify-qualification" />
+          <StatCard label="Generated Lists" value={generatedCount} icon={CheckCircle} href="/staff/approved-requests" />
         </div>
 
         <div className="mb-6">

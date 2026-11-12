@@ -1,14 +1,16 @@
 import type { LucideIcon } from 'lucide-react'
+import { Link } from 'react-router-dom'
 
 interface StatCardProps {
   label: string
   value: number | string
   icon?: LucideIcon
+  href?: string
 }
 
-export function StatCard({ label, value, icon: Icon }: StatCardProps) {
-  return (
-    <div className="rounded-lg border border-gray-200 bg-white p-3 shadow-sm sm:p-4">
+export function StatCard({ label, value, icon: Icon, href }: StatCardProps) {
+  const content = (
+    <>
       <div className="flex items-start justify-between gap-2">
         <div className="min-w-0">
           <p className="truncate text-[10px] font-medium text-gray-500 sm:text-xs">{label}</p>
@@ -20,6 +22,24 @@ export function StatCard({ label, value, icon: Icon }: StatCardProps) {
           </div>
         )}
       </div>
+    </>
+  )
+
+  if (href) {
+    return (
+      <Link
+        to={href}
+        aria-label={`Open ${label}`}
+        className="rounded-lg border border-gray-200 bg-white p-3 shadow-sm transition-colors hover:border-green-300 hover:bg-green-50/30 focus:outline-none focus:ring-2 focus:ring-primary/30 sm:p-4"
+      >
+        {content}
+      </Link>
+    )
+  }
+
+  return (
+    <div className="rounded-lg border border-gray-200 bg-white p-3 shadow-sm sm:p-4">
+      {content}
     </div>
   )
 }
