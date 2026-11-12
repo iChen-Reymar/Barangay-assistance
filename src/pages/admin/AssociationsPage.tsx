@@ -1,5 +1,5 @@
 ﻿import { useEffect, useMemo, useState } from 'react'
-import { Building2, Users, UserCheck, Clock, Plus, Pencil, Settings, Eye } from 'lucide-react'
+import { Building2, Users, UserCheck, Clock, Plus, Settings, Eye } from 'lucide-react'
 import { AdminHeader } from '../../components/admin/AdminHeader'
 import { StatCard } from '../../components/ui/StatCard'
 import { ActiveBadge } from '../../components/admin/StatusBadge'
@@ -313,14 +313,6 @@ export default function AssociationsPage() {
                           </button>
                           <button
                             type="button"
-                            onClick={() => handleEdit(row)}
-                            className="rounded p-1 text-gray-400 hover:bg-gray-100 hover:text-primary"
-                            aria-label={`Edit ${row.name}`}
-                          >
-                            <Pencil className="h-4 w-4" />
-                          </button>
-                          <button
-                            type="button"
                             onClick={() => handleOpenSettings(row)}
                             className="rounded p-1 text-gray-400 hover:bg-gray-100 hover:text-primary"
                             aria-label={`Settings for ${row.name}`}
@@ -369,6 +361,7 @@ export default function AssociationsPage() {
         onClose={() => setSettingsOpen(false)}
         association={settingsAssociation}
         onSave={handleSaveSettings}
+        onEdit={handleEdit}
       />
 
       <AssociationViewModal

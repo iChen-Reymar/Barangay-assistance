@@ -1,4 +1,5 @@
 ﻿import { useState, type FormEvent } from 'react'
+import { Pencil } from 'lucide-react'
 import { useResetWhenOpen } from '../../hooks/useResetWhenOpen'
 import { Modal } from '../ui/Modal'
 import { Button } from '../ui/Button'
@@ -9,6 +10,7 @@ interface AssociationSettingsModalProps {
   onClose: () => void
   association: Association | null
   onSave: (id: string, status: AssociationStatus) => void
+  onEdit: (association: Association) => void
 }
 
 export function AssociationSettingsModal({
@@ -16,6 +18,7 @@ export function AssociationSettingsModal({
   onClose,
   association,
   onSave,
+  onEdit,
 }: AssociationSettingsModalProps) {
   const [status, setStatus] = useState<AssociationStatus>('ACTIVE')
 
@@ -32,6 +35,11 @@ export function AssociationSettingsModal({
     e.preventDefault()
     onSave(selected.id, status)
     onClose()
+  }
+
+  function handleEdit() {
+    onClose()
+    onEdit(selected)
   }
 
   return (
@@ -76,7 +84,11 @@ export function AssociationSettingsModal({
           </div>
         </dl>
 
-        <div className="flex justify-end gap-3 pt-2">
+        <div className="flex flex-col-reverse gap-3 pt-2 sm:flex-row sm:justify-end">
+          <Button type="button" variant="outline" onClick={handleEdit}>
+            <Pencil className="h-4 w-4" />
+            Edit Association
+          </Button>
           <Button type="button" variant="outline" onClick={onClose}>
             Cancel
           </Button>
