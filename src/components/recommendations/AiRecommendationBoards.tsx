@@ -166,7 +166,7 @@ export function AiRecommendationBoards({
               </thead>
               <tbody>
                 {group.members.map((member) => (
-                  <tr key={`${group.association}-${group.program}-${member.rank}-${member.name}`} className="border-b border-gray-50">
+                  <tr key={member.id} className="border-b border-gray-50">
                     <td className="px-4 py-3 font-bold text-gray-900">{member.rank}</td>
                     <td className="px-4 py-3 font-medium text-gray-900">{member.name}</td>
                     <td className="px-4 py-3">
