@@ -1,6 +1,7 @@
 ﻿import { Navigate, useLocation } from 'react-router-dom'
 import { useAuth } from '../../context/useAuth'
 import { roleToDashboardPath, type UserRole } from '../../types/auth'
+import TemporaryPasswordChangePage from '../../pages/TemporaryPasswordChangePage'
 
 interface ProtectedRouteProps {
   allowedRoles: UserRole[]
@@ -8,7 +9,7 @@ interface ProtectedRouteProps {
 }
 
 export function ProtectedRoute({ allowedRoles, children }: ProtectedRouteProps) {
-  const { user, authReady } = useAuth()
+  const { user, authReady, profile } = useAuth()
   const location = useLocation()
 
   if (!authReady) {
@@ -22,6 +23,8 @@ export function ProtectedRoute({ allowedRoles, children }: ProtectedRouteProps) 
   if (!allowedRoles.includes(user.role)) {
     return <Navigate to={roleToDashboardPath(user.role)} replace />
   }
+
+  if (profile?.mustChangePassword) return <TemporaryPasswordChangePage />
 
   return children
 }

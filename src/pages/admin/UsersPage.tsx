@@ -11,6 +11,7 @@ import { buildChanges, logAuditEvent } from '../../services/auditStorage'
 import {
   createManagedUser,
   removeUser,
+  resetManagedUserPassword,
   sendUserPasswordReset,
   updateManagedUser,
   updateUserRole,
@@ -49,9 +50,11 @@ export default function UsersPage({ embedded = false }: { embedded?: boolean }) 
   const [removeTarget, setRemoveTarget] = useState<StoredUser | null>(null)
   const [editTarget, setEditTarget] = useState<StoredUser | null>(null)
   const [resetTarget, setResetTarget] = useState<StoredUser | null>(null)
+  const [temporaryPassword, setTemporaryPassword] = useState('')
   const [saving, setSaving] = useState(false)
   const [message, setMessage] = useState('')
   const [error, setError] = useState('')
+  const [resetError, setResetError] = useState('')
   const [authAdministration, setAuthAdministration] = useState(false)
   const [search, setSearch] = useState('')
   const [roleFilter, setRoleFilter] = useState<'all' | UserRole>('all')
@@ -208,14 +211,13 @@ export default function UsersPage({ embedded = false }: { embedded?: boolean }) 
 
   async function handlePasswordReset() {
     if (!resetTarget) return
-    setError('')
+    setResetError('')
     setSaving(true)
     const target = resetTarget
     const result = await sendUserPasswordReset(target.email)
     setSaving(false)
     if (!result.success) {
-      setError(result.error ?? 'Could not send the password reset email.')
-      setResetTarget(null)
+      setResetError(result.error ?? 'Could not send the password reset email.')
       return
     }
     setMessage(`A password reset link was sent to ${target.email}.`)
@@ -223,6 +225,49 @@ export default function UsersPage({ embedded = false }: { embedded?: boolean }) 
       { key: 'passwordReset', label: 'Password reset', oldValue: 'Not requested', newValue: 'Email sent' },
     ]))
     setResetTarget(null)
+  }
+
+  function openPasswordReset(account: StoredUser) {
+    setError('')
+    setResetError('')
+    setTemporaryPassword('')
+    setResetTarget(account)
+  }
+
+  function closePasswordReset() {
+    if (saving) return
+    setTemporaryPassword('')
+    setResetError('')
+    setResetTarget(null)
+  }
+
+  async function handleTemporaryPasswordReset() {
+    if (!resetTarget) return
+    setResetError('')
+    setSaving(true)
+    const target = resetTarget
+    const result = await resetManagedUserPassword(target.id)
+    setSaving(false)
+    if (!result.success || !result.temporaryPassword) {
+      setResetError(result.error ?? 'Could not issue a temporary password.')
+      return
+    }
+    setTemporaryPassword(result.temporaryPassword)
+    refreshUsers()
+    setMessage(`A temporary password was issued for ${target.fullName}.`)
+    audit(`Issued a temporary password to ${target.fullName}.`, buildChanges([
+      { key: 'passwordReset', label: 'Temporary password', oldValue: 'Not issued', newValue: 'Issued; change required' },
+    ]))
+  }
+
+  async function copyTemporaryPassword() {
+    if (!temporaryPassword) return
+    try {
+      await navigator.clipboard.writeText(temporaryPassword)
+      setMessage('Temporary password copied. Share it privately with the user.')
+    } catch {
+      setResetError('Could not copy automatically. Select and copy the temporary password manually.')
+    }
   }
 
   return (
@@ -329,9 +374,11 @@ export default function UsersPage({ embedded = false }: { embedded?: boolean }) 
                         <Button
                           size="sm"
                           variant="outline"
-                          disabled={!canEmailReset}
-                          title={canEmailReset ? 'Send a secure password reset email' : 'This username does not have a deliverable email address'}
-                          onClick={() => { setError(''); setResetTarget(account) }}
+                           disabled={authAdministration ? isSelf : !canEmailReset}
+                           title={authAdministration
+                             ? isSelf ? 'Use Account Settings to change your own password' : 'Issue a one-time temporary password'
+                             : canEmailReset ? 'Send a secure password reset email' : 'This username does not have a deliverable email address'}
+                           onClick={() => openPasswordReset(account)}
                         >
                           Reset password
                         </Button>
@@ -470,20 +517,49 @@ export default function UsersPage({ embedded = false }: { embedded?: boolean }) 
 
       <Modal
         open={resetTarget !== null}
-        onClose={() => { if (!saving) setResetTarget(null) }}
-        title="Send Password Reset"
+        onClose={closePasswordReset}
+        title={authAdministration ? 'Issue Temporary Password' : 'Send Password Reset'}
         footer={
           <div className="flex justify-end gap-2">
-            <Button variant="outline" disabled={saving} onClick={() => setResetTarget(null)}>Cancel</Button>
-            <Button disabled={saving} onClick={handlePasswordReset}>{saving ? 'Sending...' : 'Send reset link'}</Button>
+            <Button variant="outline" disabled={saving} onClick={closePasswordReset}>
+              {temporaryPassword ? 'Done' : 'Cancel'}
+            </Button>
+            {temporaryPassword ? (
+              <Button onClick={() => void copyTemporaryPassword()}>Copy password</Button>
+            ) : (
+              <Button disabled={saving} onClick={authAdministration ? handleTemporaryPasswordReset : handlePasswordReset}>
+                {saving ? 'Processing...' : authAdministration ? 'Issue temporary password' : 'Send reset link'}
+              </Button>
+            )}
           </div>
         }
       >
-        <p className="text-sm leading-6 text-gray-600">
-          {resetTarget
-            ? `Supabase will email ${resetTarget.email} a secure link to choose a new password. Their current password will remain active until they complete the reset.`
-            : ''}
-        </p>
+        {resetError ? (
+          <div role="alert" className="mb-4 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+            {resetError}
+          </div>
+        ) : null}
+        {temporaryPassword ? (
+          <div className="space-y-4">
+            <div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm leading-6 text-amber-900">
+              This password is shown only here. Give it privately to {resetTarget?.fullName}. They must create a new password after signing in.
+            </div>
+            <div>
+              <p className="mb-1 text-xs font-semibold uppercase tracking-wide text-gray-500">Temporary password</p>
+              <output className="block select-all rounded-lg border border-gray-300 bg-gray-50 px-4 py-3 text-center font-mono text-2xl font-bold tracking-widest text-gray-950">
+                {temporaryPassword}
+              </output>
+            </div>
+          </div>
+        ) : (
+          <p className="text-sm leading-6 text-gray-600">
+            {resetTarget
+              ? authAdministration
+                ? `Replace ${resetTarget.fullName}'s current login with a short, unique temporary password. Their account will require a new private password immediately after sign-in.`
+                : `Supabase will email ${resetTarget.email} a secure link to choose a new password. Their current password will remain active until they complete the reset.`
+              : ''}
+          </p>
+        )}
       </Modal>
 
       <Modal

@@ -3,6 +3,7 @@ import express from 'express'
 import fs from 'node:fs'
 import path from 'node:path'
 import { AsyncLocalStorage } from 'node:async_hooks'
+import { randomInt } from 'node:crypto'
 import { isDeepStrictEqual } from 'node:util'
 import { createClient } from '@supabase/supabase-js'
 import { fileURLToPath } from 'node:url'
@@ -145,6 +146,9 @@ function userRow(user) {
       associationAddress: user.associationAddress || null,
       registrationNumber: user.registrationNumber || null,
       createdAt: user.createdAt || new Date().toISOString(),
+      mustChangePassword: Boolean(user.mustChangePassword),
+      temporaryPasswordIssuedAt: user.temporaryPasswordIssuedAt || null,
+      temporaryPasswordIssuedBy: user.temporaryPasswordIssuedBy || null,
     },
   }
 }
@@ -617,6 +621,9 @@ async function loadStores(actor) {
         reviewedByEmail: row.reviewed_by_email ?? undefined, reviewedAt: row.reviewed_at ?? undefined,
         reviewDecision: row.review_decision ?? undefined, isAnonymized: yes(row.is_anonymized),
         anonymizedAt: row.anonymized_at ?? undefined,
+        mustChangePassword: Boolean(extra.mustChangePassword),
+        temporaryPasswordIssuedAt: extra.temporaryPasswordIssuedAt || undefined,
+        temporaryPasswordIssuedBy: extra.temporaryPasswordIssuedBy || undefined,
       }
     }))
   }
@@ -1003,6 +1010,12 @@ async function requireAdmin(req, res) {
   return Boolean(await requireRole(req, res, ['admin']))
 }
 
+function generateTemporaryPassword() {
+  const alphabet = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'
+  const characters = Array.from({ length: 8 }, () => alphabet[randomInt(0, alphabet.length)])
+  return `${characters.slice(0, 4).join('')}-${characters.slice(4).join('')}`
+}
+
 app.post('/api/users', async (req, res) => {
   if (!systemSupabase || !usingSecretKey) {
     res.status(503).json({ error: 'Supabase is not ready to create login accounts.' })
@@ -1133,6 +1146,130 @@ app.delete('/api/users/:id', async (req, res) => {
     return
   }
   res.json({ ok: true })
+})
+
+app.post('/api/users/:id/temporary-password', async (req, res) => {
+  if (!systemSupabase || !usingSecretKey) {
+    res.status(503).json({ error: 'Temporary password resets require Supabase Auth administration.' })
+    return
+  }
+  const actor = await requireRole(req, res, ['admin'])
+  if (!actor) return
+
+  const id = String(req.params.id || '')
+  if (!id || id === actor.id) {
+    res.status(400).json({ error: 'Use Account Settings to change your own password.' })
+    return
+  }
+
+  try {
+    const { data: existing, error: existingError } = await supabase.from('users').select('*').eq('id', id).maybeSingle()
+    if (existingError) throw new Error(existingError.message)
+    if (!existing) {
+      res.status(404).json({ error: 'User not found.' })
+      return
+    }
+
+    const authUser = await findAuthUser(id, [existing.email])
+    if (!authUser) {
+      res.status(404).json({ error: 'The user does not have a Supabase login account.' })
+      return
+    }
+
+    const previousPayload = existing.payload && typeof existing.payload === 'object' ? existing.payload : {}
+    const issuedAt = new Date().toISOString()
+    const nextPayload = {
+      ...previousPayload,
+      mustChangePassword: true,
+      temporaryPasswordIssuedAt: issuedAt,
+      temporaryPasswordIssuedBy: actor.id,
+    }
+    const marked = await supabase.from('users').update({ payload: nextPayload }).eq('id', id)
+    if (marked.error) throw new Error(marked.error.message)
+
+    const temporaryPassword = generateTemporaryPassword()
+    const changed = await supabase.auth.admin.updateUserById(authUser.id, {
+      password: temporaryPassword,
+      user_metadata: {
+        ...(authUser.user_metadata || {}),
+        must_change_password: true,
+      },
+    })
+    if (changed.error) {
+      await supabase.from('users').update({ payload: previousPayload }).eq('id', id)
+      res.status(400).json({ error: changed.error.message })
+      return
+    }
+
+    res.setHeader('Cache-Control', 'no-store')
+    res.json({
+      ok: true,
+      temporaryPassword,
+      user: {
+        id,
+        mustChangePassword: true,
+        temporaryPasswordIssuedAt: issuedAt,
+        temporaryPasswordIssuedBy: actor.id,
+      },
+    })
+  } catch (error) {
+    res.status(500).json({ error: error.message })
+  }
+})
+
+app.post('/api/account/password-reset-complete', async (req, res) => {
+  if (!systemSupabase || !usingSecretKey) {
+    res.status(503).json({ error: 'Supabase Auth administration is unavailable.' })
+    return
+  }
+  const actor = await authenticate(req, res)
+  if (!actor) return
+  const password = String(req.body?.password || '')
+  if (password.length < 8) {
+    res.status(400).json({ error: 'New password must be at least 8 characters.' })
+    return
+  }
+
+  try {
+    const { data: existing, error: existingError } = await supabase.from('users').select('email,payload').eq('id', actor.id).maybeSingle()
+    if (existingError) throw new Error(existingError.message)
+    if (!existing) {
+      res.status(404).json({ error: 'User not found.' })
+      return
+    }
+    const payload = existing.payload && typeof existing.payload === 'object' ? { ...existing.payload } : {}
+    if (payload.mustChangePassword !== true) {
+      res.status(400).json({ error: 'This account does not have an active temporary password.' })
+      return
+    }
+    const authUser = await findAuthUser(actor.id, [existing.email, actor.email])
+    if (!authUser) {
+      res.status(404).json({ error: 'The user does not have a Supabase login account.' })
+      return
+    }
+    const authUpdate = await supabase.auth.admin.updateUserById(authUser.id, {
+      password,
+      user_metadata: {
+        ...(authUser.user_metadata || {}),
+        must_change_password: false,
+      },
+    })
+    if (authUpdate.error) {
+      res.status(400).json({ error: authUpdate.error.message })
+      return
+    }
+
+    payload.mustChangePassword = false
+    payload.passwordChangedAt = new Date().toISOString()
+    delete payload.temporaryPasswordIssuedAt
+    delete payload.temporaryPasswordIssuedBy
+    const saved = await supabase.from('users').update({ payload }).eq('id', actor.id)
+    if (saved.error) throw new Error(saved.error.message)
+
+    res.json({ ok: true })
+  } catch (error) {
+    res.status(500).json({ error: error.message })
+  }
 })
 
 app.patch('/api/users/:id', async (req, res) => {
@@ -1716,6 +1853,7 @@ if (process.env.NODE_ENV !== 'test' && !process.env.VERCEL) {
 export {
   app,
   canWriteResource,
+  generateTemporaryPassword,
   initializeServer,
   payloadIdentity,
   requestWriteError,

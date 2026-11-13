@@ -20,6 +20,7 @@ import {
   getUserById,
   initializeAuthStorage,
   login as loginUser,
+  replaceTemporaryPassword,
   rejectUser,
   submitAccessRequest,
   submitAssociationHeadRequest,
@@ -36,7 +37,7 @@ import type {
 } from '../types/auth'
 import { AUTH_EXPIRED_EVENT } from '../services/authenticatedFetch'
 import { supabase } from '../lib/supabase'
-import { discardFailedSynchronizations } from '../services/databaseSync'
+import { discardFailedSynchronizations, pullFromDatabase } from '../services/databaseSync'
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<SessionUser | null>(null)
@@ -64,7 +65,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const appSession = getSession()
       const valid = !error && data.session?.user?.id && appSession?.id === data.session.user.id
       const recoveringPassword = window.location.pathname === '/reset-password'
-      if (valid) setUser(appSession)
+      if (valid) {
+        await pullFromDatabase()
+        if (!active) return
+        setPendingRequests(getPendingUsers())
+        setAllUsers(getAllUsers())
+        setUser(appSession)
+      }
       else if (recoveringPassword && data.session) setUser(null)
       else if (appSession || data.session) {
         clearLocalSession()
@@ -327,6 +334,28 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     [user],
   )
 
+  const completeTemporaryPasswordChange = useCallback(
+    async (newPassword: string) => {
+      if (!user) return { success: false, error: 'Not signed in.' }
+      const result = await replaceTemporaryPassword(user.id, newPassword)
+      if (result.success) {
+        refreshUsers()
+        logAuditEvent({
+          user: user.fullName,
+          userEmail: user.email,
+          action: 'Security',
+          actionColor: 'purple',
+          description: `${user.fullName} replaced a temporary password.`,
+          entityType: 'user',
+          entityId: user.id,
+          changes: [{ field: 'Temporary password', oldValue: 'Issued', newValue: 'Replaced' }],
+        })
+      }
+      return result
+    },
+    [user, refreshUsers],
+  )
+
   const profile = useMemo(() => {
     if (!user) return null
     return allUsers.find((u) => u.id === user.id) ?? null
@@ -348,9 +377,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       rejectRequest,
       updateProfile,
       changePassword,
+      completeTemporaryPasswordChange,
       refreshUsers,
     }),
-    [user, authReady, profile, pendingRequests, allUsers, login, enterDashboard, logout, submitRequest, submitAssociationHeadRequestHandler, approveRequest, rejectRequest, updateProfile, changePassword, refreshUsers],
+    [user, authReady, profile, pendingRequests, allUsers, login, enterDashboard, logout, submitRequest, submitAssociationHeadRequestHandler, approveRequest, rejectRequest, updateProfile, changePassword, completeTemporaryPasswordChange, refreshUsers],
   )
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>

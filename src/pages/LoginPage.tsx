@@ -25,10 +25,10 @@ function LoginForm() {
     setSigningIn(true)
     const result = await login(email, password, rememberMe)
     if (result.success && result.redirectTo) {
+      await pullFromDatabase()
       enterDashboard()
       navigate(result.redirectTo)
       showToast('Signed in successfully')
-      void pullFromDatabase()
       return
     }
     setSigningIn(false)

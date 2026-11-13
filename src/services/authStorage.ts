@@ -130,6 +130,63 @@ export async function updateManagedUser(
   return { success: true }
 }
 
+export async function resetManagedUserPassword(
+  userId: string,
+): Promise<{ success: boolean; temporaryPassword?: string; error?: string }> {
+  const response = await authenticatedFetch(`/api/users/${userId}/temporary-password`, {
+    method: 'POST',
+  })
+  const body = await response.json().catch(() => ({})) as {
+    error?: string
+    temporaryPassword?: string
+    user?: Pick<StoredUser, 'id' | 'mustChangePassword' | 'temporaryPasswordIssuedAt' | 'temporaryPasswordIssuedBy'>
+  }
+  if (!response.ok || !body.temporaryPassword) {
+    return { success: false, error: body.error || 'Could not issue a temporary password.' }
+  }
+
+  const users = readUsers()
+  const index = users.findIndex((user) => user.id === userId)
+  if (index !== -1 && body.user) {
+    users[index] = { ...users[index], ...body.user }
+    writeUsers(users)
+  }
+  return { success: true, temporaryPassword: body.temporaryPassword }
+}
+
+export async function replaceTemporaryPassword(
+  userId: string,
+  newPassword: string,
+): Promise<{ success: boolean; error?: string }> {
+  if (newPassword.length < 8) return { success: false, error: 'New password must be at least 8 characters.' }
+
+  const response = await authenticatedFetch('/api/account/password-reset-complete', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ password: newPassword }),
+  })
+  const body = await response.json().catch(() => ({})) as { error?: string }
+  if (!response.ok) {
+    return {
+      success: false,
+      error: body.error || 'Could not replace the temporary password.',
+    }
+  }
+
+  const users = readUsers()
+  const index = users.findIndex((user) => user.id === userId)
+  if (index !== -1) {
+    users[index] = {
+      ...users[index],
+      mustChangePassword: false,
+      temporaryPasswordIssuedAt: undefined,
+      temporaryPasswordIssuedBy: undefined,
+    }
+    writeUsers(users)
+  }
+  return { success: true }
+}
+
 export async function updateUserRole(
   userId: string,
   role: UserRole,
@@ -331,6 +388,9 @@ function profileFromRow(row: Record<string, unknown>): StoredUser | null {
     associationType: text(extra.associationType, text(row.association_type)) || undefined,
     associationAddress: text(extra.associationAddress, text(row.association_address)) || undefined,
     registrationNumber: text(extra.registrationNumber, text(row.registration_number)) || undefined,
+    mustChangePassword: extra.mustChangePassword === true,
+    temporaryPasswordIssuedAt: text(extra.temporaryPasswordIssuedAt) || undefined,
+    temporaryPasswordIssuedBy: text(extra.temporaryPasswordIssuedBy) || undefined,
   }
 }
 
@@ -444,7 +504,7 @@ export async function login(email: string, password: string, rememberMe: boolean
   const fullName = fromTable?.fullName
     || metadataValue(userMetadata, ['full_name', 'name'])
     || email.trim()
-  const account: StoredUser = fromTable ?? {
+  const fallbackAccount: StoredUser = {
     id: data.user.id,
     email: email.trim(),
     password: '',
@@ -458,6 +518,10 @@ export async function login(email: string, password: string, rememberMe: boolean
     roleLabel: roleToLabel(role),
     status: 'approved',
     createdAt: new Date().toISOString(),
+  }
+  const account: StoredUser = {
+    ...(fromTable ?? fallbackAccount),
+    mustChangePassword: fromTable?.mustChangePassword === true || userMetadata.must_change_password === true,
   }
   rememberUser(account)
 

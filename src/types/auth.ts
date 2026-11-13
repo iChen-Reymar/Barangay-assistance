@@ -28,6 +28,9 @@ export interface StoredUser {
   registrationNumber?: string
   isAnonymized?: boolean
   anonymizedAt?: string
+  mustChangePassword?: boolean
+  temporaryPasswordIssuedAt?: string
+  temporaryPasswordIssuedBy?: string
 }
 
 export interface SessionUser {

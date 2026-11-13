@@ -2,6 +2,7 @@ import { createContext } from 'react'
 import type {
   changeUserPassword,
   login as loginUser,
+  replaceTemporaryPassword,
   submitAccessRequest,
   submitAssociationHeadRequest,
   updateUserProfile,
@@ -41,6 +42,7 @@ export interface AuthContextValue {
   rejectRequest: (userId: string, notes: string) => void
   updateProfile: (input: ProfileUpdateInput) => ReturnType<typeof updateUserProfile>
   changePassword: (input: PasswordChangeInput) => ReturnType<typeof changeUserPassword>
+  completeTemporaryPasswordChange: (newPassword: string) => ReturnType<typeof replaceTemporaryPassword>
   refreshUsers: () => void
 }
 

@@ -4,12 +4,19 @@ import test from 'node:test'
 process.env.NODE_ENV = 'test'
 const {
   canWriteResource,
+  generateTemporaryPassword,
   payloadIdentity,
   requestWriteError,
   requestWriteOperation,
   scopeStoresForActor,
   trustedAuditEntry,
 } = await import('./index.mjs')
+
+test('temporary passwords are short, readable, and unique', () => {
+  const generated = new Set(Array.from({ length: 50 }, () => generateTemporaryPassword()))
+  assert.equal(generated.size, 50)
+  for (const password of generated) assert.match(password, /^[A-HJ-NP-Z2-9]{4}-[A-HJ-NP-Z2-9]{4}$/)
+})
 
 test('resource writes follow the role matrix', () => {
   assert.equal(canWriteResource({ role: 'admin' }, 'barangay_privacy_settings'), true)
