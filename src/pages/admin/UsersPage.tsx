@@ -1,5 +1,18 @@
 ﻿import { useEffect, useMemo, useState } from 'react'
-import { Plus } from 'lucide-react'
+import {
+  AlertTriangle,
+  CheckCircle2,
+  Copy,
+  KeyRound,
+  Mail,
+  Pencil,
+  Plus,
+  Search,
+  ShieldCheck,
+  Trash2,
+  UserRound,
+  Users,
+} from 'lucide-react'
 import { AdminHeader } from '../../components/admin/AdminHeader'
 import { Badge } from '../../components/ui/Badge'
 import { Button } from '../../components/ui/Button'
@@ -51,6 +64,7 @@ export default function UsersPage({ embedded = false }: { embedded?: boolean }) 
   const [editTarget, setEditTarget] = useState<StoredUser | null>(null)
   const [resetTarget, setResetTarget] = useState<StoredUser | null>(null)
   const [temporaryPassword, setTemporaryPassword] = useState('')
+  const [temporaryPasswordSaved, setTemporaryPasswordSaved] = useState(false)
   const [saving, setSaving] = useState(false)
   const [message, setMessage] = useState('')
   const [error, setError] = useState('')
@@ -62,7 +76,6 @@ export default function UsersPage({ embedded = false }: { embedded?: boolean }) 
     firstName: '',
     lastName: '',
     email: '',
-    password: '',
   })
   const [form, setForm] = useState({
     firstName: '',
@@ -155,23 +168,17 @@ export default function UsersPage({ embedded = false }: { embedded?: boolean }) 
       firstName: account.firstName,
       lastName: account.lastName,
       email: account.email,
-      password: '',
     })
   }
 
-  async function saveEdit(password = editForm.password.trim()) {
+  async function saveEdit() {
     if (!editTarget) return
     setError('')
-    if (password && password.length < 8) {
-      setError('Password must be at least 8 characters.')
-      return
-    }
     setSaving(true)
     const result = await updateManagedUser(editTarget.id, {
       firstName: editForm.firstName,
       lastName: editForm.lastName,
       email: editForm.email,
-      password,
     })
     setSaving(false)
     if (!result.success) {
@@ -180,12 +187,10 @@ export default function UsersPage({ embedded = false }: { embedded?: boolean }) 
     }
     refreshUsers()
     const fullName = `${editForm.firstName.trim()} ${editForm.lastName.trim()}`.trim()
-    const passwordNote = password ? ' The password was changed.' : ''
-    setMessage(`${fullName} was updated.${passwordNote}`)
+    setMessage(`${fullName} was updated.`)
     audit(`Updated user ${fullName}.`, buildChanges([
       { key: 'name', label: 'Name', oldValue: editTarget.fullName, newValue: fullName },
       { key: 'email', label: 'Email', oldValue: editTarget.email, newValue: editForm.email.trim().toLowerCase() },
-      ...(password ? [{ key: 'password', label: 'Password', oldValue: 'Hidden', newValue: 'Changed' }] : []),
     ]))
     setEditTarget(null)
   }
@@ -231,12 +236,18 @@ export default function UsersPage({ embedded = false }: { embedded?: boolean }) 
     setError('')
     setResetError('')
     setTemporaryPassword('')
+    setTemporaryPasswordSaved(false)
     setResetTarget(account)
   }
 
   function closePasswordReset() {
     if (saving) return
+    if (temporaryPassword && !temporaryPasswordSaved) {
+      setResetError('Copy the temporary password or confirm that you saved it before closing.')
+      return
+    }
     setTemporaryPassword('')
+    setTemporaryPasswordSaved(false)
     setResetError('')
     setResetTarget(null)
   }
@@ -264,26 +275,83 @@ export default function UsersPage({ embedded = false }: { embedded?: boolean }) 
     if (!temporaryPassword) return
     try {
       await navigator.clipboard.writeText(temporaryPassword)
+      setTemporaryPasswordSaved(true)
       setMessage('Temporary password copied. Share it privately with the user.')
     } catch {
       setResetError('Could not copy automatically. Select and copy the temporary password manually.')
     }
   }
 
+  function accountActions(account: StoredUser, mobile = false) {
+    const isSelf = account.id === user?.id
+    const canEmailReset = !recoveryEmailError(account.email)
+    const resetDisabled = authAdministration ? isSelf : !canEmailReset
+    const resetTitle = authAdministration
+      ? isSelf ? 'Use Account Settings to change your own password' : 'Create a one-time temporary password'
+      : canEmailReset ? 'Send a secure password reset email' : 'This username does not have a deliverable email address'
+
+    return (
+      <div className={`flex flex-wrap gap-2 ${mobile ? 'w-full' : ''}`}>
+        <Button size="sm" variant="outline" className={mobile ? 'flex-1' : ''} onClick={() => openEdit(account)}>
+          <Pencil className="h-3.5 w-3.5" />
+          Edit
+        </Button>
+        <Button
+          size="sm"
+          variant="outline"
+          className={mobile ? 'flex-1' : ''}
+          disabled={resetDisabled}
+          title={resetTitle}
+          onClick={() => openPasswordReset(account)}
+        >
+          <KeyRound className="h-3.5 w-3.5" />
+          {authAdministration ? 'Temporary password' : 'Reset password'}
+        </Button>
+        {authAdministration ? (
+          <Button
+            size="sm"
+            variant="outline"
+            className="border-red-200 text-red-600 hover:bg-red-50"
+            disabled={isSelf}
+            title={isSelf ? 'You cannot remove your own account' : `Remove ${account.fullName}`}
+            aria-label={`Remove ${account.fullName}`}
+            onClick={() => { setError(''); setRemoveTarget(account) }}
+          >
+            <Trash2 className="h-3.5 w-3.5" />
+            {mobile ? 'Remove' : <span className="sr-only">Remove</span>}
+          </Button>
+        ) : null}
+      </div>
+    )
+  }
+
   return (
     <>
       {!embedded ? <AdminHeader title="Manage Users" /> : null}
       <div className={embedded ? '' : 'flex-1 overflow-y-auto p-4 sm:p-5 md:p-6'}>
-        <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
-          <p className="max-w-2xl text-sm text-gray-500">
-            {authAdministration
-              ? 'Add people, update account details, or change whether someone is an administrator, barangay staff, or association head.'
-              : 'Update profile names, permissions, and association access. Login credentials remain protected by Supabase Auth.'}
-          </p>
+        <div className="mb-4 flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+          <div className="flex min-w-0 gap-3">
+            <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-green-50 text-primary">
+              <Users className="h-5 w-5" />
+            </span>
+            <div>
+              <div className="flex flex-wrap items-center gap-2">
+                <h2 className="font-bold text-gray-950">User accounts</h2>
+                <span className="rounded-full bg-gray-100 px-2.5 py-0.5 text-xs font-semibold text-gray-600">
+                  {allUsers.length}
+                </span>
+              </div>
+              <p className="mt-1 max-w-2xl text-sm leading-6 text-gray-500">
+                {authAdministration
+                  ? 'Manage account details, permissions, associations, and secure login recovery.'
+                  : 'Manage profile details, permissions, and association access. Login credentials remain protected by Supabase Auth.'}
+              </p>
+            </div>
+          </div>
           {authAdministration ? (
-            <Button onClick={() => { setError(''); setFormOpen(true) }}>
+            <Button className="shrink-0" onClick={() => { setError(''); setFormOpen(true) }}>
               <Plus className="h-4 w-4" />
-              Add User
+              Add user
             </Button>
           ) : (
             <p className="rounded-lg bg-blue-50 px-3 py-2 text-xs text-blue-700">
@@ -303,28 +371,39 @@ export default function UsersPage({ embedded = false }: { embedded?: boolean }) 
           </div>
         ) : null}
 
-        <div className="mb-3 flex flex-col gap-2 sm:flex-row">
-          <input
-            type="search"
-            value={search}
-            onChange={(event) => setSearch(event.target.value)}
-            placeholder="Search name, email, role, or association"
-            className={`${fieldClass} sm:max-w-md`}
-          />
-          <select
-            value={roleFilter}
-            onChange={(event) => setRoleFilter(event.target.value as 'all' | UserRole)}
-            className={`${fieldClass} sm:w-48`}
-          >
-            <option value="all">All permissions</option>
-            {roleOptions.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
-          </select>
-        </div>
+        <div className="overflow-hidden rounded-xl border border-gray-200 bg-white">
+          <div className="flex flex-col gap-3 border-b border-gray-200 bg-gray-50/60 p-3 sm:flex-row sm:items-center sm:justify-between">
+            <div className="flex flex-1 flex-col gap-2 sm:flex-row">
+              <label className="relative block w-full sm:max-w-md">
+                <span className="sr-only">Search users</span>
+                <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
+                <input
+                  type="search"
+                  value={search}
+                  onChange={(event) => setSearch(event.target.value)}
+                  placeholder="Search people, email, or association"
+                  className={`${fieldClass} bg-white pl-9`}
+                />
+              </label>
+              <select
+                aria-label="Filter by permission"
+                value={roleFilter}
+                onChange={(event) => setRoleFilter(event.target.value as 'all' | UserRole)}
+                className={`${fieldClass} bg-white sm:w-48`}
+              >
+                <option value="all">All permissions</option>
+                {roleOptions.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
+              </select>
+            </div>
+            <p className="text-xs text-gray-500">
+              Showing <span className="font-semibold text-gray-700">{visibleUsers.length}</span> of {allUsers.length}
+            </p>
+          </div>
 
-        <div className="overflow-x-auto rounded-lg border border-gray-200 bg-white shadow-sm">
-          <table className="w-full min-w-[720px] text-sm">
+          <div className="hidden overflow-x-auto md:block">
+          <table className="w-full min-w-[1050px] text-sm">
             <thead>
-              <tr className="border-b border-gray-100 bg-gray-50 text-left text-xs font-semibold uppercase text-gray-500">
+              <tr className="border-b border-gray-100 bg-white text-left text-xs font-semibold text-gray-500">
                 <th className="px-4 py-3">Name</th>
                 <th className="px-4 py-3">Email</th>
                 <th className="px-4 py-3">Permission</th>
@@ -335,21 +414,27 @@ export default function UsersPage({ embedded = false }: { embedded?: boolean }) 
             </thead>
             <tbody>
               {visibleUsers.map((account) => {
-                const isSelf = account.id === user?.id
-                const canEmailReset = !recoveryEmailError(account.email)
-                return (
-                  <tr key={account.id} className="border-b border-gray-50">
+                  const isSelf = account.id === user?.id
+                  return (
+                  <tr key={account.id} className={`border-b border-gray-100 last:border-b-0 ${isSelf ? 'bg-green-50/30' : 'hover:bg-gray-50/60'}`}>
                     <td className="px-4 py-3 font-medium text-gray-900">
-                      {account.fullName}
-                      {isSelf ? <span className="ml-2 text-xs font-normal text-gray-400">You</span> : null}
+                      <div className="flex items-center gap-2.5">
+                        <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-gray-100 text-gray-500">
+                          <UserRound className="h-4 w-4" />
+                        </span>
+                        <span>
+                          <span className="block">{account.fullName}</span>
+                          {isSelf ? <span className="text-xs font-normal text-primary">Signed-in account</span> : null}
+                        </span>
+                      </div>
                     </td>
-                    <td className="px-4 py-3 text-gray-600">{account.email}</td>
+                    <td className="px-4 py-3 text-gray-600"><span className="break-all">{account.email}</span></td>
                     <td className="px-4 py-3">
                       <select
                         value={account.role}
                         disabled={isSelf}
                         onChange={(event) => handleRoleChange(account, event.target.value as UserRole)}
-                        className="rounded-lg border border-gray-200 px-2 py-1.5 text-sm disabled:bg-gray-50 disabled:text-gray-400"
+                        className="rounded-lg border border-gray-200 bg-white px-2 py-1.5 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary disabled:bg-gray-50 disabled:text-gray-400"
                       >
                         {roleOptions.map((option) => (
                           <option key={option.value} value={option.value}>{option.label}</option>
@@ -358,41 +443,19 @@ export default function UsersPage({ embedded = false }: { embedded?: boolean }) 
                     </td>
                     <td className="px-4 py-3">
                       {account.role === 'association' ? (
-                        <span className="text-gray-700">{associationFor(account, associations) || 'Not assigned'}</span>
+                        <span className="block max-w-xs text-gray-700">{associationFor(account, associations) || 'Not assigned'}</span>
                       ) : (
                         <span className="text-gray-300">—</span>
                       )}
                     </td>
                     <td className="px-4 py-3">
-                      <Badge variant={statusVariant(account.status)}>{account.status.toUpperCase()}</Badge>
+                      <div className="flex flex-col items-start gap-1.5">
+                        <Badge variant={statusVariant(account.status)}>{account.status.toUpperCase()}</Badge>
+                        {account.mustChangePassword ? <Badge variant="warning">PASSWORD CHANGE DUE</Badge> : null}
+                      </div>
                     </td>
                     <td className="px-4 py-3">
-                      <div className="flex flex-wrap gap-2">
-                        <Button size="sm" variant="outline" onClick={() => openEdit(account)}>
-                          Edit
-                        </Button>
-                        <Button
-                          size="sm"
-                          variant="outline"
-                           disabled={authAdministration ? isSelf : !canEmailReset}
-                           title={authAdministration
-                             ? isSelf ? 'Use Account Settings to change your own password' : 'Issue a one-time temporary password'
-                             : canEmailReset ? 'Send a secure password reset email' : 'This username does not have a deliverable email address'}
-                           onClick={() => openPasswordReset(account)}
-                        >
-                          Reset password
-                        </Button>
-                        {authAdministration ? (
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            disabled={isSelf}
-                            onClick={() => { setError(''); setRemoveTarget(account) }}
-                          >
-                            Remove
-                          </Button>
-                        ) : null}
-                      </div>
+                      {accountActions(account)}
                     </td>
                   </tr>
                 )
@@ -402,6 +465,56 @@ export default function UsersPage({ embedded = false }: { embedded?: boolean }) 
               ) : null}
             </tbody>
           </table>
+          </div>
+
+          <div className="divide-y divide-gray-100 md:hidden">
+            {visibleUsers.map((account) => {
+              const isSelf = account.id === user?.id
+              return (
+                <article key={account.id} className={`space-y-4 p-4 ${isSelf ? 'bg-green-50/30' : ''}`}>
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="flex min-w-0 gap-3">
+                      <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-gray-100 text-gray-500">
+                        <UserRound className="h-4 w-4" />
+                      </span>
+                      <div className="min-w-0">
+                        <h3 className="truncate font-semibold text-gray-900">{account.fullName}</h3>
+                        <p className="break-all text-xs text-gray-500">{account.email}</p>
+                        {isSelf ? <p className="mt-0.5 text-xs font-medium text-primary">Signed-in account</p> : null}
+                      </div>
+                    </div>
+                    <div className="flex flex-col items-end gap-1">
+                      <Badge variant={statusVariant(account.status)}>{account.status.toUpperCase()}</Badge>
+                      {account.mustChangePassword ? <Badge variant="warning">PASSWORD CHANGE DUE</Badge> : null}
+                    </div>
+                  </div>
+                  <dl className="grid gap-3 rounded-lg bg-gray-50 p-3 text-sm sm:grid-cols-2">
+                    <div>
+                      <dt className="text-xs text-gray-500">Permission</dt>
+                      <dd className="mt-1">
+                        <select
+                          value={account.role}
+                          disabled={isSelf}
+                          onChange={(event) => handleRoleChange(account, event.target.value as UserRole)}
+                          className="w-full rounded-lg border border-gray-200 bg-white px-2 py-1.5 text-sm disabled:bg-gray-50 disabled:text-gray-400"
+                        >
+                          {roleOptions.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
+                        </select>
+                      </dd>
+                    </div>
+                    <div>
+                      <dt className="text-xs text-gray-500">Association</dt>
+                      <dd className="mt-1 text-gray-800">{associationFor(account, associations) || 'Not assigned'}</dd>
+                    </div>
+                  </dl>
+                  {accountActions(account, true)}
+                </article>
+              )
+            })}
+            {visibleUsers.length === 0 ? (
+              <p className="px-4 py-10 text-center text-sm text-gray-500">No users match the current filters.</p>
+            ) : null}
+          </div>
         </div>
       </div>
 
@@ -493,43 +606,31 @@ export default function UsersPage({ embedded = false }: { embedded?: boolean }) 
             <input required disabled={!authAdministration} type="email" value={editForm.email} onChange={(event) => setEditForm({ ...editForm, email: event.target.value })} className={`${fieldClass} disabled:bg-gray-50 disabled:text-gray-500`} />
             {!authAdministration ? <span className="mt-1 block text-xs text-gray-500">Login email changes require optional Supabase Auth administration.</span> : null}
           </label>
-          {authAdministration ? (
-            <label className="block text-sm">
-              <span className="mb-1 block text-xs font-semibold uppercase text-gray-500">New password</span>
-              <input
-                type="password"
-                value={editForm.password}
-                onChange={(event) => setEditForm({ ...editForm, password: event.target.value })}
-                placeholder="Leave blank to keep the current password"
-                className={fieldClass}
-              />
-              <span className="mt-1 block text-xs text-gray-500">
-                Use at least 8 characters. Passwords are managed by Supabase Auth and are never stored in browser data.
-              </span>
-            </label>
-          ) : (
-            <div className="rounded-lg border border-gray-200 bg-gray-50 px-3 py-3 text-xs leading-5 text-gray-600">
-              Passwords cannot be changed by another account in publishable-key mode. The user can change their own password from account settings.
-            </div>
-          )}
+          <div className="flex gap-3 rounded-lg border border-gray-200 bg-gray-50 px-3 py-3 text-xs leading-5 text-gray-600">
+            <KeyRound className="mt-0.5 h-4 w-4 shrink-0 text-gray-400" />
+            <span>Use the Temporary password action in the account list for secure login recovery.</span>
+          </div>
         </form>
       </Modal>
 
       <Modal
         open={resetTarget !== null}
         onClose={closePasswordReset}
-        title={authAdministration ? 'Issue Temporary Password' : 'Send Password Reset'}
+        title={authAdministration ? 'Create temporary password' : 'Send password reset'}
         footer={
-          <div className="flex justify-end gap-2">
-            <Button variant="outline" disabled={saving} onClick={closePasswordReset}>
-              {temporaryPassword ? 'Done' : 'Cancel'}
-            </Button>
+          <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
             {temporaryPassword ? (
-              <Button onClick={() => void copyTemporaryPassword()}>Copy password</Button>
-            ) : (
-              <Button disabled={saving} onClick={authAdministration ? handleTemporaryPasswordReset : handlePasswordReset}>
-                {saving ? 'Processing...' : authAdministration ? 'Issue temporary password' : 'Send reset link'}
+              <Button disabled={!temporaryPasswordSaved} onClick={closePasswordReset}>
+                Done
               </Button>
+            ) : (
+              <>
+                <Button variant="outline" disabled={saving} onClick={closePasswordReset}>Cancel</Button>
+              <Button disabled={saving} onClick={authAdministration ? handleTemporaryPasswordReset : handlePasswordReset}>
+                  {authAdministration ? <KeyRound className="h-4 w-4" /> : <Mail className="h-4 w-4" />}
+                  {saving ? 'Processing...' : authAdministration ? 'Generate temporary password' : 'Send reset link'}
+              </Button>
+              </>
             )}
           </div>
         }
@@ -540,26 +641,91 @@ export default function UsersPage({ embedded = false }: { embedded?: boolean }) 
           </div>
         ) : null}
         {temporaryPassword ? (
-          <div className="space-y-4">
-            <div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm leading-6 text-amber-900">
-              This password is shown only here. Give it privately to {resetTarget?.fullName}. They must create a new password after signing in.
+          <div className="space-y-5">
+            <div className="flex items-start gap-3 rounded-lg border border-green-200 bg-green-50 p-4">
+              <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-green-600 text-white">
+                <CheckCircle2 className="h-5 w-5" />
+              </span>
+              <div>
+                <h3 className="font-semibold text-green-950">Temporary password created</h3>
+                <p className="mt-0.5 text-sm leading-5 text-green-800">
+                  {resetTarget?.fullName} can now use it to sign in once and create a private password.
+                </p>
+              </div>
             </div>
-            <div>
-              <p className="mb-1 text-xs font-semibold uppercase tracking-wide text-gray-500">Temporary password</p>
-              <output className="block select-all rounded-lg border border-gray-300 bg-gray-50 px-4 py-3 text-center font-mono text-2xl font-bold tracking-widest text-gray-950">
-                {temporaryPassword}
-              </output>
+
+            <div className="rounded-xl border-2 border-primary/20 bg-green-50/40 p-4">
+              <p className="text-sm font-medium text-gray-700">Temporary password</p>
+              <div className="mt-2 flex flex-col gap-3 sm:flex-row sm:items-center">
+                <output className="block min-w-0 flex-1 select-all rounded-lg bg-white px-4 py-3 text-center font-mono text-2xl font-bold tracking-[0.18em] text-gray-950 ring-1 ring-gray-200">
+                  {temporaryPassword}
+                </output>
+                <Button className="shrink-0" onClick={() => void copyTemporaryPassword()}>
+                  <Copy className="h-4 w-4" />
+                  {temporaryPasswordSaved ? 'Copied' : 'Copy password'}
+                </Button>
+              </div>
             </div>
+
+            <div className="flex gap-3 rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm text-amber-950">
+              <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0 text-amber-600" />
+              <div>
+                <p className="font-semibold">This password is shown only once</p>
+                <p className="mt-1 leading-5 text-amber-800">Give it privately to the user. Do not send it in a public group or store it in notes.</p>
+              </div>
+            </div>
+
+            <ol className="space-y-2 rounded-lg border border-gray-200 p-4 text-sm text-gray-700">
+              <li className="flex gap-3"><span className="font-semibold text-primary">1.</span><span>Share the temporary password privately.</span></li>
+              <li className="flex gap-3"><span className="font-semibold text-primary">2.</span><span>The user signs in with their usual email or username.</span></li>
+              <li className="flex gap-3"><span className="font-semibold text-primary">3.</span><span>The system requires a new permanent password before opening the dashboard.</span></li>
+            </ol>
+
+            <label className="flex cursor-pointer items-start gap-3 rounded-lg border border-gray-200 p-3 text-sm text-gray-700">
+              <input
+                type="checkbox"
+                checked={temporaryPasswordSaved}
+                onChange={(event) => setTemporaryPasswordSaved(event.target.checked)}
+                className="mt-0.5 h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary"
+              />
+              <span>I copied or securely recorded this temporary password.</span>
+            </label>
           </div>
-        ) : (
-          <p className="text-sm leading-6 text-gray-600">
-            {resetTarget
-              ? authAdministration
-                ? `Replace ${resetTarget.fullName}'s current login with a short, unique temporary password. Their account will require a new private password immediately after sign-in.`
-                : `Supabase will email ${resetTarget.email} a secure link to choose a new password. Their current password will remain active until they complete the reset.`
-              : ''}
-          </p>
-        )}
+        ) : resetTarget ? (
+          <div className="space-y-4">
+            <div className="flex items-center gap-3 rounded-lg border border-gray-200 bg-gray-50 p-4">
+              <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-white text-primary ring-1 ring-gray-200">
+                <UserRound className="h-5 w-5" />
+              </span>
+              <div className="min-w-0">
+                <p className="truncate font-semibold text-gray-950">{resetTarget.fullName}</p>
+                <p className="truncate text-sm text-gray-500">{resetTarget.email}</p>
+                <p className="mt-0.5 text-xs font-medium text-primary">{resetTarget.roleLabel}</p>
+              </div>
+            </div>
+
+            {authAdministration ? (
+              <>
+                <div className="flex gap-3 rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm text-amber-950">
+                  <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0 text-amber-600" />
+                  <div>
+                    <p className="font-semibold">Their current password will stop working</p>
+                    <p className="mt-1 leading-5 text-amber-800">A unique temporary password will replace it immediately.</p>
+                  </div>
+                </div>
+                <div className="flex gap-3 rounded-lg border border-green-100 bg-green-50/60 p-4 text-sm text-green-900">
+                  <ShieldCheck className="mt-0.5 h-5 w-5 shrink-0 text-primary" />
+                  <p className="leading-5">The password is generated securely, shown only once, and must be replaced after sign-in.</p>
+                </div>
+              </>
+            ) : (
+              <div className="flex gap-3 rounded-lg border border-blue-100 bg-blue-50 p-4 text-sm text-blue-900">
+                <Mail className="mt-0.5 h-5 w-5 shrink-0" />
+                <p className="leading-5">A secure reset link will be sent to {resetTarget.email}. Their current password remains active until they finish the reset.</p>
+              </div>
+            )}
+          </div>
+        ) : null}
       </Modal>
 
       <Modal
