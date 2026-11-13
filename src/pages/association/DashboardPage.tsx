@@ -96,7 +96,7 @@ export default function AssociationDashboardPage() {
         <div className="mb-6 grid grid-cols-2 gap-4 lg:grid-cols-4">
           <StatCard label="Total Members" value={memberCount} icon={Users} />
           <StatCard label="Pending Requests" value={pendingCount} icon={Clock} />
-           <StatCard label="Generated Lists" value={approvedItems.length} icon={CheckCircle} />
+           <StatCard label="Approved Requests" value={approvedItems.length} icon={CheckCircle} />
           <StatCard label="Not Qualified" value={rejectedCount} icon={XCircle} />
         </div>
 

@@ -93,6 +93,7 @@ export default function DashboardPage() {
   const beneficiaries = getStaffBeneficiaries()
   const requests = getAssistanceItems()
   const generated = getGeneratedAssistanceList()
+  const finalizedListCount = requests.filter((row) => row.status === 'LIST GENERATED').length
   const recommendationSummaries = summarizeRecommendations(generated)
   const activity = getAuditLogs().slice(0, 5)
   const high = beneficiaries.filter((row) => row.vulnerability === 'HIGH').length
@@ -107,7 +108,7 @@ export default function DashboardPage() {
           <StatCard label="Total Associations" value={associations.length} icon={Building2} href="/admin/associations" />
           <StatCard label="Total Beneficiaries" value={beneficiaries.length} icon={Users} href="/admin/recommendations" />
           <StatCard label="Pending Requests" value={requests.filter((row) => row.status === 'PENDING' || row.status === 'UNDER REVIEW').length} icon={Clock} href="/admin/people?view=assistance" />
-          <StatCard label="Generated Lists" value={generated.length} icon={CheckCircle} href="/admin/recommendations" />
+          <StatCard label="Finalized Lists" value={finalizedListCount} icon={CheckCircle} href="/admin/recommendations" />
           <StatCard label="High Vulnerability" value={high} icon={AlertTriangle} href="/admin/recommendations" />
         </div>
 

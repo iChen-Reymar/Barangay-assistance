@@ -12,7 +12,7 @@ import {
   getStaffBeneficiaries,
   subscribeStaffBeneficiaryStorage,
 } from '../../services/staffBeneficiaryStorage'
-import { getGeneratedAssistanceList, subscribeGeneratedAssistanceList } from '../../services/aiProcessing'
+import { getAssistanceItems, subscribeDecisionStorage } from '../../services/decisionStorage'
 import { getAuditLogs, subscribeAuditLogs } from '../../services/auditStorage'
 
 export default function StaffDashboardPage() {
@@ -23,7 +23,9 @@ export default function StaffDashboardPage() {
   )
   const [pendingCount, setPendingCount] = useState(() => countPendingVerification())
   const [beneficiaries, setBeneficiaries] = useState<StaffBeneficiary[]>(() => getStaffBeneficiaries())
-  const [generatedCount, setGeneratedCount] = useState(() => getGeneratedAssistanceList().length)
+  const [finalizedListCount, setFinalizedListCount] = useState(() =>
+    getAssistanceItems().filter((item) => item.status === 'LIST GENERATED').length,
+  )
   const [activities, setActivities] = useState(() => getAuditLogs().slice(0, 5))
 
   function refreshPending() {
@@ -34,13 +36,13 @@ export default function StaffDashboardPage() {
 
   useEffect(() => {
     const stopBeneficiaries = subscribeStaffBeneficiaryStorage(refreshPending)
-    const stopGenerated = subscribeGeneratedAssistanceList(() =>
-      setGeneratedCount(getGeneratedAssistanceList().length),
+    const stopDecisions = subscribeDecisionStorage(() =>
+      setFinalizedListCount(getAssistanceItems().filter((item) => item.status === 'LIST GENERATED').length),
     )
     const stopAudit = subscribeAuditLogs(() => setActivities(getAuditLogs().slice(0, 5)))
     return () => {
       stopBeneficiaries()
-      stopGenerated()
+      stopDecisions()
       stopAudit()
     }
   }, [])
@@ -59,7 +61,7 @@ export default function StaffDashboardPage() {
           <StatCard label="Assessed Beneficiaries" value={beneficiaries.filter((row) => row.vulnerability).length} icon={Shield} href="/staff/vulnerability-assessment" />
           <StatCard label="High Vulnerability" value={beneficiaries.filter((row) => row.vulnerability === 'HIGH').length} icon={AlertTriangle} href="/staff/vulnerability-assessment" />
           <StatCard label="Pending Verification" value={pendingCount} icon={Clock} href="/staff/verify-qualification" />
-          <StatCard label="Generated Lists" value={generatedCount} icon={CheckCircle} href="/staff/approved-requests" />
+          <StatCard label="Finalized Lists" value={finalizedListCount} icon={CheckCircle} href="/staff/approved-requests" />
         </div>
 
         <div className="mb-6">
