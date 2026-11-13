@@ -1,6 +1,7 @@
 import { supabase } from '../lib/supabase'
 import { authenticatedFetch } from './authenticatedFetch'
 import { publishSyncStatus, registerSyncRetry } from './syncStatus'
+import { shouldRetrySynchronization } from './syncRetryPolicy'
 
 const VERSION_KEY = 'barangay_store_version'
 const VERSION = 'supabase-records-2'
@@ -29,17 +30,10 @@ const failedSyncJobs = new Map<number, () => Promise<void>>()
 const latestSyncErrors = new Map<string, Error>()
 let syncJobId = 0
 let activeSyncJobs = 0
+let synchronizationGeneration = 0
 
 function shouldSync(key: string) {
   return key.startsWith('barangay_') && !SKIP_KEYS.has(key)
-}
-
-async function authHeaders(includeJson = false) {
-  const { data } = await supabase.auth.getSession()
-  const headers: Record<string, string> = {}
-  if (includeJson) headers['Content-Type'] = 'application/json'
-  if (data.session?.access_token) headers.Authorization = `Bearer ${data.session.access_token}`
-  return headers
 }
 
 function parseJson(raw: string | null): unknown {
@@ -97,13 +91,13 @@ async function retryableRequest(url: string, init: RequestInit) {
       if (response.ok) return
       const body = await response.json().catch(() => ({})) as { error?: string }
       lastError = body.error || `Database request failed (${response.status}).`
-      if (response.status < 500 && response.status !== 429) {
+      if (!shouldRetrySynchronization(response.status)) {
         throw new SyncRequestError(lastError, false, undefined, response.status)
       }
     } catch (error) {
       lastError = error instanceof Error ? error.message : lastError
       if (error instanceof SyncRequestError && !error.retryable) throw error
-      if (attempt === 2) throw new SyncRequestError(lastError, false, error)
+      if (attempt === 2) throw new SyncRequestError(lastError, true, error)
     }
     await new Promise((resolve) => window.setTimeout(resolve, 400 * (2 ** attempt)))
   }
@@ -113,7 +107,7 @@ async function retryableRequest(url: string, init: RequestInit) {
 async function putRecord(key: string, id: string, payload: unknown) {
   await retryableRequest(`/api/records/${encodeURIComponent(key)}/${encodeURIComponent(id)}`, {
     method: 'PUT',
-    headers: await authHeaders(true),
+    headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ payload }),
   })
 }
@@ -142,11 +136,11 @@ export async function waitForDatabaseSynchronization(key: string) {
 async function deleteRecord(key: string, id: string) {
   await retryableRequest(`/api/records/${encodeURIComponent(key)}/${encodeURIComponent(id)}`, {
     method: 'DELETE',
-    headers: await authHeaders(),
   })
 }
 
-async function syncStoreChange(key: string, previousRaw: string | null, nextRaw: string | null) {
+async function syncStoreChange(key: string, previousRaw: string | null, nextRaw: string | null, generation: number) {
+  if (generation !== synchronizationGeneration) return
   const previous = parseJson(previousRaw)
   const next = parseJson(nextRaw)
   const identify = RECORD_IDS[key]
@@ -154,10 +148,12 @@ async function syncStoreChange(key: string, previousRaw: string | null, nextRaw:
     const before = recordMap(key, previous)
     const after = recordMap(key, next)
     for (const [id, record] of after) {
+      if (generation !== synchronizationGeneration) return
       if (JSON.stringify(before.get(id)) !== JSON.stringify(record)) await putRecord(key, id, record)
     }
     if (key !== 'barangay_users') {
       for (const id of before.keys()) {
+        if (generation !== synchronizationGeneration) return
         if (!after.has(id)) await deleteRecord(key, id)
       }
     }
@@ -173,11 +169,17 @@ async function syncStoreChange(key: string, previousRaw: string | null, nextRaw:
 
 function queueStoreChange(key: string, previousRaw: string | null, nextRaw: string | null) {
   const id = ++syncJobId
+  const generation = synchronizationGeneration
   const execute = async () => {
+    if (generation !== synchronizationGeneration) return
     activeSyncJobs += 1
     publishSyncStatus({ phase: 'syncing', pending: activeSyncJobs + failedSyncJobs.size })
     try {
-      await syncStoreChange(key, previousRaw, nextRaw)
+      await syncStoreChange(key, previousRaw, nextRaw, generation)
+      if (generation !== synchronizationGeneration) {
+        activeSyncJobs -= 1
+        return
+      }
       latestSyncErrors.delete(key)
       failedSyncJobs.delete(id)
       activeSyncJobs -= 1
@@ -188,14 +190,21 @@ function queueStoreChange(key: string, previousRaw: string | null, nextRaw: stri
           : { phase: 'saved', pending: 0 })
     } catch (error) {
       activeSyncJobs -= 1
+      const message = error instanceof Error ? error.message : 'Database synchronization failed.'
       if (isAuthenticationSyncError(error)) {
         failedSyncJobs.delete(id)
         latestSyncErrors.delete(key)
         publishCurrentQueueStatus()
         return
       }
+      if (error instanceof SyncRequestError && !error.retryable) {
+        failedSyncJobs.delete(id)
+        latestSyncErrors.set(key, error)
+        console.error(`Database synchronization rejected for ${key}.`, error)
+        publishSyncStatus({ phase: 'failed', pending: 0, error: message })
+        return
+      }
       failedSyncJobs.set(id, execute)
-      const message = error instanceof Error ? error.message : 'Database synchronization failed.'
       latestSyncErrors.set(key, error instanceof Error ? error : new Error(message))
       console.error(`Database synchronization failed for ${key}.`, error)
       publishSyncStatus({ phase: 'failed', pending: failedSyncJobs.size, error: message })
@@ -216,8 +225,10 @@ async function retryFailedSyncJobs() {
 registerSyncRetry(retryFailedSyncJobs)
 
 export function discardFailedSynchronizations() {
+  synchronizationGeneration += 1
   failedSyncJobs.clear()
   latestSyncErrors.clear()
+  syncQueues.clear()
   publishCurrentQueueStatus()
 }
 

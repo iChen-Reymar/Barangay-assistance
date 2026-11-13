@@ -22,6 +22,7 @@ const workflow = await import('../src/services/assistanceWorkflow.ts')
 const eligibility = await import('../src/services/assistanceListEligibility.ts')
 const associationNotifications = await import('../src/services/associationNotificationStorage.ts')
 const housingCondition = await import('../src/utils/housingCondition.ts')
+const syncRetryPolicy = await import('../src/services/syncRetryPolicy.ts')
 
 test('non-remembered Supabase sessions stay in session storage', () => {
   persistence.setRememberSession(false)
@@ -52,6 +53,17 @@ test('password recovery rejects internal addresses and weak passwords', () => {
   assert.match(recovery.newPasswordError('123', '123'), /8 characters/)
   assert.match(recovery.newPasswordError('long-password', 'different-password'), /do not match/)
   assert.equal(recovery.newPasswordError('long-password', 'long-password'), '')
+})
+
+test('synchronization retries only transient failures', () => {
+  assert.equal(syncRetryPolicy.shouldRetrySynchronization(undefined), true)
+  assert.equal(syncRetryPolicy.shouldRetrySynchronization(408), true)
+  assert.equal(syncRetryPolicy.shouldRetrySynchronization(429), true)
+  assert.equal(syncRetryPolicy.shouldRetrySynchronization(503), true)
+  assert.equal(syncRetryPolicy.shouldRetrySynchronization(400), false)
+  assert.equal(syncRetryPolicy.shouldRetrySynchronization(401), false)
+  assert.equal(syncRetryPolicy.shouldRetrySynchronization(403), false)
+  assert.equal(syncRetryPolicy.shouldRetrySynchronization(404), false)
 })
 
 test('legacy temporary housing values normalize to renter', () => {

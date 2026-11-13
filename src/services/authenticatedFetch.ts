@@ -2,20 +2,27 @@ import { supabase } from '../lib/supabase'
 
 export const AUTH_EXPIRED_EVENT = 'barangay:auth-expired'
 let expiredSessionAnnounced = false
+let refreshPromise: Promise<string | null> | null = null
+
+function refreshedAccessToken() {
+  if (!refreshPromise) {
+    refreshPromise = supabase.auth.refreshSession()
+      .then(({ data, error }) => error ? null : (data.session?.access_token ?? null))
+      .finally(() => { refreshPromise = null })
+  }
+  return refreshPromise
+}
 
 async function accessToken(forceRefresh = false) {
   if (forceRefresh) {
-    const { data, error } = await supabase.auth.refreshSession()
-    if (error) return null
-    return data.session?.access_token ?? null
+    return refreshedAccessToken()
   }
 
   const { data, error } = await supabase.auth.getSession()
   if (error) return null
   if (data.session?.access_token) return data.session.access_token
 
-  const refreshed = await supabase.auth.refreshSession()
-  return refreshed.error ? null : refreshed.data.session?.access_token ?? null
+  return refreshedAccessToken()
 }
 
 function withToken(init: RequestInit, token: string) {

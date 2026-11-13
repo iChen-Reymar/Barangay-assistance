@@ -3,6 +3,7 @@ import test from 'node:test'
 
 process.env.NODE_ENV = 'test'
 const {
+  auditWritePolicy,
   canWriteResource,
   generateTemporaryPassword,
   payloadIdentity,
@@ -45,6 +46,16 @@ test('audit identity is bound to the authenticated non-admin account', () => {
     userEmail: 'erpat@example.com',
   })
   assert.equal(trustedAuditEntry(forged, { role: 'admin' }), forged)
+})
+
+test('non-admin audit entries are append-only and owner-bound', () => {
+  const association = { role: 'association', email: 'head@example.com' }
+  const staff = { role: 'staff', email: 'staff@example.com' }
+  assert.equal(auditWritePolicy(association, null), 'write')
+  assert.equal(auditWritePolicy(association, { user_email: 'head@example.com' }), 'ignore')
+  assert.equal(auditWritePolicy(association, { user_email: 'other@example.com' }), 'reject')
+  assert.equal(auditWritePolicy(staff, { user_email: 'head@example.com' }), 'reject')
+  assert.equal(auditWritePolicy({ role: 'admin', email: 'admin@example.com' }, { user_email: 'other@example.com' }), 'write')
 })
 
 test('record identity must come from stable IDs, not display rank', () => {

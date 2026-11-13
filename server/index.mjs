@@ -438,6 +438,13 @@ function trustedAuditEntry(row, actor) {
   }
 }
 
+function auditWritePolicy(actor, current) {
+  if (!actor || actor.role === 'admin' || !current) return 'write'
+  const owner = String(current.user_email || '').trim().toLowerCase()
+  const actorEmail = String(actor.email || '').trim().toLowerCase()
+  return owner && owner === actorEmail ? 'ignore' : 'reject'
+}
+
 async function saveAudit(rows, actor) {
   if (!Array.isArray(rows)) return
   const trustedRows = rows.map((row) => trustedAuditEntry(row, actor))
@@ -1681,7 +1688,27 @@ app.put('/api/records/:key/:id', async (req, res) => {
     res.status(400).json({ error: 'The record ID does not match the request path.' })
     return
   }
-  if (actor.role === 'association') {
+  if (key === 'barangay_audit_logs' && actor.role !== 'admin') {
+    const { data: currentAudit, error: auditError } = await supabase
+      .from('audit_logs')
+      .select('user_email')
+      .eq('id', id)
+      .maybeSingle()
+    if (auditError) {
+      res.status(500).json({ error: auditError.message })
+      return
+    }
+    const policy = auditWritePolicy(actor, currentAudit)
+    if (policy === 'reject') {
+      res.status(403).json({ error: 'Audit entries are immutable and belong to the account that created them.' })
+      return
+    }
+    if (policy === 'ignore') {
+      res.json({ ok: true, id })
+      return
+    }
+  }
+  if (actor.role === 'association' && key !== 'barangay_audit_logs') {
     const expected = String(actor.association_name || '').trim().toLowerCase()
     if (!expected || payloadAssociation(payload, key).trim().toLowerCase() !== expected) {
       res.status(403).json({ error: 'You can update only records assigned to your association.' })
@@ -1852,6 +1879,7 @@ if (process.env.NODE_ENV !== 'test' && !process.env.VERCEL) {
 
 export {
   app,
+  auditWritePolicy,
   canWriteResource,
   generateTemporaryPassword,
   initializeServer,
