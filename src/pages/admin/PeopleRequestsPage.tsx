@@ -37,7 +37,7 @@ export default function PeopleRequestsPage() {
   return (
     <>
       <AdminHeader title="People & Requests" searchPlaceholder="Search people and requests..." />
-      <main className="flex-1 overflow-y-auto bg-gray-50 p-4 [scrollbar-gutter:stable] sm:p-5 md:p-6">
+      <main className="flex-1 overflow-y-scroll bg-gray-50 p-4 [scrollbar-gutter:stable] sm:p-5 md:p-6">
         <section className="mx-auto max-w-[1500px]">
           <div className="mb-5">
             <h1 className="text-xl font-bold text-gray-950">People and request oversight</h1>
@@ -54,8 +54,8 @@ export default function PeopleRequestsPage() {
                   key={id}
                   type="button"
                   onClick={() => setParams({ view: id }, { replace: true })}
-                  className={`flex min-h-20 items-center gap-3 rounded-lg px-4 py-3 text-left transition focus:outline-none focus:ring-2 focus:ring-primary/30 ${
-                    selected ? 'bg-primary text-white shadow-sm' : 'text-gray-700 hover:bg-gray-50'
+                  className={`flex min-h-20 w-full min-w-0 items-center gap-3 rounded-lg px-4 py-3 text-left focus:outline-none focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary ${
+                    selected ? 'bg-primary text-white' : 'text-gray-700 hover:bg-gray-50'
                   }`}
                   aria-pressed={selected}
                 >
