@@ -129,7 +129,7 @@ export default function DashboardPage() {
           <Link
             to="/admin/people?view=assistance"
             aria-label="Open assistance requests"
-            className="rounded-lg border border-gray-200 bg-white shadow-sm focus:outline-none focus:ring-2 focus:ring-primary/30"
+            className="rounded-lg border border-gray-200 bg-white shadow-sm focus:outline-none focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
           >
             <div className="border-b border-gray-200 px-5 py-4">
               <h2 className="text-sm font-bold text-gray-900">Recent Assistance Requests</h2>
@@ -169,7 +169,7 @@ export default function DashboardPage() {
           <Link
             to="/admin/recommendations"
             aria-label="Open AI-generated recommendations"
-            className="rounded-lg border border-gray-200 bg-white shadow-sm focus:outline-none focus:ring-2 focus:ring-primary/30"
+            className="rounded-lg border border-gray-200 bg-white shadow-sm focus:outline-none focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
           >
             <div className="border-b border-gray-200 px-5 py-4">
               <h2 className="text-sm font-bold text-gray-900">Recent AI Recommendations</h2>

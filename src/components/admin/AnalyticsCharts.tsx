@@ -48,7 +48,7 @@ export function AnalyticsCharts({ requestStatusHref }: { requestStatusHref?: str
         <Link
           to={requestStatusHref}
           aria-label="Open assistance requests"
-          className="rounded-lg border border-gray-200 bg-white p-4 shadow-sm focus:outline-none focus:ring-2 focus:ring-primary/30 sm:p-5"
+          className="rounded-lg border border-gray-200 bg-white p-4 shadow-sm focus:outline-none focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary sm:p-5"
         >
           {requestStatusContent}
         </Link>
