@@ -37,8 +37,8 @@ export default function PeopleRequestsPage() {
   return (
     <>
       <AdminHeader title="People & Requests" searchPlaceholder="Search people and requests..." />
-      <main className="flex-1 overflow-y-scroll bg-gray-50 p-4 [scrollbar-gutter:stable] sm:p-5 md:p-6">
-        <section className="mx-auto max-w-[1500px]">
+      <main className="min-w-0 w-full flex-1 overflow-y-scroll bg-gray-50 p-4 [scrollbar-gutter:stable] sm:p-5 md:p-6">
+        <section className="mx-auto w-full min-w-0 max-w-[1500px]">
           <div className="mb-5">
             <h1 className="text-xl font-bold text-gray-950">People and request oversight</h1>
             <p className="mt-1 max-w-3xl text-sm leading-6 text-gray-500">
@@ -46,7 +46,7 @@ export default function PeopleRequestsPage() {
             </p>
           </div>
 
-          <div className="mb-5 grid gap-2 rounded-xl border border-gray-200 bg-white p-2 shadow-sm md:grid-cols-3">
+          <div className="mb-5 grid w-full min-w-0 gap-2 rounded-xl border border-gray-200 bg-white p-2 shadow-sm md:grid-cols-3">
             {views.map(({ id, label, description, icon: Icon }) => {
               const selected = active === id
               return (
@@ -76,9 +76,11 @@ export default function PeopleRequestsPage() {
             })}
           </div>
 
-          {active === 'users' ? <UsersPage embedded /> : null}
-          {active === 'access' ? <AccessRequestsPage embedded /> : null}
-          {active === 'assistance' ? <AssistanceRequestsPage embedded /> : null}
+          <div className="w-full min-w-0 max-w-full overflow-x-hidden">
+            {active === 'users' ? <UsersPage embedded /> : null}
+            {active === 'access' ? <AccessRequestsPage embedded /> : null}
+            {active === 'assistance' ? <AssistanceRequestsPage embedded /> : null}
+          </div>
         </section>
       </main>
     </>
