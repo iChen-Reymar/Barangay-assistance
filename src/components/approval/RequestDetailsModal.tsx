@@ -5,11 +5,13 @@ import type {
   QualificationStatus,
   ReviewableAssistanceItem,
 } from '../../types/approval'
+import type { GeneratedAssistanceRow } from '../../services/aiProcessing'
 
 interface RequestDetailsModalProps {
   open: boolean
   onClose: () => void
   item: ReviewableAssistanceItem | null
+  generatedRows?: GeneratedAssistanceRow[]
   canVerify?: boolean
   onVerifyDocument?: (documentId: string, status: DocumentStatus) => void
   onVerifyQualification?: (checkId: string, status: QualificationStatus, notes?: string) => void
@@ -19,6 +21,7 @@ export function RequestDetailsModal({
   open,
   onClose,
   item,
+  generatedRows,
   canVerify = false,
   onVerifyDocument,
   onVerifyQualification,
@@ -34,6 +37,7 @@ export function RequestDetailsModal({
     >
       <RequestDetailsPanel
         item={item}
+        generatedRows={generatedRows}
         canVerify={canVerify}
         onVerifyDocument={onVerifyDocument}
         onVerifyQualification={onVerifyQualification}

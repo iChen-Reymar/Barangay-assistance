@@ -22,6 +22,7 @@ import type { RequestStatus } from '../../data/mockData'
 import { useAuth } from '../../context/useAuth'
 import { getInitials } from '../../utils/userDisplay'
 import { downloadCsv } from '../../utils/csvExport'
+import { getGeneratedAssistanceList, subscribeGeneratedAssistanceList } from '../../services/aiProcessing'
 
 function statusVariant(status: RequestStatus) {
   if (status === 'APPROVED' || status === 'LIST GENERATED') return 'success'
@@ -39,11 +40,19 @@ export default function StaffAssistanceRequestsPage() {
   const initials = getInitials(displayName)
 
   const [items, setItems] = useState<ReviewableAssistanceItem[]>(() => getAssistanceItems())
+  const [generatedRows, setGeneratedRows] = useState(() => getGeneratedAssistanceList())
   const [activeTab, setActiveTab] = useState<'All' | RequestStatus>('All')
   const [viewItem, setViewItem] = useState<ReviewableAssistanceItem | null>(null)
   const [search, setSearch] = useState('')
 
-  useEffect(() => subscribeDecisionStorage(() => setItems(getAssistanceItems())), [])
+  useEffect(() => {
+    const stopRequests = subscribeDecisionStorage(() => setItems(getAssistanceItems()))
+    const stopGenerated = subscribeGeneratedAssistanceList(() => setGeneratedRows(getGeneratedAssistanceList()))
+    return () => {
+      stopRequests()
+      stopGenerated()
+    }
+  }, [])
 
   const filtered = useMemo(() => {
     const query = search.trim().toLowerCase()
@@ -169,6 +178,7 @@ export default function StaffAssistanceRequestsPage() {
         open={!!viewItem}
         onClose={() => setViewItem(null)}
         item={viewItem}
+        generatedRows={viewItem ? generatedRows.filter((row) => row.requestId === viewItem.id) : []}
         canVerify
         onVerifyDocument={handleVerifyDocument}
         onVerifyQualification={handleVerifyQualification}

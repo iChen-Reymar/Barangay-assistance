@@ -25,9 +25,11 @@ import type {
   QualificationStatus,
   ReviewableAssistanceItem,
 } from '../../types/approval'
+import type { GeneratedAssistanceRow } from '../../services/aiProcessing'
 
 interface RequestDetailsPanelProps {
   item: ReviewableAssistanceItem
+  generatedRows?: GeneratedAssistanceRow[]
   canVerify?: boolean
   onVerifyDocument?: (documentId: string, status: DocumentStatus) => void
   onVerifyQualification?: (checkId: string, status: QualificationStatus, notes?: string) => void
@@ -59,6 +61,7 @@ function qualStatusLabel(status: QualificationStatus) {
 
 export function RequestDetailsPanel({
   item,
+  generatedRows,
   canVerify = false,
   onVerifyDocument,
   onVerifyQualification,
@@ -143,9 +146,10 @@ export function RequestDetailsPanel({
         ))}
       </div>
 
-      {activeTab === 'Details' && details && (
+      {activeTab === 'Details' && (
         <div className="space-y-4">
-          <section>
+          {details ? (
+            <section>
             <h4 className="mb-3 flex items-center gap-2 text-sm font-bold text-gray-900">
               <FileText className="h-4 w-4 text-primary" />
               Full Request Details
@@ -208,7 +212,12 @@ export function RequestDetailsPanel({
                 <dd className="mt-0.5 text-gray-700">{details.supportingInfo}</dd>
               </div>
             </dl>
-          </section>
+            </section>
+          ) : (
+            <p className="rounded-lg border border-gray-100 bg-gray-50 p-4 text-sm text-gray-500">
+              No additional request details were recorded.
+            </p>
+          )}
 
           {item.description && (
             <section className="rounded-lg border border-green-100 bg-green-50 p-4">
@@ -218,6 +227,57 @@ export function RequestDetailsPanel({
                 <p className="mt-2 text-xs text-green-700">
                   Previous Assistance: {item.previousAssistance}
                 </p>
+              )}
+            </section>
+          )}
+
+          {generatedRows !== undefined && item.status === 'LIST GENERATED' && (
+            <section>
+              <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+                <h4 className="flex items-center gap-2 text-sm font-bold text-gray-900">
+                  <CheckCircle className="h-4 w-4 text-primary" />
+                  Generated Beneficiary List
+                </h4>
+                <Badge variant="success">
+                  {`${generatedRows.length} ${generatedRows.length === 1 ? 'beneficiary' : 'beneficiaries'}`}
+                </Badge>
+              </div>
+              {generatedRows.length === 0 ? (
+                <p className="rounded-lg border border-gray-100 bg-gray-50 p-4 text-sm text-gray-500">
+                  No request-linked generated beneficiaries were found for this list.
+                </p>
+              ) : (
+                <div className="overflow-x-auto rounded-lg border border-gray-200">
+                  <table className="w-full min-w-[640px] text-sm">
+                    <thead>
+                      <tr className="border-b border-gray-200 bg-gray-50 text-left text-[10px] font-semibold uppercase text-gray-500">
+                        <th className="px-3 py-2.5">Rank</th>
+                        <th className="px-3 py-2.5">Beneficiary</th>
+                        <th className="px-3 py-2.5">V-Score</th>
+                        <th className="px-3 py-2.5">Classification</th>
+                        <th className="px-3 py-2.5">Program</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {[...generatedRows]
+                        .sort((left, right) => left.rank - right.rank)
+                        .map((row) => (
+                          <tr key={row.id} className="border-b border-gray-100 last:border-b-0">
+                            <td className="px-3 py-3 font-semibold text-gray-700">#{row.rank}</td>
+                            <td className="px-3 py-3">
+                              <p className="font-medium text-gray-900">{row.name}</p>
+                              <p className="text-xs text-gray-500">{row.association}</p>
+                            </td>
+                            <td className="px-3 py-3 font-semibold text-gray-900">{row.score}/100</td>
+                            <td className="px-3 py-3">
+                              <VulnerabilityBadge level={row.classification} />
+                            </td>
+                            <td className="px-3 py-3 text-gray-700">{row.program}</td>
+                          </tr>
+                        ))}
+                    </tbody>
+                  </table>
+                </div>
               )}
             </section>
           )}
