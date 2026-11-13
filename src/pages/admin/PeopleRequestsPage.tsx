@@ -37,8 +37,8 @@ export default function PeopleRequestsPage() {
   return (
     <>
       <AdminHeader title="People & Requests" searchPlaceholder="Search people and requests..." />
-      <main className="min-w-0 w-full flex-1 overflow-y-scroll bg-gray-50 p-4 [scrollbar-gutter:stable] sm:p-5 md:p-6">
-        <section className="mx-auto w-full min-w-0 max-w-[1500px]">
+      <main className="min-w-0 w-full flex-1 overflow-x-hidden overflow-y-scroll bg-gray-50 p-4 [scrollbar-gutter:stable] sm:p-5 md:p-6">
+        <section className="w-full min-w-0">
           <div className="mb-5">
             <h1 className="text-xl font-bold text-gray-950">People and request oversight</h1>
             <p className="mt-1 max-w-3xl text-sm leading-6 text-gray-500">
