@@ -6,7 +6,6 @@ import {
   getDistributionBeneficiaryTotal,
   getDistributionByAssociationChartData,
   getDistributionStatusChartData,
-  getProgramMatchChartData,
   getRequestStatusChartData,
   getRequestStatusTotal,
 } from '../../services/analyticsData'
@@ -23,7 +22,6 @@ export function AnalyticsCharts({ requestStatusHref }: { requestStatusHref?: str
   }, [])
 
   const requestStatus = getRequestStatusChartData()
-  const programMatch = getProgramMatchChartData()
   const distributionStatus = getDistributionStatusChartData()
   const distributionByAssociation = getDistributionByAssociationChartData()
   const requestStatusContent = (
@@ -43,7 +41,7 @@ export function AnalyticsCharts({ requestStatusHref }: { requestStatusHref?: str
   )
 
   return (
-    <div className="grid gap-4 sm:gap-6 lg:grid-cols-3">
+    <div className="grid gap-4 sm:gap-6 lg:grid-cols-2">
       {requestStatusHref ? (
         <Link
           to={requestStatusHref}
@@ -57,16 +55,6 @@ export function AnalyticsCharts({ requestStatusHref }: { requestStatusHref?: str
           {requestStatusContent}
         </div>
       )}
-
-      <div className="rounded-lg border border-gray-200 bg-white p-4 shadow-sm sm:p-5">
-        <div className="mb-4">
-          <h2 className="text-sm font-bold text-gray-900">Program Match</h2>
-          <p className="mt-0.5 text-xs text-gray-500">
-            Top AI-matched programs ranked by vulnerability match score.
-          </p>
-        </div>
-        <HorizontalBarChart items={programMatch} maxValue={100} />
-      </div>
 
       <div className="rounded-lg border border-gray-200 bg-white p-4 shadow-sm sm:p-5">
         <div className="mb-4">
