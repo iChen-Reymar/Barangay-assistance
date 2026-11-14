@@ -291,15 +291,15 @@ export default function UsersPage({ embedded = false }: { embedded?: boolean }) 
       : canEmailReset ? 'Send a secure password reset email' : 'This username does not have a deliverable email address'
 
     return (
-      <div className={`flex flex-wrap gap-2 ${mobile ? 'w-full' : ''}`}>
-        <Button size="sm" variant="outline" className={mobile ? 'flex-1' : ''} onClick={() => openEdit(account)}>
+      <div className={mobile ? 'flex w-full flex-wrap gap-2' : 'inline-flex flex-nowrap items-center gap-2 whitespace-nowrap'}>
+        <Button size="sm" variant="outline" className={mobile ? 'min-w-24 flex-1' : 'shrink-0'} onClick={() => openEdit(account)}>
           <Pencil className="h-3.5 w-3.5" />
           Edit
         </Button>
         <Button
           size="sm"
           variant="outline"
-          className={mobile ? 'flex-1' : ''}
+          className={mobile ? 'min-w-40 flex-[2]' : 'shrink-0'}
           disabled={resetDisabled}
           title={resetTitle}
           onClick={() => openPasswordReset(account)}
@@ -311,7 +311,7 @@ export default function UsersPage({ embedded = false }: { embedded?: boolean }) 
           <Button
             size="sm"
             variant="outline"
-            className="border-red-200 text-red-600 hover:bg-red-50"
+            className={`shrink-0 border-red-200 text-red-600 hover:bg-red-50 ${mobile ? 'px-3' : ''}`}
             disabled={isSelf}
             title={isSelf ? 'You cannot remove your own account' : `Remove ${account.fullName}`}
             aria-label={`Remove ${account.fullName}`}
@@ -401,7 +401,7 @@ export default function UsersPage({ embedded = false }: { embedded?: boolean }) 
           </div>
 
           <div className="hidden overflow-x-auto md:block">
-          <table className="w-full min-w-[1050px] text-sm">
+          <table className="w-full min-w-[1180px] text-sm">
             <thead>
               <tr className="border-b border-gray-100 bg-white text-left text-xs font-semibold text-gray-500">
                 <th className="px-4 py-3">Name</th>
@@ -409,7 +409,7 @@ export default function UsersPage({ embedded = false }: { embedded?: boolean }) 
                 <th className="px-4 py-3">Permission</th>
                 <th className="px-4 py-3">Association</th>
                 <th className="px-4 py-3">Status</th>
-                <th className="px-4 py-3">Actions</th>
+                <th className="w-[290px] min-w-[290px] px-4 py-3">Actions</th>
               </tr>
             </thead>
             <tbody>
@@ -454,7 +454,7 @@ export default function UsersPage({ embedded = false }: { embedded?: boolean }) 
                         {account.mustChangePassword ? <Badge variant="warning">PASSWORD CHANGE DUE</Badge> : null}
                       </div>
                     </td>
-                    <td className="px-4 py-3">
+                    <td className="w-[290px] min-w-[290px] px-4 py-3 align-middle">
                       {accountActions(account)}
                     </td>
                   </tr>
