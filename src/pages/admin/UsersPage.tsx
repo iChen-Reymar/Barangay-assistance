@@ -342,9 +342,7 @@ export default function UsersPage({ embedded = false }: { embedded?: boolean }) 
                 </span>
               </div>
               <p className="mt-1 max-w-2xl text-sm leading-6 text-gray-500">
-                {authAdministration
-                  ? 'Manage account details, permissions, associations, and secure login recovery.'
-                  : 'Manage profile details, permissions, and association access. Login credentials remain protected by Supabase Auth.'}
+                Manage user profiles, permissions, association access, and password resets.
               </p>
             </div>
           </div>
