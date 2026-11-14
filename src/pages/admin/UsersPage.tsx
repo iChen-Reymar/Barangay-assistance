@@ -305,7 +305,7 @@ export default function UsersPage({ embedded = false }: { embedded?: boolean }) 
           onClick={() => openPasswordReset(account)}
         >
           <KeyRound className="h-3.5 w-3.5" />
-          {authAdministration ? 'Temporary password' : 'Reset password'}
+          Reset password
         </Button>
         {authAdministration ? (
           <Button
@@ -608,7 +608,7 @@ export default function UsersPage({ embedded = false }: { embedded?: boolean }) 
           </label>
           <div className="flex gap-3 rounded-lg border border-gray-200 bg-gray-50 px-3 py-3 text-xs leading-5 text-gray-600">
             <KeyRound className="mt-0.5 h-4 w-4 shrink-0 text-gray-400" />
-            <span>Use the Temporary password action in the account list for secure login recovery.</span>
+            <span>Use the Reset password action in the account list for secure login recovery.</span>
           </div>
         </form>
       </Modal>
@@ -616,7 +616,7 @@ export default function UsersPage({ embedded = false }: { embedded?: boolean }) 
       <Modal
         open={resetTarget !== null}
         onClose={closePasswordReset}
-        title={authAdministration ? 'Create temporary password' : 'Send password reset'}
+        title="Reset password"
         footer={
           <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
             {temporaryPassword ? (
@@ -628,7 +628,7 @@ export default function UsersPage({ embedded = false }: { embedded?: boolean }) 
                 <Button variant="outline" disabled={saving} onClick={closePasswordReset}>Cancel</Button>
               <Button disabled={saving} onClick={authAdministration ? handleTemporaryPasswordReset : handlePasswordReset}>
                   {authAdministration ? <KeyRound className="h-4 w-4" /> : <Mail className="h-4 w-4" />}
-                  {saving ? 'Processing...' : authAdministration ? 'Generate temporary password' : 'Send reset link'}
+                  {saving ? 'Processing...' : authAdministration ? 'Reset password' : 'Send reset link'}
               </Button>
               </>
             )}
