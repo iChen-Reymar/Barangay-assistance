@@ -23,6 +23,7 @@ const eligibility = await import('../src/services/assistanceListEligibility.ts')
 const associationNotifications = await import('../src/services/associationNotificationStorage.ts')
 const housingCondition = await import('../src/utils/housingCondition.ts')
 const syncRetryPolicy = await import('../src/services/syncRetryPolicy.ts')
+const aidRecords = await import('../src/services/aidRecordStorage.ts')
 
 test('non-remembered Supabase sessions stay in session storage', () => {
   persistence.setRememberSession(false)
@@ -64,6 +65,31 @@ test('synchronization retries only transient failures', () => {
   assert.equal(syncRetryPolicy.shouldRetrySynchronization(401), false)
   assert.equal(syncRetryPolicy.shouldRetrySynchronization(403), false)
   assert.equal(syncRetryPolicy.shouldRetrySynchronization(404), false)
+})
+
+test('bulk aid records create one history row per member and skip duplicates', () => {
+  localStorage.removeItem('barangay_aid_records')
+  const base = {
+    associationName: 'ERPAT',
+    program: 'Rice Assistance',
+    dateReceived: '2026-11-15',
+    quantity: '1 sack',
+    comments: '',
+    submittedBy: 'Association Head',
+  }
+  const first = aidRecords.submitAidRecords([
+    { ...base, memberId: 'member-1', memberName: 'Member One' },
+    { ...base, memberId: 'member-2', memberName: 'Member Two' },
+  ])
+  assert.equal(first.records.length, 2)
+  assert.equal(first.skipped.length, 0)
+
+  const repeated = aidRecords.submitAidRecords([
+    { ...base, memberId: 'member-1', memberName: 'Member One' },
+  ])
+  assert.equal(repeated.records.length, 0)
+  assert.equal(repeated.skipped.length, 1)
+  assert.equal(aidRecords.getAidRecords('ERPAT').length, 2)
 })
 
 test('legacy temporary housing values normalize to renter', () => {

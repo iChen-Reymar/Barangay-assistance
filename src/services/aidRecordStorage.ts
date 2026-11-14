@@ -17,6 +17,13 @@ export type AidRecord = {
   submittedAt: string
 }
 
+export type AidRecordInput = Omit<AidRecord, 'id' | 'submittedAt' | 'status'>
+
+export type AidRecordBatchResult = {
+  records: AidRecord[]
+  skipped: AidRecordInput[]
+}
+
 function readRecords(): AidRecord[] {
   const raw = localStorage.getItem(AID_RECORDS_KEY)
   if (!raw) return []
@@ -40,7 +47,39 @@ export function getAidRecords(associationName?: string): AidRecord[] {
   return records.filter((row) => row.associationName.trim().toLowerCase() === key)
 }
 
-export function submitAidRecord(input: Omit<AidRecord, 'id' | 'submittedAt' | 'status'>): AidRecord {
+function recordIdentity(record: Pick<AidRecord, 'associationName' | 'memberId' | 'program' | 'dateReceived'>) {
+  return [record.associationName, record.memberId, record.program, record.dateReceived]
+    .map((value) => value.trim().toLowerCase())
+    .join('|')
+}
+
+export function submitAidRecords(inputs: AidRecordInput[]): AidRecordBatchResult {
+  const existing = readRecords()
+  const identities = new Set(existing.map(recordIdentity))
+  const submittedAt = new Date().toISOString()
+  const records: AidRecord[] = []
+  const skipped: AidRecordInput[] = []
+
+  for (const input of inputs) {
+    const identity = recordIdentity(input)
+    if (identities.has(identity)) {
+      skipped.push(input)
+      continue
+    }
+    identities.add(identity)
+    records.push({
+      ...input,
+      id: crypto.randomUUID(),
+      status: 'RECEIVED',
+      submittedAt,
+    })
+  }
+
+  if (records.length > 0) writeRecords([...records, ...existing])
+  return { records, skipped }
+}
+
+export function submitAidRecord(input: AidRecordInput): AidRecord {
   const record: AidRecord = {
     ...input,
     id: crypto.randomUUID(),
