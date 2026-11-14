@@ -67,7 +67,7 @@ export function ApprovalDecisionModal({
     <Modal
       open={open}
       onClose={onClose}
-      title={`${decisionLabels[decisionType]} â€” ${itemTitle}`}
+      title={`${decisionLabels[decisionType]} — ${itemTitle}`}
       size="lg"
     >
       <form onSubmit={handleSubmit} className="space-y-4">

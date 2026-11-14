@@ -12,7 +12,7 @@ interface ProgramSettingsModalProps {
 }
 
 function formatCurrency(amount?: number) {
-  if (amount === undefined) return 'â€”'
+  if (amount === undefined) return '—'
   return `₱ ${amount.toLocaleString('en-PH', { minimumFractionDigits: 2 })}`
 }
 
@@ -45,7 +45,7 @@ export function ProgramSettingsModal({
         <div className="rounded-lg border border-gray-100 bg-gray-50 px-4 py-3">
           <p className="text-sm font-semibold text-gray-900">{selected.name}</p>
           <p className="text-xs text-gray-500">
-            {selected.category} Â· {selected.sponsoringAgency}
+            {selected.category} · {selected.sponsoringAgency}
           </p>
         </div>
 
@@ -72,7 +72,7 @@ export function ProgramSettingsModal({
           </div>
           <div>
             <dt className="text-[10px] font-semibold uppercase text-gray-400">Max Beneficiaries</dt>
-            <dd className="mt-0.5 text-gray-900">{selected.maxBeneficiaries ?? 'â€”'}</dd>
+            <dd className="mt-0.5 text-gray-900">{selected.maxBeneficiaries ?? '—'}</dd>
           </div>
           <div>
             <dt className="text-[10px] font-semibold uppercase text-gray-400">Start Date</dt>

@@ -68,7 +68,7 @@ function StaffRequestAccessForm() {
         <div className="relative flex flex-col justify-center bg-white px-8 py-16 lg:px-12 xl:px-20">
           <div className="mx-auto w-full max-w-lg text-center">
             <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-full bg-green-100 text-2xl text-green-600">
-              âœ“
+              ✓
             </div>
             <h2 className="mb-2 text-2xl font-bold text-gray-900">Request Submitted</h2>
             <p className="mb-6 text-sm text-gray-600">

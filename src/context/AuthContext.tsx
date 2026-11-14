@@ -174,10 +174,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           description: `Submitted access request for ${input.roleLabel} account.`,
           entityType: 'user',
           changes: buildChanges([
-            { key: 'email', label: 'Email', oldValue: 'â€”', newValue: input.email.trim() },
-            { key: 'role', label: 'Role', oldValue: 'â€”', newValue: input.roleLabel },
-            { key: 'department', label: 'Department', oldValue: 'â€”', newValue: formatDepartment(input.department) },
-            { key: 'status', label: 'Status', oldValue: 'â€”', newValue: 'PENDING' },
+            { key: 'email', label: 'Email', oldValue: '—', newValue: input.email.trim() },
+            { key: 'role', label: 'Role', oldValue: '—', newValue: input.roleLabel },
+            { key: 'department', label: 'Department', oldValue: '—', newValue: formatDepartment(input.department) },
+            { key: 'status', label: 'Status', oldValue: '—', newValue: 'PENDING' },
           ]),
         })
       }
@@ -201,15 +201,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             : 'Submitted Association Head registration.',
           entityType: 'user',
           changes: buildChanges([
-            { key: 'email', label: 'Email', oldValue: 'â€”', newValue: input.email.trim() },
-            { key: 'role', label: 'Role', oldValue: 'â€”', newValue: 'Association Head' },
+            { key: 'email', label: 'Email', oldValue: '—', newValue: input.email.trim() },
+            { key: 'role', label: 'Role', oldValue: '—', newValue: 'Association Head' },
             {
               key: 'association',
               label: 'Association',
-              oldValue: 'â€”',
+              oldValue: '—',
               newValue: input.associationName?.trim() || 'Assigned by administrator',
             },
-            { key: 'status', label: 'Status', oldValue: 'â€”', newValue: 'PENDING' },
+            { key: 'status', label: 'Status', oldValue: '—', newValue: 'PENDING' },
           ]),
         })
       }
@@ -244,8 +244,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         entityId: userId,
         changes: buildChanges([
           { key: 'status', label: 'Account Status', oldValue: 'PENDING', newValue: 'APPROVED' },
-          { key: 'notes', label: 'Decision Notes', oldValue: 'â€”', newValue: notes || 'â€”' },
-          { key: 'reviewedAt', label: 'Reviewed At', oldValue: 'â€”', newValue: new Date().toISOString() },
+          { key: 'notes', label: 'Decision Notes', oldValue: '—', newValue: notes || '—' },
+          { key: 'reviewedAt', label: 'Reviewed At', oldValue: '—', newValue: new Date().toISOString() },
         ]),
       })
     },
@@ -274,8 +274,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         entityId: userId,
         changes: buildChanges([
           { key: 'status', label: 'Account Status', oldValue: 'PENDING', newValue: 'REJECTED' },
-          { key: 'notes', label: 'Decision Notes', oldValue: 'â€”', newValue: notes },
-          { key: 'reviewedAt', label: 'Reviewed At', oldValue: 'â€”', newValue: new Date().toISOString() },
+          { key: 'notes', label: 'Decision Notes', oldValue: '—', newValue: notes },
+          { key: 'reviewedAt', label: 'Reviewed At', oldValue: '—', newValue: new Date().toISOString() },
         ]),
       })
     },

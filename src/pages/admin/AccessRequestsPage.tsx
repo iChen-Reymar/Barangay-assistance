@@ -37,7 +37,7 @@ export default function AccessRequestsPage({ embedded = false }: { embedded?: bo
       key: 'associationName',
       header: 'Association',
       hideOnMobile: true,
-      render: (r) => r.associationName ?? 'â€”',
+      render: (r) => r.associationName ?? '—',
     },
     { key: 'position', header: 'Position', hideOnMobile: true },
     {
@@ -142,7 +142,7 @@ export default function AccessRequestsPage({ embedded = false }: { embedded?: bo
         itemTitle={decisionModal?.user.fullName ?? ''}
         itemSubtitle={
           decisionModal?.user.associationName
-            ? `${decisionModal.user.email} Â· ${decisionModal.user.associationName}`
+            ? `${decisionModal.user.email} · ${decisionModal.user.associationName}`
             : decisionModal?.user.email
         }
         currentStatus="PENDING"
@@ -156,7 +156,7 @@ export default function AccessRequestsPage({ embedded = false }: { embedded?: bo
       <Modal
         open={!!historyUser}
         onClose={() => setHistoryUser(null)}
-        title={historyUser ? `Decision Record â€” ${historyUser.fullName}` : 'Decision Record'}
+        title={historyUser ? `Decision Record — ${historyUser.fullName}` : 'Decision Record'}
       >
         {historyUser && (
           <DecisionTimeline

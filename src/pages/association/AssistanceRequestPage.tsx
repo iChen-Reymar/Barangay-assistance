@@ -51,8 +51,8 @@ export default function AssistanceRequestPage() {
       entityType: 'assistance_request',
       entityId: submittedRequest.id,
       changes: buildChanges([
-        { key: 'status', label: 'Status', oldValue: 'â€”', newValue: 'PENDING' },
-        { key: 'program', label: 'Program', oldValue: 'â€”', newValue: program },
+        { key: 'status', label: 'Status', oldValue: '—', newValue: 'PENDING' },
+        { key: 'program', label: 'Program', oldValue: '—', newValue: program },
       ]),
     })
     setSubmitted(true)

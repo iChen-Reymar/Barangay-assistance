@@ -162,11 +162,11 @@ export default function AssociationsPage() {
       entityType: 'association',
       entityId: newAssociation.id,
       changes: buildChanges([
-        { key: 'name', label: 'Association Name', oldValue: 'â€”', newValue: input.name },
-        { key: 'type', label: 'Type', oldValue: 'â€”', newValue: input.type },
-        { key: 'members', label: 'Total Members', oldValue: 'â€”', newValue: input.members },
-        { key: 'status', label: 'Status', oldValue: 'â€”', newValue: 'ACTIVE' },
-        { key: 'contactPerson', label: 'Association Head', oldValue: 'â€”', newValue: input.contactPerson },
+        { key: 'name', label: 'Association Name', oldValue: '—', newValue: input.name },
+        { key: 'type', label: 'Type', oldValue: '—', newValue: input.type },
+        { key: 'members', label: 'Total Members', oldValue: '—', newValue: input.members },
+        { key: 'status', label: 'Status', oldValue: '—', newValue: 'ACTIVE' },
+        { key: 'contactPerson', label: 'Association Head', oldValue: '—', newValue: input.contactPerson },
       ]),
     })
     assignHead(headUserId, input.name, input.type)

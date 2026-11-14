@@ -141,10 +141,10 @@ export default function BeneficiariesPage() {
       entityType: 'beneficiary',
       entityId: created.id,
       changes: buildChanges([
-        { key: 'name', label: 'Name', oldValue: 'â€”', newValue: created.name },
-        { key: 'association', label: 'Association', oldValue: 'â€”', newValue: created.association },
-        { key: 'status', label: 'Status', oldValue: 'â€”', newValue: created.status },
-        { key: 'vulnerability', label: 'Vulnerability', oldValue: 'â€”', newValue: created.vulnerability },
+        { key: 'name', label: 'Name', oldValue: '—', newValue: created.name },
+        { key: 'association', label: 'Association', oldValue: '—', newValue: created.association },
+        { key: 'status', label: 'Status', oldValue: '—', newValue: created.status },
+        { key: 'vulnerability', label: 'Vulnerability', oldValue: '—', newValue: created.vulnerability },
       ]),
     })
   }

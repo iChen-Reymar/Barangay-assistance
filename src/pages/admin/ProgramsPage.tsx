@@ -30,7 +30,7 @@ function formatDate(date: Date) {
 }
 
 function formatCurrency(amount?: number) {
-  if (amount === undefined) return 'â€”'
+  if (amount === undefined) return '—'
   return `₱ ${amount.toLocaleString('en-PH', { minimumFractionDigits: 2 })}`
 }
 
@@ -149,9 +149,9 @@ export default function ProgramsPage() {
       entityType: 'assistance_program',
       entityId: newProgram.id,
       changes: buildChanges([
-        { key: 'name', label: 'Program Name', oldValue: 'â€”', newValue: input.name },
-        { key: 'category', label: 'Category', oldValue: 'â€”', newValue: input.category },
-        { key: 'status', label: 'Status', oldValue: 'â€”', newValue: 'ACTIVE' },
+        { key: 'name', label: 'Program Name', oldValue: '—', newValue: input.name },
+        { key: 'category', label: 'Category', oldValue: '—', newValue: input.category },
+        { key: 'status', label: 'Status', oldValue: '—', newValue: 'ACTIVE' },
       ]),
     })
   }
@@ -262,7 +262,7 @@ export default function ProgramsPage() {
                 key: 'maxBeneficiaries',
                 header: 'Max Beneficiaries',
                 mobileLabel: 'Capacity',
-                render: (row) => row.maxBeneficiaries ?? 'â€”',
+                render: (row) => row.maxBeneficiaries ?? '—',
               },
               {
                 key: 'period',

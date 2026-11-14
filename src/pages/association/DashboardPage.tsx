@@ -115,7 +115,7 @@ export default function AssociationDashboardPage() {
                       <p className="font-medium text-gray-900">{req.requestType}</p>
                       <p className="text-xs text-gray-500">
                         {req.date}
-                        {req.details?.memberCount ? ` Â· ${req.details.memberCount} members` : ''}
+                        {req.details?.memberCount ? ` · ${req.details.memberCount} members` : ''}
                       </p>
                     </div>
                     <Badge variant={statusVariant(req.status)}>{req.status}</Badge>
@@ -150,7 +150,7 @@ export default function AssociationDashboardPage() {
                   <p className="font-bold text-green-800">{item.requestType}</p>
                    <p className="mt-1 text-xs text-gray-500">Finalized: {approvedOn(item)}</p>
                   <p className="text-sm text-gray-600">
-                    {item.details?.memberCount ?? 'â€”'} members
+                    {item.details?.memberCount ?? '—'} members
                   </p>
                   <div className="mt-2">
                      <Badge variant="success">{item.status}</Badge>
