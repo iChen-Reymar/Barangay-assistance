@@ -34,4 +34,16 @@ export const programCategories: ProgramCategory[] = [
 
 export const programAgencies = ['DSWD', 'DA', 'BFAR', 'Barangay', 'DOH', 'NFA']
 
+export const eligibilityCriteriaOptions = [
+  'Verified low-income households',
+  'Households with senior citizens',
+  'Households with persons with disabilities',
+  'Large households with six or more members',
+  'Disaster-affected households',
+  'Verified farmers and agricultural workers',
+  'Verified fisherfolk households',
+  'Unemployed or underemployed residents',
+  'Verified vulnerable households based on the barangay assessment',
+] as const
+
 export const seedPrograms: AssistanceProgram[] = []

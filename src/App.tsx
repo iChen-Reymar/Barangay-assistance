@@ -112,6 +112,7 @@ export default function App() {
           <Route path="approved-requests" element={<StaffApprovedRequestsPage />} />
           <Route path="status-reports" element={<Navigate to="/staff" replace />} />
           <Route path="aid-records" element={<StaffAidRecordsPage />} />
+          <Route path="profile" element={<Navigate to="/staff/settings" replace />} />
           <Route path="settings" element={<StaffSettingsPage />} />
         </Route>
 

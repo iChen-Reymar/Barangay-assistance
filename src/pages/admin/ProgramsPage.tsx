@@ -29,6 +29,12 @@ function formatDate(date: Date) {
   return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
 }
 
+function formatProgramDate(value: string) {
+  const isoDate = /^\d{4}-\d{2}-\d{2}$/.test(value) ? `${value}T00:00:00` : value
+  const date = new Date(isoDate)
+  return Number.isNaN(date.getTime()) ? value : formatDate(date)
+}
+
 function formatCurrency(amount?: number) {
   if (amount === undefined) return '—'
   return `₱ ${amount.toLocaleString('en-PH', { minimumFractionDigits: 2 })}`
@@ -270,8 +276,8 @@ export default function ProgramsPage() {
                 mobileLabel: 'Period',
                 render: (row) => (
                   <span className="text-gray-600">
-                    {row.startDate}
-                    {row.endDate ? ` - ${row.endDate}` : ''}
+                    {formatProgramDate(row.startDate)}
+                    {row.endDate ? ` - ${formatProgramDate(row.endDate)}` : ''}
                   </span>
                 ),
               },

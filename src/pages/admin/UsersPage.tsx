@@ -31,6 +31,7 @@ import {
 } from '../../services/authStorage'
 import type { StoredUser, UserRole } from '../../types/auth'
 import { recoveryEmailError } from '../../services/passwordRecovery'
+import { isValidContactNumber, sanitizeContactNumber } from '../../utils/contactNumber'
 
 const roleOptions: { value: UserRole; label: string }[] = [
   { value: 'admin', label: 'Administrator' },
@@ -136,6 +137,10 @@ export default function UsersPage({ embedded = false }: { embedded?: boolean }) 
   async function handleCreate(event: React.FormEvent) {
     event.preventDefault()
     setError('')
+    if (!isValidContactNumber(form.contactNumber)) {
+      setError('Enter a valid contact number using 7 to 15 digits only.')
+      return
+    }
     setSaving(true)
     const result = await createManagedUser(form)
     setSaving(false)
@@ -548,7 +553,17 @@ export default function UsersPage({ embedded = false }: { embedded?: boolean }) 
           </label>
           <label className="block text-sm">
             <span className="mb-1 block text-xs font-semibold uppercase text-gray-500">Contact number</span>
-            <input required value={form.contactNumber} onChange={(event) => setForm({ ...form, contactNumber: event.target.value })} className={fieldClass} />
+            <input
+              required
+              type="tel"
+              inputMode="numeric"
+              pattern="[0-9]{7,15}"
+              minLength={7}
+              maxLength={15}
+              value={form.contactNumber}
+              onChange={(event) => setForm({ ...form, contactNumber: sanitizeContactNumber(event.target.value) })}
+              className={fieldClass}
+            />
           </label>
           <label className="block text-sm">
             <span className="mb-1 block text-xs font-semibold uppercase text-gray-500">Permission</span>

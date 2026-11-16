@@ -45,6 +45,7 @@ export function UserProfileSection({
         <div>
           <h2 className="text-lg font-bold text-gray-900">{profile.fullName}</h2>
           <p className="text-sm text-gray-500">@{usernameFromEmail(profile.email)}</p>
+          {showRoleBadge && <Badge variant="success">{profile.roleLabel}</Badge>}
         </div>
       </div>
     )

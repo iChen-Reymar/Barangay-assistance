@@ -1,4 +1,5 @@
-import { useEffect, useMemo, useState } from 'react'
+import { Fragment, useEffect, useMemo, useState } from 'react'
+import { ChevronDown, ChevronUp } from 'lucide-react'
 import { Badge } from '../ui/Badge'
 import type { VulnerabilityLevel } from '../../data/associationMockData'
 import {
@@ -36,6 +37,7 @@ export function AiRecommendationBoards({
   const [rows, setRows] = useState<GeneratedAssistanceRow[]>(() => getGeneratedAssistanceList())
   const [requests, setRequests] = useState<ReviewableAssistanceItem[]>(() => getAssistanceItems())
   const [openKey, setOpenKey] = useState<string | null>(null)
+  const [expandedMemberId, setExpandedMemberId] = useState<string | null>(null)
 
   useEffect(() => {
     const refreshRows = () => setRows(getGeneratedAssistanceList())
@@ -101,7 +103,10 @@ export function AiRecommendationBoards({
             <button
               key={key}
               type="button"
-              onClick={() => setOpenKey(key)}
+              onClick={() => {
+                setOpenKey(key)
+                setExpandedMemberId(null)
+              }}
               className="flex w-full items-center justify-between gap-4 border-b border-gray-100 px-5 py-4 text-left last:border-b-0 hover:bg-gray-50"
             >
               <span>
@@ -133,7 +138,10 @@ export function AiRecommendationBoards({
           {compact ? (
             <button
               type="button"
-              onClick={() => setOpenKey(null)}
+              onClick={() => {
+                setOpenKey(null)
+                setExpandedMemberId(null)
+              }}
               className="mb-4 text-sm font-semibold text-green-700 hover:underline"
             >
               Back to list
@@ -162,26 +170,80 @@ export function AiRecommendationBoards({
                   <th className="px-4 py-3">Score</th>
                   <th className="px-4 py-3">Classification</th>
                   <th className="px-4 py-3">Why</th>
+                  <th className="px-4 py-3 text-right">Details</th>
                 </tr>
               </thead>
               <tbody>
-                {group.members.map((member) => (
-                  <tr key={member.id} className="border-b border-gray-50">
-                    <td className="px-4 py-3 font-bold text-gray-900">{member.rank}</td>
-                    <td className="px-4 py-3 font-medium text-gray-900">{member.name}</td>
-                    <td className="px-4 py-3">
-                      <span className={member.score >= 80 ? 'font-semibold text-red-500' : member.score >= 50 ? 'text-orange-500' : 'text-green-600'}>
-                        {member.score} / 100
-                      </span>
-                    </td>
-                    <td className="px-4 py-3">
-                      <Badge variant={vulnerabilityVariant(member.classification)}>{member.classification}</Badge>
-                    </td>
-                    <td className="max-w-xs px-4 py-3 text-gray-600">
-                      <span className="line-clamp-2" title={member.reason}>{member.reason}</span>
-                    </td>
-                  </tr>
-                ))}
+                {group.members.map((member) => {
+                  const expanded = expandedMemberId === member.id
+                  return (
+                    <Fragment key={member.id}>
+                      <tr className="border-b border-gray-50">
+                        <td className="px-4 py-3 font-bold text-gray-900">{member.rank}</td>
+                        <td className="px-4 py-3 font-medium text-gray-900">{member.name}</td>
+                        <td className="px-4 py-3">
+                          <span className={member.score >= 80 ? 'font-semibold text-red-500' : member.score >= 50 ? 'text-orange-500' : 'text-green-600'}>
+                            {member.score} / 100
+                          </span>
+                        </td>
+                        <td className="px-4 py-3">
+                          <Badge variant={vulnerabilityVariant(member.classification)}>{member.classification}</Badge>
+                        </td>
+                        <td className="max-w-xs px-4 py-3 text-gray-600">
+                          <span className="line-clamp-2" title={member.reason}>{member.reason}</span>
+                        </td>
+                        <td className="px-4 py-3 text-right">
+                          <button
+                            type="button"
+                            onClick={() => setExpandedMemberId(expanded ? null : member.id)}
+                            className="inline-flex items-center gap-1 whitespace-nowrap rounded-lg px-2 py-1 text-sm font-semibold text-green-700 hover:bg-green-50"
+                            aria-expanded={expanded}
+                          >
+                            {expanded ? 'Hide' : 'View'}
+                            {expanded ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+                          </button>
+                        </td>
+                      </tr>
+                      {expanded ? (
+                        <tr className="border-b border-gray-100 bg-green-50/40">
+                          <td colSpan={6} className="px-4 py-4">
+                            <div className="grid gap-4 text-sm md:grid-cols-3">
+                              <div className="md:col-span-2">
+                                <p className="text-xs font-semibold uppercase text-gray-500">Recommendation explanation</p>
+                                <p className="mt-1 leading-6 text-gray-700">{member.reason || 'No explanation was provided.'}</p>
+                                {member.factors?.length ? (
+                                  <div className="mt-3 flex flex-wrap gap-2">
+                                    {member.factors.map((factor) => (
+                                      <span key={factor} className="rounded-full bg-white px-2.5 py-1 text-xs text-gray-700 shadow-sm">{factor}</span>
+                                    ))}
+                                  </div>
+                                ) : null}
+                              </div>
+                              <dl className="grid grid-cols-2 gap-3 rounded-lg bg-white p-3">
+                                <div>
+                                  <dt className="text-xs text-gray-500">Decision tree</dt>
+                                  <dd className="mt-1 font-semibold text-gray-900">{member.decisionTreePrediction ?? '—'}</dd>
+                                </div>
+                                <div>
+                                  <dt className="text-xs text-gray-500">Logistic model</dt>
+                                  <dd className="mt-1 font-semibold text-gray-900">{member.logisticRegressionPrediction ?? '—'}</dd>
+                                </div>
+                                <div>
+                                  <dt className="text-xs text-gray-500">Model agreement</dt>
+                                  <dd className="mt-1 font-semibold text-gray-900">{member.modelAgreement === undefined ? '—' : member.modelAgreement ? 'Yes' : 'No'}</dd>
+                                </div>
+                                <div>
+                                  <dt className="text-xs text-gray-500">Verification</dt>
+                                  <dd className="mt-1 font-semibold text-gray-900">{member.verification}</dd>
+                                </div>
+                              </dl>
+                            </div>
+                          </td>
+                        </tr>
+                      ) : null}
+                    </Fragment>
+                  )
+                })}
               </tbody>
             </table>
           </div>

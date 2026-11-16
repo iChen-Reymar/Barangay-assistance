@@ -24,6 +24,7 @@ const associationNotifications = await import('../src/services/associationNotifi
 const housingCondition = await import('../src/utils/housingCondition.ts')
 const syncRetryPolicy = await import('../src/services/syncRetryPolicy.ts')
 const aidRecords = await import('../src/services/aidRecordStorage.ts')
+const contactNumber = await import('../src/utils/contactNumber.ts')
 
 test('non-remembered Supabase sessions stay in session storage', () => {
   persistence.setRememberSession(false)
@@ -90,6 +91,14 @@ test('bulk aid records create one history row per member and skip duplicates', (
   assert.equal(repeated.records.length, 0)
   assert.equal(repeated.skipped.length, 1)
   assert.equal(aidRecords.getAidRecords('ERPAT').length, 2)
+})
+
+test('contact numbers reject letters and enforce a reasonable digit length', () => {
+  assert.equal(contactNumber.sanitizeContactNumber('09ab17-123 4567'), '09171234567')
+  assert.equal(contactNumber.sanitizeContactNumber('12345678901234567890'), '123456789012345')
+  assert.equal(contactNumber.isValidContactNumber('09171234567'), true)
+  assert.equal(contactNumber.isValidContactNumber('12345'), false)
+  assert.equal(contactNumber.isValidContactNumber('0917ABC4567'), false)
 })
 
 test('legacy temporary housing values normalize to renter', () => {

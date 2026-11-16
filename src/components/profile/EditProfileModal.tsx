@@ -4,6 +4,7 @@ import { Modal } from '../ui/Modal'
 import { Button } from '../ui/Button'
 import { departmentOptions } from '../../services/authStorage'
 import type { ProfileUpdateInput, StoredUser } from '../../types/auth'
+import { isValidContactNumber, sanitizeContactNumber } from '../../utils/contactNumber'
 
 interface EditProfileModalProps {
   open: boolean
@@ -36,6 +37,10 @@ export function EditProfileModal({ open, onClose, profile, onSave }: EditProfile
   function handleSubmit(e: FormEvent) {
     e.preventDefault()
     setError('')
+    if (!isValidContactNumber(contactNumber)) {
+      setError('Enter a valid contact number using 7 to 15 digits only.')
+      return
+    }
     const result = onSave({
       firstName,
       lastName,
@@ -105,8 +110,12 @@ export function EditProfileModal({ open, onClose, profile, onSave }: EditProfile
           <input
             required
             type="tel"
+            inputMode="numeric"
+            pattern="[0-9]{7,15}"
+            minLength={7}
+            maxLength={15}
             value={contactNumber}
-            onChange={(e) => setContactNumber(e.target.value)}
+            onChange={(e) => setContactNumber(sanitizeContactNumber(e.target.value))}
             className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
           />
         </div>

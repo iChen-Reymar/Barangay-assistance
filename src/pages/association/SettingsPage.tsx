@@ -42,10 +42,10 @@ export default function AssociationSettingsPage() {
             ))}
           </nav>
 
-          <div className="mx-auto w-full max-w-2xl space-y-6">
+          <div className="w-full max-w-5xl space-y-6">
             {activeTab === 'Profile' && (
-              <div className="rounded-lg border border-gray-200 bg-white p-6 shadow-sm">
-                <UserProfileSection profile={profile} layout="centered" showRoleBadge />
+                <div className="rounded-lg border border-gray-200 bg-white p-5 shadow-sm sm:p-6">
+                  <UserProfileSection profile={profile} showRoleBadge />
               </div>
             )}
             {activeTab === 'Privacy' && <PrivacyNoticePanel />}

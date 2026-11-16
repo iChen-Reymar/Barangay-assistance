@@ -3,6 +3,7 @@ import { authenticatedFetch } from './authenticatedFetch'
 import { clearRoleScopedCache, writeStoreWithoutSync } from './databaseSync'
 import { setRememberSession } from './sessionPersistence'
 import type { ReviewInput } from '../types/approval'
+import { isValidContactNumber } from '../utils/contactNumber'
 import {
   roleLabelToRole,
   roleToDashboardPath,
@@ -60,6 +61,9 @@ export async function createManagedUser(input: {
 }): Promise<{ success: boolean; error?: string }> {
   if (input.password.length < 8) {
     return { success: false, error: 'Password must be at least 8 characters.' }
+  }
+  if (!isValidContactNumber(input.contactNumber)) {
+    return { success: false, error: 'Enter a valid contact number using 7 to 15 digits only.' }
   }
 
   const users = readUsers()
@@ -727,6 +731,9 @@ export function updateUserProfile(
   const index = users.findIndex((u) => u.id === userId)
   if (index === -1) {
     return { success: false, error: 'User not found.' }
+  }
+  if (!isValidContactNumber(input.contactNumber)) {
+    return { success: false, error: 'Enter a valid contact number using 7 to 15 digits only.' }
   }
 
   const email = input.email.trim().toLowerCase()

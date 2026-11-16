@@ -3,6 +3,7 @@ import { useResetWhenOpen } from '../../hooks/useResetWhenOpen'
 import { Modal } from '../ui/Modal'
 import { Button } from '../ui/Button'
 import {
+  eligibilityCriteriaOptions,
   programAgencies,
   programCategories,
   type AssistanceProgram,
@@ -31,6 +32,21 @@ const emptyForm: ProgramFormInput = {
   endDate: '',
 }
 
+function dateInputValue(value?: string) {
+  if (!value) return ''
+  if (/^\d{4}-\d{2}-\d{2}$/.test(value)) return value
+  const parsed = new Date(value)
+  if (Number.isNaN(parsed.getTime())) return ''
+  const year = parsed.getFullYear()
+  const month = String(parsed.getMonth() + 1).padStart(2, '0')
+  const day = String(parsed.getDate()).padStart(2, '0')
+  return `${year}-${month}-${day}`
+}
+
+function openDatePicker(event: React.MouseEvent<HTMLInputElement>) {
+  event.currentTarget.showPicker?.()
+}
+
 export function ProgramFormModal({
   open,
   onClose,
@@ -51,8 +67,8 @@ export function ProgramFormModal({
         eligibilityCriteria: initialValues.eligibilityCriteria,
         maxBeneficiaries: initialValues.maxBeneficiaries,
         budgetAllocation: initialValues.budgetAllocation,
-        startDate: initialValues.startDate,
-        endDate: initialValues.endDate ?? '',
+        startDate: dateInputValue(initialValues.startDate),
+        endDate: dateInputValue(initialValues.endDate),
       })
     } else {
       setForm(emptyForm)
@@ -76,6 +92,10 @@ export function ProgramFormModal({
     }
     if (!form.startDate.trim()) {
       setError('Start date is required.')
+      return
+    }
+    if (form.endDate && form.endDate < form.startDate) {
+      setError('End date cannot be earlier than the start date.')
       return
     }
     onSave({
@@ -167,15 +187,22 @@ export function ProgramFormModal({
           <label className="mb-1 block text-xs font-semibold uppercase text-gray-500">
             Eligibility Criteria
           </label>
-          <textarea
+          <select
             required
-            rows={3}
             value={form.eligibilityCriteria}
             onChange={(e) =>
               setForm((prev) => ({ ...prev, eligibilityCriteria: e.target.value }))
             }
             className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
-          />
+          >
+            <option value="">Select eligibility criteria</option>
+            {form.eligibilityCriteria && !eligibilityCriteriaOptions.includes(form.eligibilityCriteria as typeof eligibilityCriteriaOptions[number]) ? (
+              <option value={form.eligibilityCriteria}>{form.eligibilityCriteria}</option>
+            ) : null}
+            {eligibilityCriteriaOptions.map((criteria) => (
+              <option key={criteria} value={criteria}>{criteria}</option>
+            ))}
+          </select>
         </div>
 
         <div className="grid gap-4 sm:grid-cols-2">
@@ -223,9 +250,10 @@ export function ProgramFormModal({
             </label>
             <input
               required
+              type="date"
               value={form.startDate}
               onChange={(e) => setForm((prev) => ({ ...prev, startDate: e.target.value }))}
-              placeholder="e.g. Jan 1, 2026"
+              onClick={openDatePicker}
               className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
             />
           </div>
@@ -234,9 +262,11 @@ export function ProgramFormModal({
               End Date (optional)
             </label>
             <input
+              type="date"
               value={form.endDate ?? ''}
               onChange={(e) => setForm((prev) => ({ ...prev, endDate: e.target.value }))}
-              placeholder="e.g. Dec 31, 2026"
+              onClick={openDatePicker}
+              min={form.startDate || undefined}
               className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
             />
           </div>

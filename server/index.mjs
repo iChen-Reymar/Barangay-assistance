@@ -1040,6 +1040,10 @@ app.post('/api/users', async (req, res) => {
     res.status(400).json({ error: 'Name, valid email, and a password of at least 8 characters are required.' })
     return
   }
+  if (!/^\d{7,15}$/.test(contactNumber)) {
+    res.status(400).json({ error: 'Contact number must contain 7 to 15 digits only.' })
+    return
+  }
   if (!['admin', 'staff', 'association'].includes(role)) {
     res.status(400).json({ error: 'Select a valid account role.' })
     return
