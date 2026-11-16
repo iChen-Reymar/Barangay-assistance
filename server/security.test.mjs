@@ -4,6 +4,7 @@ import test from 'node:test'
 process.env.NODE_ENV = 'test'
 const {
   auditWritePolicy,
+  authClaimsForProfile,
   canWriteResource,
   generateTemporaryPassword,
   payloadIdentity,
@@ -12,6 +13,20 @@ const {
   scopeStoresForActor,
   trustedAuditEntry,
 } = await import('./index.mjs')
+
+test('auth claims use server-controlled profile fields', () => {
+  assert.deepEqual(authClaimsForProfile({
+    role: 'staff',
+    status: 'approved',
+    full_name: 'Barangay Staff',
+    association_name: null,
+  }), {
+    barangay_role: 'staff',
+    barangay_status: 'approved',
+    barangay_full_name: 'Barangay Staff',
+    barangay_association_name: null,
+  })
+})
 
 test('temporary passwords are short, readable, and unique', () => {
   const generated = new Set(Array.from({ length: 50 }, () => generateTemporaryPassword()))

@@ -1023,6 +1023,15 @@ function generateTemporaryPassword() {
   return `${characters.slice(0, 4).join('')}-${characters.slice(4).join('')}`
 }
 
+function authClaimsForProfile(profile) {
+  return {
+    barangay_role: profile.role,
+    barangay_status: profile.status,
+    barangay_full_name: profile.full_name || profile.fullName || profile.email,
+    barangay_association_name: profile.association_name || profile.associationName || null,
+  }
+}
+
 app.post('/api/users', async (req, res) => {
   if (!systemSupabase || !usingSecretKey) {
     res.status(503).json({ error: 'Supabase is not ready to create login accounts.' })
@@ -1060,6 +1069,7 @@ app.post('/api/users', async (req, res) => {
     password,
     email_confirm: true,
     user_metadata: { full_name: fullName, role, status: 'approved', association_name: associationName || null },
+    app_metadata: authClaimsForProfile({ role, status: 'approved', full_name: fullName, association_name: associationName }),
   })
   if (created.error || !created.data.user) {
     res.status(400).json({ error: created.error?.message || 'Could not create the login.' })
@@ -1099,7 +1109,11 @@ app.patch('/api/users/:id/role', async (req, res) => {
     res.status(400).json({ error: 'Select a valid account role.' })
     return
   }
-  const { data: current, error: currentError } = await supabase.from('users').select('role,status').eq('id', id).maybeSingle()
+  const { data: current, error: currentError } = await supabase
+    .from('users')
+    .select('role,status,full_name,association_name')
+    .eq('id', id)
+    .maybeSingle()
   if (currentError || !current) {
     res.status(404).json({ error: 'User not found.' })
     return
@@ -1119,7 +1133,84 @@ app.patch('/api/users/:id/role', async (req, res) => {
     res.status(400).json({ error: error.message })
     return
   }
+  if (usingSecretKey) {
+    const authUser = await findAuthUser(id, [])
+    if (authUser) {
+      const authUpdate = await supabase.auth.admin.updateUserById(id, {
+        app_metadata: {
+          ...(authUser.app_metadata || {}),
+          ...authClaimsForProfile({
+            role,
+            status: current.status,
+            full_name: current.full_name || authUser.email,
+            association_name: current.association_name,
+          }),
+        },
+      })
+      if (authUpdate.error) {
+        await supabase.from('users').update({ role: current.role, payload: row?.payload || {} }).eq('id', id)
+        res.status(400).json({ error: authUpdate.error.message })
+        return
+      }
+    }
+  }
   res.json({ ok: true })
+})
+
+app.post('/api/account/auth-claims', async (req, res) => {
+  if (!usingSecretKey) {
+    res.status(503).json({ error: 'Supabase Auth administration is unavailable.' })
+    return
+  }
+  const actor = await authenticate(req, res)
+  if (!actor) return
+  try {
+    const authUser = await findAuthUser(actor.id, [actor.email])
+    if (!authUser) {
+      res.status(404).json({ error: 'The user does not have a Supabase login account.' })
+      return
+    }
+    const claims = authClaimsForProfile(actor)
+    const updated = await supabase.auth.admin.updateUserById(actor.id, {
+      app_metadata: { ...(authUser.app_metadata || {}), ...claims },
+    })
+    if (updated.error) throw new Error(updated.error.message)
+    res.json({ ok: true, claims })
+  } catch (error) {
+    res.status(500).json({ error: error.message })
+  }
+})
+
+app.post('/api/users/backfill-auth-claims', async (req, res) => {
+  if (!usingSecretKey) {
+    res.status(503).json({ error: 'Supabase Auth administration is unavailable.' })
+    return
+  }
+  if (!(await requireAdmin(req, res))) return
+  try {
+    const profilesResult = await supabase
+      .from('users')
+      .select('id,email,full_name,role,status,association_name')
+    if (profilesResult.error) throw new Error(profilesResult.error.message)
+    const profiles = (profilesResult.data ?? []).filter((profile) => profile.status === 'approved')
+    let updatedCount = 0
+    for (const profile of profiles) {
+      const authUser = await findAuthUser(profile.id, [profile.email])
+      if (!authUser) continue
+      const claims = authClaimsForProfile(profile)
+      const current = authUser.app_metadata || {}
+      const needsUpdate = Object.entries(claims).some(([key, value]) => current[key] !== value)
+      if (!needsUpdate) continue
+      const updated = await supabase.auth.admin.updateUserById(authUser.id, {
+        app_metadata: { ...current, ...claims },
+      })
+      if (updated.error) throw new Error(updated.error.message)
+      updatedCount += 1
+    }
+    res.json({ ok: true, updated: updatedCount })
+  } catch (error) {
+    res.status(500).json({ error: error.message })
+  }
 })
 
 app.delete('/api/users/:id', async (req, res) => {
@@ -1362,6 +1453,12 @@ app.patch('/api/users/:id', async (req, res) => {
         full_name: fullName,
         username: nextPayload.username,
       },
+      app_metadata: authClaimsForProfile({
+        role: existing.role,
+        status: existing.status,
+        full_name: fullName,
+        association_name: existing.association_name,
+      }),
     }
     if (password) attributes.password = password
     const authUser = await findAuthUser(id, [existing.email, email])
@@ -1374,6 +1471,7 @@ app.patch('/api/users/:id', async (req, res) => {
           password,
           email_confirm: true,
           user_metadata: attributes.user_metadata,
+          app_metadata: attributes.app_metadata,
         })
         : { error: null }
     if (authUpdate.error) {
@@ -1452,6 +1550,12 @@ app.post('/api/association-users', async (req, res) => {
         status: 'approved',
         association_name: associationName,
       },
+      app_metadata: authClaimsForProfile({
+        role: 'association',
+        status: 'approved',
+        full_name: fullName,
+        association_name: associationName,
+      }),
     })
     if (created.error || !created.data.user) {
       res.status(400).json({ error: created.error?.message || 'Could not create the login.' })
@@ -1883,6 +1987,7 @@ if (process.env.NODE_ENV !== 'test' && !process.env.VERCEL) {
 
 export {
   app,
+  authClaimsForProfile,
   auditWritePolicy,
   canWriteResource,
   generateTemporaryPassword,

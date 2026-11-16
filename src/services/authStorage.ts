@@ -4,6 +4,7 @@ import { clearRoleScopedCache, writeStoreWithoutSync } from './databaseSync'
 import { setRememberSession } from './sessionPersistence'
 import type { ReviewInput } from '../types/approval'
 import { isValidContactNumber } from '../utils/contactNumber'
+import { trustedAuthClaims } from './authClaims'
 import {
   roleLabelToRole,
   roleToDashboardPath,
@@ -471,23 +472,20 @@ export async function login(email: string, password: string, rememberMe: boolean
     }
   }
 
-  const visible = await fetchVisibleUsers(data.user.id)
   const signedInEmail = authEmail.toLowerCase()
-  const fromTable = visible.find((user) => user.email.toLowerCase() === signedInEmail)
-    ?? readUsers().find((user) => user.email.toLowerCase() === signedInEmail)
   const userMetadata = data.user.user_metadata as Record<string, unknown>
   const appMetadata = data.user.app_metadata as Record<string, unknown>
-  const metadataRole = roleFromLabel(metadataValue(userMetadata, ['role', 'user_role', 'role_label']))
-    ?? roleFromLabel(metadataValue(appMetadata, ['role', 'user_role', 'role_label']))
-  const metadataStatus = metadataValue(userMetadata, ['status'])
-  const role = fromTable?.role ?? metadataRole
-  if (!role) {
+  const claims = trustedAuthClaims(appMetadata)
+  const cached = readUsers().find((account) => account.id === data.user.id || account.email.toLowerCase() === signedInEmail)
+  const visible = claims ? [] : await fetchVisibleUsers(data.user.id)
+  const fromTable = visible.find((account) => account.id === data.user.id)
+  if (!claims && !fromTable) {
     await supabase.auth.signOut({ scope: 'local' })
     clearSession()
-    return { success: false, error: 'This account has no authorized system role. Contact the administrator.' }
+    return { success: false, error: 'The account permissions could not be verified. Please try again.' }
   }
-  const status = fromTable?.status
-    ?? (metadataStatus === 'approved' || metadataStatus === 'pending' || metadataStatus === 'rejected' ? metadataStatus : 'pending')
+  const role = claims?.role ?? fromTable!.role
+  const status = claims?.status ?? fromTable!.status
   if (status === 'pending') {
     await supabase.auth.signOut({ scope: 'local' })
     clearSession()
@@ -505,7 +503,8 @@ export async function login(email: string, password: string, rememberMe: boolean
     }
   }
 
-  const fullName = fromTable?.fullName
+  const fullName = claims?.fullName
+    || fromTable?.fullName
     || metadataValue(userMetadata, ['full_name', 'name'])
     || email.trim()
   const fallbackAccount: StoredUser = {
@@ -524,10 +523,23 @@ export async function login(email: string, password: string, rememberMe: boolean
     createdAt: new Date().toISOString(),
   }
   const account: StoredUser = {
-    ...(fromTable ?? fallbackAccount),
-    mustChangePassword: fromTable?.mustChangePassword === true || userMetadata.must_change_password === true,
+    ...fallbackAccount,
+    ...(cached ?? {}),
+    ...(fromTable ?? {}),
+    id: data.user.id,
+    email: data.user.email ?? authEmail,
+    fullName,
+    role,
+    roleLabel: roleToLabel(role),
+    status,
+    associationName: claims?.associationName ?? fromTable?.associationName ?? cached?.associationName,
+    mustChangePassword: fromTable?.mustChangePassword === true || cached?.mustChangePassword === true || userMetadata.must_change_password === true,
   }
   rememberUser(account)
+
+  if (!claims) {
+    void authenticatedFetch('/api/account/auth-claims', { method: 'POST' }).catch(() => undefined)
+  }
 
   const session: SessionUser = {
     id: account.id,

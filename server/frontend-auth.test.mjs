@@ -25,6 +25,7 @@ const housingCondition = await import('../src/utils/housingCondition.ts')
 const syncRetryPolicy = await import('../src/services/syncRetryPolicy.ts')
 const aidRecords = await import('../src/services/aidRecordStorage.ts')
 const contactNumber = await import('../src/utils/contactNumber.ts')
+const authClaims = await import('../src/services/authClaims.ts')
 
 test('non-remembered Supabase sessions stay in session storage', () => {
   persistence.setRememberSession(false)
@@ -99,6 +100,25 @@ test('contact numbers reject letters and enforce a reasonable digit length', () 
   assert.equal(contactNumber.isValidContactNumber('09171234567'), true)
   assert.equal(contactNumber.isValidContactNumber('12345'), false)
   assert.equal(contactNumber.isValidContactNumber('0917ABC4567'), false)
+})
+
+test('login fast path accepts only complete trusted app metadata', () => {
+  assert.deepEqual(authClaims.trustedAuthClaims({
+    barangay_role: 'association',
+    barangay_status: 'approved',
+    barangay_full_name: 'Association Head',
+    barangay_association_name: 'ERPAT',
+  }), {
+    role: 'association',
+    status: 'approved',
+    fullName: 'Association Head',
+    associationName: 'ERPAT',
+  })
+  assert.equal(authClaims.trustedAuthClaims({
+    role: 'admin',
+    status: 'approved',
+    full_name: 'Untrusted metadata',
+  }), null)
 })
 
 test('legacy temporary housing values normalize to renter', () => {
