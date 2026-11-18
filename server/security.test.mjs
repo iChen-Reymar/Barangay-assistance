@@ -103,6 +103,27 @@ test('association bootstrap removes records owned by other associations', () => 
   ])
 })
 
+test('staff bootstrap keeps only the signed-in staff profile', () => {
+  const stores = [
+    {
+      key: 'barangay_users',
+      payload: JSON.stringify([
+        { id: 'staff-1', fullName: 'Signed-in Staff' },
+        { id: 'staff-2', fullName: 'Other Staff' },
+        { id: 'admin-1', fullName: 'Administrator' },
+      ]),
+    },
+    { key: 'barangay_privacy_settings', payload: JSON.stringify({ retention: 30 }) },
+    { key: 'barangay_reviewable_items', payload: '[]' },
+  ]
+  const scoped = scopeStoresForActor(stores, { id: 'staff-1', role: 'staff' })
+  const users = scoped.find((row) => row.key === 'barangay_users')
+
+  assert.deepEqual(JSON.parse(users.payload), [{ id: 'staff-1', fullName: 'Signed-in Staff' }])
+  assert.equal(scoped.some((row) => row.key === 'barangay_privacy_settings'), false)
+  assert.equal(scoped.some((row) => row.key === 'barangay_reviewable_items'), true)
+})
+
 test('staff generates final lists while admin monitors requests', () => {
   const pending = { source: 'assistance', status: 'PENDING', decisions: [] }
   const current = { status: 'PENDING', payload: pending }

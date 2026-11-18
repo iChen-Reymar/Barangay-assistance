@@ -944,8 +944,17 @@ async function requireRole(req, res, roles) {
 function scopeStoresForActor(stores, actor) {
   if (actor.role === 'admin') return stores
   if (actor.role === 'staff') {
-    const hidden = new Set(['barangay_users', 'barangay_privacy_settings'])
-    return stores.filter((row) => !hidden.has(row.key))
+    return stores.flatMap((row) => {
+      if (row.key === 'barangay_privacy_settings') return []
+      if (row.key !== 'barangay_users') return [row]
+      try {
+        const users = JSON.parse(row.payload)
+        const ownProfile = Array.isArray(users) ? users.filter((item) => item.id === actor.id) : []
+        return [{ ...row, payload: JSON.stringify(ownProfile) }]
+      } catch {
+        return [{ ...row, payload: '[]' }]
+      }
+    })
   }
 
   const association = String(actor.association_name || '').trim().toLowerCase()

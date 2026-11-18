@@ -11,18 +11,40 @@ export default function StaffSettingsPage() {
   const [activeTab, setActiveTab] = useState<(typeof settingsTabs)[number]>('Profile')
   const { user, profile } = useAuth()
 
-  if (!user || !profile) {
+  if (!user) {
     return null
   }
 
-  const initials = getInitials(profile.fullName)
+  const displayName = profile?.fullName ?? user.fullName
+  const initials = getInitials(displayName)
+
+  if (!profile) {
+    return (
+      <>
+        <DashboardNavbar
+          title="System Settings & Configuration"
+          searchPlaceholder="Search settings, user accounts..."
+          userName={displayName}
+          userInitials={initials}
+        />
+        <main className="flex-1 overflow-y-auto p-4 sm:p-5 md:p-6">
+          <div className="rounded-lg border border-amber-200 bg-amber-50 px-5 py-4 text-sm text-amber-900">
+            <h2 className="font-bold">Profile information is syncing</h2>
+            <p className="mt-1 leading-6">
+              Your account is signed in, but the profile details are still loading. Refresh the page if this message remains visible.
+            </p>
+          </div>
+        </main>
+      </>
+    )
+  }
 
   return (
     <>
       <DashboardNavbar
         title="System Settings & Configuration"
         searchPlaceholder="Search settings, user accounts..."
-        userName={profile.fullName}
+        userName={displayName}
         userInitials={initials}
       />
       <main className="flex-1 overflow-y-auto p-4 sm:p-5 md:p-6">
