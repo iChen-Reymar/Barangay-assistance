@@ -33,11 +33,20 @@ import type { StoredUser, UserRole } from '../../types/auth'
 import { recoveryEmailError } from '../../services/passwordRecovery'
 import { isValidContactNumber, sanitizeContactNumber } from '../../utils/contactNumber'
 
-const roleOptions: { value: UserRole; label: string }[] = [
+const roleFilterOptions: { value: UserRole; label: string }[] = [
   { value: 'admin', label: 'Administrator' },
   { value: 'staff', label: 'Barangay Staff' },
   { value: 'association', label: 'Association Head' },
 ]
+
+const managedRoleOptions: { value: Exclude<UserRole, 'admin'>; label: string }[] = [
+  { value: 'staff', label: 'Barangay Staff' },
+  { value: 'association', label: 'Association Head' },
+]
+
+function roleLabel(role: UserRole) {
+  return roleFilterOptions.find((option) => option.value === role)?.label ?? role
+}
 
 const fieldClass =
   'w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary'
@@ -127,7 +136,7 @@ export default function UsersPage({ embedded = false }: { embedded?: boolean }) 
       return
     }
     refreshUsers()
-    const nextLabel = roleOptions.find((option) => option.value === role)?.label ?? role
+    const nextLabel = roleLabel(role)
     setMessage(`${account.fullName} is now ${nextLabel}.`)
     audit(`Changed permissions for ${account.fullName}.`, buildChanges([
       { key: 'role', label: 'Role', oldValue: account.roleLabel, newValue: nextLabel },
@@ -151,7 +160,7 @@ export default function UsersPage({ embedded = false }: { embedded?: boolean }) 
     refreshUsers()
     audit(`Added user ${form.firstName.trim()} ${form.lastName.trim()}.`, buildChanges([
       { key: 'email', label: 'Email', oldValue: '—', newValue: form.email.trim() },
-      { key: 'role', label: 'Role', oldValue: '—', newValue: roleOptions.find((option) => option.value === form.role)?.label ?? form.role },
+      { key: 'role', label: 'Role', oldValue: '—', newValue: roleLabel(form.role) },
     ]))
     setMessage(`${form.firstName.trim()} ${form.lastName.trim()} can now sign in.`)
     setFormOpen(false)
@@ -289,6 +298,7 @@ export default function UsersPage({ embedded = false }: { embedded?: boolean }) 
 
   function accountActions(account: StoredUser, mobile = false) {
     const isSelf = account.id === user?.id
+    const cannotRemove = isSelf || account.role === 'admin'
     const canEmailReset = !recoveryEmailError(account.email)
     const resetDisabled = authAdministration ? isSelf : !canEmailReset
     const resetTitle = authAdministration
@@ -317,8 +327,12 @@ export default function UsersPage({ embedded = false }: { embedded?: boolean }) 
             size="sm"
             variant="outline"
             className={`shrink-0 border-red-200 text-red-600 hover:bg-red-50 ${mobile ? 'px-3' : ''}`}
-            disabled={isSelf}
-            title={isSelf ? 'You cannot remove your own account' : `Remove ${account.fullName}`}
+            disabled={cannotRemove}
+            title={isSelf
+              ? 'You cannot remove your own account'
+              : account.role === 'admin'
+                ? 'Administrator accounts can only be managed directly in Supabase'
+                : `Remove ${account.fullName}`}
             aria-label={`Remove ${account.fullName}`}
             onClick={() => { setError(''); setRemoveTarget(account) }}
           >
@@ -395,7 +409,7 @@ export default function UsersPage({ embedded = false }: { embedded?: boolean }) 
                 className={`${fieldClass} bg-white sm:w-48`}
               >
                 <option value="all">All permissions</option>
-                {roleOptions.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
+                {roleFilterOptions.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
               </select>
             </div>
             <p className="text-xs text-gray-500">
@@ -433,16 +447,21 @@ export default function UsersPage({ embedded = false }: { embedded?: boolean }) 
                     </td>
                     <td className="px-4 py-3 text-gray-600"><span className="break-all">{account.email}</span></td>
                     <td className="px-4 py-3">
-                      <select
-                        value={account.role}
-                        disabled={isSelf}
-                        onChange={(event) => handleRoleChange(account, event.target.value as UserRole)}
-                        className="rounded-lg border border-gray-200 bg-white px-2 py-1.5 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary disabled:bg-gray-50 disabled:text-gray-400"
-                      >
-                        {roleOptions.map((option) => (
-                          <option key={option.value} value={option.value}>{option.label}</option>
-                        ))}
-                      </select>
+                      {account.role === 'admin' ? (
+                        <span className="inline-flex rounded-lg border border-gray-200 bg-gray-50 px-3 py-1.5 text-sm font-medium text-gray-600">
+                          Administrator
+                        </span>
+                      ) : (
+                        <select
+                          value={account.role}
+                          onChange={(event) => handleRoleChange(account, event.target.value as UserRole)}
+                          className="rounded-lg border border-gray-200 bg-white px-2 py-1.5 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
+                        >
+                          {managedRoleOptions.map((option) => (
+                            <option key={option.value} value={option.value}>{option.label}</option>
+                          ))}
+                        </select>
+                      )}
                     </td>
                     <td className="px-4 py-3">
                       {account.role === 'association' ? (
@@ -495,14 +514,19 @@ export default function UsersPage({ embedded = false }: { embedded?: boolean }) 
                     <div>
                       <dt className="text-xs text-gray-500">Permission</dt>
                       <dd className="mt-1">
-                        <select
-                          value={account.role}
-                          disabled={isSelf}
-                          onChange={(event) => handleRoleChange(account, event.target.value as UserRole)}
-                          className="w-full rounded-lg border border-gray-200 bg-white px-2 py-1.5 text-sm disabled:bg-gray-50 disabled:text-gray-400"
-                        >
-                          {roleOptions.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
-                        </select>
+                        {account.role === 'admin' ? (
+                          <span className="block w-full rounded-lg border border-gray-200 bg-gray-50 px-3 py-1.5 text-sm font-medium text-gray-600">
+                            Administrator
+                          </span>
+                        ) : (
+                          <select
+                            value={account.role}
+                            onChange={(event) => handleRoleChange(account, event.target.value as UserRole)}
+                            className="w-full rounded-lg border border-gray-200 bg-white px-2 py-1.5 text-sm"
+                          >
+                            {managedRoleOptions.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
+                          </select>
+                        )}
                       </dd>
                     </div>
                     <div>
@@ -568,7 +592,7 @@ export default function UsersPage({ embedded = false }: { embedded?: boolean }) 
           <label className="block text-sm">
             <span className="mb-1 block text-xs font-semibold uppercase text-gray-500">Permission</span>
             <select value={form.role} onChange={(event) => setForm({ ...form, role: event.target.value as UserRole })} className={fieldClass}>
-              {roleOptions.map((option) => (
+              {managedRoleOptions.map((option) => (
                 <option key={option.value} value={option.value}>{option.label}</option>
               ))}
             </select>

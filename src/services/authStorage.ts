@@ -45,12 +45,6 @@ export function initializeAuthStorage() {
   // Accounts live in Supabase. The app does not create a local administrator.
 }
 
-function approvedAdminCount(users: StoredUser[], exceptId?: string) {
-  return users.filter(
-    (user) => user.id !== exceptId && user.role === 'admin' && user.status === 'approved',
-  ).length
-}
-
 export async function createManagedUser(input: {
   firstName: string
   lastName: string
@@ -60,6 +54,9 @@ export async function createManagedUser(input: {
   role: UserRole
   associationName?: string
 }): Promise<{ success: boolean; error?: string }> {
+  if (input.role === 'admin') {
+    return { success: false, error: 'Administrator accounts can only be created directly in Supabase.' }
+  }
   if (input.password.length < 8) {
     return { success: false, error: 'Password must be at least 8 characters.' }
   }
@@ -201,8 +198,8 @@ export async function updateUserRole(
   if (index === -1) return { success: false, error: 'User not found.' }
 
   const current = users[index]
-  if (current.role === 'admin' && current.status === 'approved' && role !== 'admin' && approvedAdminCount(users, userId) === 0) {
-    return { success: false, error: 'At least one administrator must remain.' }
+  if (current.role === 'admin' || role === 'admin') {
+    return { success: false, error: 'Administrator permissions can only be managed directly in Supabase.' }
   }
 
   const response = await authenticatedFetch(`/api/users/${userId}/role`, {
@@ -238,8 +235,8 @@ export async function removeUser(
   const users = readUsers()
   const target = users.find((user) => user.id === userId)
   if (!target) return { success: false, error: 'User not found.' }
-  if (target.role === 'admin' && target.status === 'approved' && approvedAdminCount(users, userId) === 0) {
-    return { success: false, error: 'At least one administrator must remain.' }
+  if (target.role === 'admin') {
+    return { success: false, error: 'Administrator accounts can only be managed directly in Supabase.' }
   }
 
   const response = await authenticatedFetch(`/api/users/${userId}`, {

@@ -1032,6 +1032,10 @@ function authClaimsForProfile(profile) {
   }
 }
 
+function isAppManagedRole(role) {
+  return role === 'staff' || role === 'association'
+}
+
 app.post('/api/users', async (req, res) => {
   if (!systemSupabase || !usingSecretKey) {
     res.status(503).json({ error: 'Supabase is not ready to create login accounts.' })
@@ -1053,8 +1057,8 @@ app.post('/api/users', async (req, res) => {
     res.status(400).json({ error: 'Contact number must contain 7 to 15 digits only.' })
     return
   }
-  if (!['admin', 'staff', 'association'].includes(role)) {
-    res.status(400).json({ error: 'Select a valid account role.' })
+  if (!isAppManagedRole(role)) {
+    res.status(400).json({ error: 'Administrator accounts can only be created directly in Supabase.' })
     return
   }
   if (role === 'association' && !associationName) {
@@ -1105,8 +1109,8 @@ app.patch('/api/users/:id/role', async (req, res) => {
   if (!(await requireAdmin(req, res))) return
   const id = String(req.params.id || '')
   const role = String(req.body?.role || '')
-  if (!['admin', 'staff', 'association'].includes(role)) {
-    res.status(400).json({ error: 'Select a valid account role.' })
+  if (!isAppManagedRole(role)) {
+    res.status(400).json({ error: 'Administrator permissions can only be managed directly in Supabase.' })
     return
   }
   const { data: current, error: currentError } = await supabase
@@ -1118,19 +1122,16 @@ app.patch('/api/users/:id/role', async (req, res) => {
     res.status(404).json({ error: 'User not found.' })
     return
   }
-  if (current.role === 'admin' && current.status === 'approved' && role !== 'admin') {
-    const { count } = await supabase.from('users').select('id', { count: 'exact', head: true }).eq('role', 'admin').eq('status', 'approved')
-    if ((count ?? 0) <= 1) {
-      res.status(400).json({ error: 'At least one approved administrator must remain.' })
-      return
-    }
-  }
-  const roleLabel = role === 'admin' ? 'Administrator' : role === 'association' ? 'Association Head' : 'Barangay Staff'
+  const roleLabel = role === 'association' ? 'Association Head' : 'Barangay Staff'
   const { data: row } = await supabase.from('users').select('payload').eq('id', id).maybeSingle()
   const payload = { ...(row?.payload || {}), roleLabel, position: roleLabel }
   const { error } = await supabase.from('users').update({ role, payload }).eq('id', id)
   if (error) {
     res.status(400).json({ error: error.message })
+    return
+  }
+  if (current.role === 'admin') {
+    res.status(400).json({ error: 'Administrator permissions can only be managed directly in Supabase.' })
     return
   }
   if (usingSecretKey) {
@@ -1230,12 +1231,9 @@ app.delete('/api/users/:id', async (req, res) => {
     res.status(404).json({ error: 'User not found.' })
     return
   }
-  if (current.role === 'admin' && current.status === 'approved') {
-    const { count } = await supabase.from('users').select('id', { count: 'exact', head: true }).eq('role', 'admin').eq('status', 'approved')
-    if ((count ?? 0) <= 1) {
-      res.status(400).json({ error: 'At least one approved administrator must remain.' })
-      return
-    }
+  if (current.role === 'admin') {
+    res.status(400).json({ error: 'Administrator accounts can only be managed directly in Supabase.' })
+    return
   }
   const authDelete = await supabase.auth.admin.deleteUser(id)
   if (authDelete.error) {
@@ -1992,6 +1990,7 @@ export {
   canWriteResource,
   generateTemporaryPassword,
   initializeServer,
+  isAppManagedRole,
   payloadIdentity,
   requestWriteError,
   requestWriteOperation,

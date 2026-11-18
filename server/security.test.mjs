@@ -7,6 +7,7 @@ const {
   authClaimsForProfile,
   canWriteResource,
   generateTemporaryPassword,
+  isAppManagedRole,
   payloadIdentity,
   requestWriteError,
   requestWriteOperation,
@@ -26,6 +27,12 @@ test('auth claims use server-controlled profile fields', () => {
     barangay_full_name: 'Barangay Staff',
     barangay_association_name: null,
   })
+})
+
+test('application role management excludes administrators', () => {
+  assert.equal(isAppManagedRole('staff'), true)
+  assert.equal(isAppManagedRole('association'), true)
+  assert.equal(isAppManagedRole('admin'), false)
 })
 
 test('temporary passwords are short, readable, and unique', () => {
