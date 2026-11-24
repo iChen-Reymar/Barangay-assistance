@@ -732,10 +732,10 @@ function syncSession(user: StoredUser) {
   }
 }
 
-export function updateUserProfile(
+export async function updateUserProfile(
   userId: string,
   input: ProfileUpdateInput,
-): { success: boolean; error?: string } {
+): Promise<{ success: boolean; error?: string }> {
   const users = readUsers()
   const index = users.findIndex((u) => u.id === userId)
   if (index === -1) {
@@ -752,6 +752,23 @@ export function updateUserProfile(
   if (duplicate) {
     return { success: false, error: 'This email is already used by another account.' }
   }
+  if (email !== users[index].email.toLowerCase()) {
+    return { success: false, error: 'Email changes must be completed through Supabase Authentication.' }
+  }
+
+  const response = await authenticatedFetch('/api/profile', {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      firstName: input.firstName,
+      lastName: input.lastName,
+      contactNumber: input.contactNumber,
+      position: input.position,
+      department: input.department,
+    }),
+  })
+  const body = await response.json().catch(() => ({})) as { error?: string }
+  if (!response.ok) return { success: false, error: body.error || 'Unable to update profile.' }
 
   const updated: StoredUser = {
     ...users[index],
@@ -765,7 +782,7 @@ export function updateUserProfile(
   }
 
   users[index] = updated
-  writeUsers(users)
+  writeStoreWithoutSync(USERS_KEY, JSON.stringify(users))
   syncSession(updated)
   return { success: true }
 }

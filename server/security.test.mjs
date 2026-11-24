@@ -11,8 +11,10 @@ const {
   payloadIdentity,
   requestWriteError,
   requestWriteOperation,
+  resolveMlUrlForRequest,
   scopeStoresForActor,
   trustedAuditEntry,
+  validateOwnProfileInput,
 } = await import('./index.mjs')
 
 test('auth claims use server-controlled profile fields', () => {
@@ -33,6 +35,44 @@ test('application role management excludes administrators', () => {
   assert.equal(isAppManagedRole('staff'), true)
   assert.equal(isAppManagedRole('association'), true)
   assert.equal(isAppManagedRole('admin'), false)
+})
+
+test('self-profile updates accept safe fields and reject invalid contact numbers', () => {
+  assert.deepEqual(validateOwnProfileInput({
+    firstName: ' Barangay ',
+    lastName: ' Staff ',
+    contactNumber: '09171234567',
+    position: ' Encoder ',
+    department: ' social-services ',
+    role: 'admin',
+  }), {
+    input: {
+      firstName: 'Barangay',
+      lastName: 'Staff',
+      contactNumber: '09171234567',
+      position: 'Encoder',
+      department: 'social-services',
+    },
+  })
+  assert.match(validateOwnProfileInput({
+    firstName: 'Barangay',
+    lastName: 'Staff',
+    contactNumber: 'invalid',
+  }).error, /valid contact number/i)
+})
+
+test('Vercel ML requests use the bundled same-deployment function', () => {
+  const previousVercel = process.env.VERCEL
+  process.env.VERCEL = '1'
+  try {
+    assert.equal(
+      resolveMlUrlForRequest({ headers: { 'x-forwarded-host': 'preview.example.vercel.app' } }),
+      'https://preview.example.vercel.app/api/_ml-runtime',
+    )
+  } finally {
+    if (previousVercel === undefined) delete process.env.VERCEL
+    else process.env.VERCEL = previousVercel
+  }
 })
 
 test('temporary passwords are short, readable, and unique', () => {

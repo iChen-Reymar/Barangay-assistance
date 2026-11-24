@@ -74,9 +74,10 @@ npm run lint      # ESLint
 
 ## Vercel deployment
 
-Deploy this repository as two Vercel projects. This keeps the React/Express
-application and the Python/scikit-learn runtime independently deployable while
-both remain on Vercel.
+The default deployment packages the React/Express application and the
+Python/scikit-learn scorer into one Vercel project. Browser ML requests still go
+through the authenticated Express API before reaching the bundled Python
+function.
 
 ### 1. Web and API project
 
@@ -88,9 +89,11 @@ both remain on Vercel.
   VITE_SUPABASE_URL=https://your-project.supabase.co
   VITE_SUPABASE_PUBLISHABLE_KEY=your-publishable-key
   APP_ORIGINS=https://barangay-assistance.vercel.app
-  ML_URL=https://your-ml-project.vercel.app
-  ML_INTERNAL_TOKEN=one-long-random-shared-value
   ```
+
+`ML_URL` is optional. Set it only when overriding the bundled scorer with a
+separately deployed ML project. If `ML_INTERNAL_TOKEN` is set, configure the
+same value for the scorer that receives the forwarded request.
 
 The root `vercel.json` builds Vite, preserves SPA routes, and sends `/api/*` to
 the Express serverless function. `SUPABASE_SECRET_KEY` is not required for the
@@ -101,9 +104,10 @@ publishable key so GitHub-triggered deployments remain functional before Vercel
 variables are configured. Project environment variables override this fallback.
 Never add a secret or service-role key to that file.
 
-### 2. ML project
+### 2. Optional separate ML project
 
-- Import the same repository again as a separate Vercel project.
+- This is not required for the default deployment. To operate the scorer as an
+  independent service, import the same repository again as a separate Vercel project.
 - Set its root directory to `ml-service`.
 - Configure the same `ML_INTERNAL_TOKEN` value used by the web/API project.
 - Deploy it and copy its production URL into the web/API project's `ML_URL`.

@@ -4,6 +4,7 @@ import { DashboardLayoutProvider } from './DashboardLayoutContext'
 import { DashboardSidebar, type NavItem } from './DashboardSidebar'
 import { pullFromDatabase } from '../../services/databaseSync'
 import { SyncStatusIndicator } from './SyncStatusIndicator'
+import { useAuth } from '../../context/useAuth'
 
 interface DashboardLayoutProps {
   navItems: NavItem[]
@@ -13,6 +14,7 @@ interface DashboardLayoutProps {
 }
 
 export default function DashboardLayout({ navItems, user, logoutPath, settingsPath }: DashboardLayoutProps) {
+  const { refreshUsers } = useAuth()
   useEffect(() => {
     let active = true
     let refreshing = false
@@ -21,6 +23,7 @@ export default function DashboardLayout({ navItems, user, logoutPath, settingsPa
       refreshing = true
       try {
         await pullFromDatabase()
+        refreshUsers()
       } finally {
         refreshing = false
       }
@@ -39,7 +42,7 @@ export default function DashboardLayout({ navItems, user, logoutPath, settingsPa
       window.removeEventListener('focus', onFocus)
       document.removeEventListener('visibilitychange', onVisibility)
     }
-  }, [])
+  }, [refreshUsers])
 
   return (
     <DashboardLayoutProvider settingsPath={settingsPath}>

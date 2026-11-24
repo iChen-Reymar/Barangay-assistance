@@ -738,6 +738,60 @@ as $$
   select email from public.users where id = auth.uid()::text and status = 'approved'
 $$;
 
+-- Signed-in users may maintain only their own non-privileged profile fields.
+-- Role, status, association assignment, email, and account ownership are never
+-- accepted from the caller.
+create or replace function public.update_own_profile(
+  profile_first_name text,
+  profile_last_name text,
+  profile_contact_number text,
+  profile_position text,
+  profile_department text
+)
+returns public.users
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  account public.users;
+  first_name text := btrim(coalesce(profile_first_name, ''));
+  last_name text := btrim(coalesce(profile_last_name, ''));
+  normalized_contact text := btrim(coalesce(profile_contact_number, ''));
+begin
+  if auth.uid() is null then
+    raise exception 'Sign in to update your profile.';
+  end if;
+  if first_name = '' or last_name = '' then
+    raise exception 'First name and last name are required.';
+  end if;
+  if normalized_contact !~ '^[0-9]{7,15}$' then
+    raise exception 'Enter a valid contact number using 7 to 15 digits only.';
+  end if;
+
+  update public.users
+  set
+    full_name = first_name || ' ' || last_name,
+    payload = coalesce(payload, '{}'::jsonb) || jsonb_build_object(
+      'firstName', first_name,
+      'lastName', last_name,
+      'contactNumber', normalized_contact,
+      'position', btrim(coalesce(profile_position, '')),
+      'department', btrim(coalesce(profile_department, ''))
+    )
+  where id = auth.uid()::text and status = 'approved'
+  returning * into account;
+
+  if account.id is null then
+    raise exception 'Approved profile not found.';
+  end if;
+  return account;
+end
+$$;
+
+revoke all on function public.update_own_profile(text, text, text, text, text) from public;
+grant execute on function public.update_own_profile(text, text, text, text, text) to authenticated;
+
 -- Publishable-key account registration. The trigger deliberately forces every
 -- self-registration to PENDING and accepts only Staff or Association Head roles;
 -- callers cannot create an approved account or an Administrator through Auth

@@ -283,10 +283,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   )
 
   const updateProfile = useCallback(
-    (input: ProfileUpdateInput) => {
+    async (input: ProfileUpdateInput) => {
       if (!user) return { success: false, error: 'Not signed in.' }
       const before = getUserById(user.id)
-      const result = updateUserProfile(user.id, input)
+      const result = await updateUserProfile(user.id, input)
       if (result.success && before) {
         setUser(getSession())
         refreshUsers()

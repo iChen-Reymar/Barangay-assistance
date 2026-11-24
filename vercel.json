@@ -6,9 +6,17 @@
   "functions": {
     "api/index.mjs": {
       "maxDuration": 60
+    },
+    "api/ml-runtime.py": {
+      "maxDuration": 60,
+      "includeFiles": "ml-service/**"
     }
   },
   "rewrites": [
+    {
+      "source": "/api/_ml-runtime/(.*)",
+      "destination": "/api/ml-runtime"
+    },
     {
       "source": "/api/(.*)",
       "destination": "/api"

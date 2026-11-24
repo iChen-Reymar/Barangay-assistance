@@ -10,7 +10,7 @@ interface EditProfileModalProps {
   open: boolean
   onClose: () => void
   profile: StoredUser
-  onSave: (input: ProfileUpdateInput) => { success: boolean; error?: string }
+  onSave: (input: ProfileUpdateInput) => Promise<{ success: boolean; error?: string }>
 }
 
 export function EditProfileModal({ open, onClose, profile, onSave }: EditProfileModalProps) {
@@ -22,6 +22,7 @@ export function EditProfileModal({ open, onClose, profile, onSave }: EditProfile
   const [department, setDepartment] = useState(profile.department)
   const [error, setError] = useState('')
   const [success, setSuccess] = useState(false)
+  const [saving, setSaving] = useState(false)
 
   useResetWhenOpen(open, profile, () => {
     setFirstName(profile.firstName)
@@ -34,14 +35,15 @@ export function EditProfileModal({ open, onClose, profile, onSave }: EditProfile
     setSuccess(false)
   })
 
-  function handleSubmit(e: FormEvent) {
+  async function handleSubmit(e: FormEvent) {
     e.preventDefault()
     setError('')
     if (!isValidContactNumber(contactNumber)) {
       setError('Enter a valid contact number using 7 to 15 digits only.')
       return
     }
-    const result = onSave({
+    setSaving(true)
+    const result = await onSave({
       firstName,
       lastName,
       email,
@@ -49,6 +51,7 @@ export function EditProfileModal({ open, onClose, profile, onSave }: EditProfile
       position,
       department,
     })
+    setSaving(false)
     if (!result.success) {
       setError(result.error ?? 'Unable to update profile.')
       return
@@ -100,9 +103,11 @@ export function EditProfileModal({ open, onClose, profile, onSave }: EditProfile
             required
             type="email"
             value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
+            readOnly
+            aria-describedby="profile-email-help"
+            className="w-full cursor-not-allowed rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-500"
           />
+          <p id="profile-email-help" className="mt-1 text-xs text-gray-500">Email changes require Supabase Authentication.</p>
         </div>
 
         <div>
@@ -150,7 +155,7 @@ export function EditProfileModal({ open, onClose, profile, onSave }: EditProfile
           <Button type="button" variant="outline" onClick={onClose}>
             Cancel
           </Button>
-          <Button type="submit">Save Changes</Button>
+          <Button type="submit" disabled={saving}>{saving ? 'Saving...' : 'Save Changes'}</Button>
         </div>
       </form>
     </Modal>

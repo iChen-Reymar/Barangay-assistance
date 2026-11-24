@@ -1045,6 +1045,21 @@ function isAppManagedRole(role) {
   return role === 'staff' || role === 'association'
 }
 
+function validateOwnProfileInput(body) {
+  const input = {
+    firstName: String(body?.firstName || '').trim(),
+    lastName: String(body?.lastName || '').trim(),
+    contactNumber: String(body?.contactNumber || '').trim(),
+    position: String(body?.position || '').trim(),
+    department: String(body?.department || '').trim(),
+  }
+  if (!input.firstName || !input.lastName) return { error: 'First name and last name are required.' }
+  if (!/^\d{7,15}$/.test(input.contactNumber)) {
+    return { error: 'Enter a valid contact number using 7 to 15 digits only.' }
+  }
+  return { input }
+}
+
 app.post('/api/users', async (req, res) => {
   if (!systemSupabase || !usingSecretKey) {
     res.status(503).json({ error: 'Supabase is not ready to create login accounts.' })
@@ -1163,6 +1178,38 @@ app.patch('/api/users/:id/role', async (req, res) => {
         return
       }
     }
+  }
+  res.json({ ok: true })
+})
+
+app.patch('/api/profile', async (req, res) => {
+  const actor = await requireRole(req, res, ['admin', 'staff', 'association'])
+  if (!actor) return
+  const validated = validateOwnProfileInput(req.body)
+  if (validated.error) {
+    res.status(400).json({ error: validated.error })
+    return
+  }
+  const { firstName, lastName, contactNumber, position, department } = validated.input
+
+  const header = String(req.headers.authorization || '')
+  const token = header.startsWith('Bearer ') ? header.slice(7).trim() : ''
+  const profileClient = authenticatedClient(token)
+  const { data, error } = await profileClient.rpc('update_own_profile', {
+    profile_first_name: firstName,
+    profile_last_name: lastName,
+    profile_contact_number: contactNumber,
+    profile_position: position,
+    profile_department: department,
+  })
+  if (error) {
+    res.status(500).json({ error: error.message })
+    return
+  }
+  const row = Array.isArray(data) ? data[0] : data
+  if (!row || String(row.id) !== String(actor.id)) {
+    res.status(500).json({ error: 'The updated profile could not be loaded.' })
+    return
   }
   res.json({ ok: true })
 })
@@ -1902,33 +1949,36 @@ app.all('/api/store/:key', async (req, res) => {
 
 // -- ML proxy ------------------------------------------------------------
 //
-// The machine learning module is a separate Python service (see ml-service/),
-// matching the three-tier design: the browser talks only to this application
-// layer, and this layer reaches the ML service and the database. Proxying here
-// rather than calling Python from the browser keeps a single origin, so there
-// is no CORS configuration in production and the client never needs to know
-// where the models are hosted.
+// The browser talks only to this authenticated application layer. On Vercel,
+// authorized requests are forwarded to the bundled Python function in the same
+// deployment. ML_URL remains an optional override for a separately deployed
+// scorer, and local development keeps using the Python process on ML_PORT.
 //
 // When Python is down the proxy answers 503. Operational list generation fails
 // safely and never finalizes a request from a local heuristic fallback.
 
 const mlPort = Number(process.env.ML_PORT || 5050)
 const configuredMlUrl = String(process.env.ML_URL || '').trim().replace(/\/+$/, '')
-const mlUrl = configuredMlUrl || `http://127.0.0.1:${mlPort}`
+const localMlUrl = `http://127.0.0.1:${mlPort}`
 const ML_TIMEOUT_MS = Number(process.env.ML_TIMEOUT_MS || 20000)
 
-function mlConfigurationError() {
-  if (process.env.VERCEL && !configuredMlUrl) {
-    return 'ML_URL is not configured for this Vercel deployment.'
-  }
-  return null
+function requestMlUrl(req) {
+  if (configuredMlUrl) return configuredMlUrl
+  if (!process.env.VERCEL) return localMlUrl
+  const forwardedHost = String(req.headers['x-forwarded-host'] || req.headers.host || '').split(',')[0].trim()
+  if (!forwardedHost) throw new Error('The Vercel deployment host is unavailable.')
+  return `https://${forwardedHost}/api/_ml-runtime`
 }
 
-async function callMl(path, body) {
+function resolveMlUrlForRequest(req) {
+  return requestMlUrl(req)
+}
+
+async function callMl(req, path, body) {
   const mlHeaders = {}
   if (body !== undefined) mlHeaders['Content-Type'] = 'application/json'
   if (process.env.ML_INTERNAL_TOKEN) mlHeaders['X-ML-Internal-Token'] = process.env.ML_INTERNAL_TOKEN
-  const response = await fetch(`${mlUrl}${path}`, {
+  const response = await fetch(`${requestMlUrl(req)}${path}`, {
     method: body === undefined ? 'GET' : 'POST',
     headers: mlHeaders,
     body: body === undefined ? undefined : JSON.stringify(body),
@@ -1944,14 +1994,9 @@ async function callMl(path, body) {
   return { status: response.status, payload }
 }
 
-app.get('/api/ml-health', async (_req, res) => {
-  const configurationError = mlConfigurationError()
-  if (configurationError) {
-    res.status(503).json({ ok: false, service: 'barangay-vulnerability-ml', error: configurationError })
-    return
-  }
+app.get('/api/ml-health', async (req, res) => {
   try {
-    const { status, payload } = await callMl('/api/health')
+    const { status, payload } = await callMl(req, '/api/health')
     if (status < 200 || status >= 300) {
       res.status(503).json({
         ok: false,
@@ -1981,15 +2026,10 @@ app.use('/api/ml', async (req, res) => {
   const trainRequest = /\/api\/train(?:\?|$)/.test(req.originalUrl)
   const actor = await requireRole(req, res, trainRequest ? ['admin'] : ['admin', 'staff', 'association'])
   if (!actor) return
-  const configurationError = mlConfigurationError()
-  if (configurationError) {
-    res.status(503).json({ ok: false, error: configurationError })
-    return
-  }
   const suffix = req.originalUrl.slice('/api/ml'.length) || '/'
   const isBodyless = req.method === 'GET' || req.method === 'HEAD'
   try {
-    const { status, payload } = await callMl(suffix, isBodyless ? undefined : (req.body ?? {}))
+    const { status, payload } = await callMl(req, suffix, isBodyless ? undefined : (req.body ?? {}))
     res.status(status).json(payload)
   } catch (error) {
     res.status(503).json({ ok: false, error: 'ML service is not running.', detail: error.message })
@@ -1999,7 +2039,7 @@ app.use('/api/ml', async (req, res) => {
 if (process.env.NODE_ENV !== 'test' && !process.env.VERCEL) {
   app.listen(apiPort, () => {
     console.log(`API listening on http://localhost:${apiPort}`)
-    console.log(`ML service expected at ${mlUrl} (proxied under /api/ml)`)
+    console.log(`ML service expected at ${configuredMlUrl || localMlUrl} (proxied under /api/ml)`)
   })
 
   initializeServer()
@@ -2027,6 +2067,8 @@ export {
   payloadIdentity,
   requestWriteError,
   requestWriteOperation,
+  resolveMlUrlForRequest,
   scopeStoresForActor,
   trustedAuditEntry,
+  validateOwnProfileInput,
 }
