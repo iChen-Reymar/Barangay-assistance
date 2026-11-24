@@ -57,30 +57,23 @@ export function AiRecommendationBoards({
     const visible = associationName === undefined
       ? linkedRows
       : linkedRows.filter((row) => associationName.trim() !== '' && same(row.association, associationName))
-    const grouped = new Map<string, { association: string; program: string; members: GeneratedAssistanceRow[] }>()
+    const grouped = new Map<string, { requestId: string; association: string; program: string; members: GeneratedAssistanceRow[] }>()
     for (const row of visible) {
+      const requestId = row.requestId!
       const association = row.association.trim() || 'Unassigned'
       const program = row.program.trim() || 'Assistance'
-      const key = `${association.toLowerCase()}|${program.toLowerCase()}`
-      const current = grouped.get(key) ?? { association, program, members: [] }
+      const current = grouped.get(requestId) ?? { requestId, association, program, members: [] }
       current.members.push(row)
-      grouped.set(key, current)
+      grouped.set(requestId, current)
     }
 
     return [...grouped.values()]
       .map((group) => {
-        const requestIds = new Set(group.members.map((member) => member.requestId).filter(Boolean))
-        const related = requests.filter(
-          (request) =>
-            requestIds.has(request.id) || (
-              same(request.association, group.association) &&
-              (same(request.requestType, group.program) || same(request.program ?? '', group.program))
-            ),
-        )
+        const related = requests.filter((request) => request.id === group.requestId)
         const members = [...group.members].sort((left, right) => left.rank - right.rank || right.score - left.score)
         return { ...group, members, requests: related }
       })
-      .sort((left, right) => left.association.localeCompare(right.association) || left.program.localeCompare(right.program))
+      .sort((left, right) => left.association.localeCompare(right.association) || left.program.localeCompare(right.program) || left.requestId.localeCompare(right.requestId))
   }, [associationName, requests, rows])
 
   if (groups.length === 0) {
@@ -92,13 +85,13 @@ export function AiRecommendationBoards({
   }
 
   const showAssociation = associationName === undefined
-  const opened = compact ? groups.find((group) => `${group.association}-${group.program}` === openKey) : null
+  const opened = compact ? groups.find((group) => group.requestId === openKey) : null
 
   if (compact && !opened) {
     return (
       <div className="overflow-hidden rounded-lg border border-gray-200 bg-white shadow-sm">
         {groups.map((group) => {
-          const key = `${group.association}-${group.program}`
+          const key = group.requestId
           return (
             <button
               key={key}
@@ -120,6 +113,7 @@ export function AiRecommendationBoards({
                   {group.members.length} member{group.members.length === 1 ? '' : 's'} scored
                   {group.requests[0]?.date ? ` · Requested ${group.requests[0].date}` : ''}
                 </span>
+                <span className="mt-1 block break-all text-[11px] text-gray-400">{group.requestId}</span>
               </span>
               <span className="shrink-0 text-sm font-semibold text-green-700">View</span>
             </button>
@@ -134,7 +128,7 @@ export function AiRecommendationBoards({
   return (
     <div className="space-y-6">
       {visibleGroups.map((group) => (
-        <section key={`${group.association}-${group.program}`} className="rounded-lg border border-gray-200 bg-white p-5 shadow-sm">
+        <section key={group.requestId} className="rounded-lg border border-gray-200 bg-white p-5 shadow-sm">
           {compact ? (
             <button
               type="button"
@@ -157,6 +151,7 @@ export function AiRecommendationBoards({
                 {group.members.length} member{group.members.length === 1 ? '' : 's'} scored
                 {group.requests[0]?.date ? ` · Requested ${group.requests[0].date}` : ''}
               </p>
+              <p className="mt-1 break-all text-xs text-gray-400">Request: {group.requestId}</p>
             </div>
             <Badge variant="success">AI GENERATED</Badge>
           </div>
