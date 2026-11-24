@@ -6,7 +6,6 @@ import { useAssociationDisplayUser } from '../../hooks/useAssociationDisplayUser
 import { getAssociationDetails } from '../../services/memberStorage'
 import { getAssociationAssistanceItems, subscribeDecisionStorage } from '../../services/decisionStorage'
 import { getGeneratedAssistanceList, subscribeGeneratedAssistanceList } from '../../services/aiProcessing'
-import { PriorityHouseholdsModal } from '../../components/association/PriorityHouseholdsModal'
 
 export default function ApprovedRequestsPage() {
   const { profile } = useAuth()
@@ -14,7 +13,6 @@ export default function ApprovedRequestsPage() {
   const associationName = profile?.associationName ?? getAssociationDetails().name
   const [requests, setRequests] = useState(() => getAssociationAssistanceItems(associationName))
   const [generated, setGenerated] = useState(() => getGeneratedAssistanceList())
-  const [selectedRequestId, setSelectedRequestId] = useState<string | null>(null)
 
   useEffect(() => {
     const refreshRequests = () => setRequests(getAssociationAssistanceItems(associationName))
@@ -51,13 +49,7 @@ export default function ApprovedRequestsPage() {
               const decision = item.decisions.find((entry) => entry.newStatus === 'APPROVED')
               const beneficiaryCount = generated.filter((row) => row.requestId === item.id).length
               return (
-                <button
-                  key={item.id}
-                  type="button"
-                  onClick={() => setSelectedRequestId(item.id)}
-                  className="rounded-lg border border-gray-200 bg-white p-5 text-left shadow-sm transition hover:border-green-300 hover:shadow-md focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2"
-                  aria-label={`View priority households for request ${item.id}`}
-                >
+                <div key={item.id} className="rounded-lg border border-gray-200 bg-white p-5 shadow-sm">
                   <p className="text-xs font-semibold uppercase text-gray-400">{item.id}</p>
                   <h2 className="mt-1 text-lg font-bold text-green-800">{item.program || item.requestType}</h2>
                   <dl className="mt-4 space-y-2 text-sm">
@@ -77,28 +69,13 @@ export default function ApprovedRequestsPage() {
                     </div>
                   </dl>
                   {decision?.notes ? <p className="mt-4 text-sm text-gray-600">{decision.notes}</p> : null}
-                   <div className="mt-4 flex items-center justify-between gap-3">
-                     <Badge variant="success">{item.status}</Badge>
-                     <span className="text-sm font-semibold text-green-700">View households</span>
-                   </div>
-                </button>
+                   <div className="mt-4"><Badge variant="success">{item.status}</Badge></div>
+                </div>
               )
             })}
           </div>
         )}
       </main>
-      {(() => {
-        const request = approved.find((item) => item.id === selectedRequestId)
-        return (
-          <PriorityHouseholdsModal
-            open={request !== undefined}
-            onClose={() => setSelectedRequestId(null)}
-            requestId={request?.id ?? ''}
-            program={request?.program || request?.requestType || 'Assistance'}
-            rows={generated.filter((row) => row.requestId === request?.id)}
-          />
-        )
-      })()}
     </>
   )
 }
