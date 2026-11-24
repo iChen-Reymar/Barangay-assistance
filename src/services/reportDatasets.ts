@@ -246,7 +246,7 @@ function aiSheets(selectedRequestId?: string): ReportSheet[] {
       })
       const name = group.requestId
         ? `${association} — ${program} — ${date} (${group.requestId})`
-        : 'Legacy / Unlinked Results'
+        : 'Historical Results — Not Linked to a Request'
 
       return {
         id: group.requestId || 'legacy-unlinked',

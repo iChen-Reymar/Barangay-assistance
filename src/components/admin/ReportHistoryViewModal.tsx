@@ -25,27 +25,34 @@ export function ReportHistoryViewModal({
   onDownload,
 }: ReportHistoryViewModalProps) {
   const [sheetIndex, setSheetIndex] = useState(0)
+  const [allGeneratedRequests, setAllGeneratedRequests] = useState(false)
+  const [selectionReportId, setSelectionReportId] = useState<string | null>(null)
 
   if (!preview) return null
 
-  const selectedSheetIndex = Math.min(sheetIndex, Math.max(preview.sheets.length - 1, 0))
+  const reportChanged = selectionReportId !== preview.entry.id
+  const selectedSheetIndex = reportChanged ? 0 : Math.min(sheetIndex, Math.max(preview.sheets.length - 1, 0))
   const sheet = preview.sheets[selectedSheetIndex]
   const shown = sheet ? sheet.rows.slice(0, PREVIEW_LIMIT) : []
   const hiddenCount = sheet ? Math.max(sheet.rows.length - shown.length, 0) : 0
   const selectsGeneratedRequest = preview.entry.reportType === 'ai_scoring'
-  const selectedReportSectionId = selectsGeneratedRequest ? sheet?.id : undefined
+  const showingAllGeneratedRequests = selectsGeneratedRequest && (reportChanged || allGeneratedRequests)
+  const selectedReportSectionId = selectsGeneratedRequest && !showingAllGeneratedRequests ? sheet?.id : undefined
+  const totalRecords = preview.sheets.reduce((sum, item) => sum + item.rows.length, 0)
 
   return (
     <Modal open={open} onClose={onClose} title={preview.title} size="xl">
       <div className="space-y-4">
         <div className="rounded-lg border border-gray-100 bg-gray-50 px-4 py-3 text-sm text-gray-600">
           <p>
-            {selectsGeneratedRequest && sheet
+            {showingAllGeneratedRequests
+              ? `${totalRecords} records across ${preview.sheets.length} generated request sections`
+              : selectsGeneratedRequest && sheet
               ? `${preview.summary[0]} · ${sheet.rows.length} record${sheet.rows.length === 1 ? '' : 's'} for the selected request`
               : preview.summary.join(' · ')}
           </p>
           <p className="mt-1">
-            Review the rows below, then download {selectsGeneratedRequest ? 'the selected request report' : 'the full report'}.
+            Review the rows below, then download {selectsGeneratedRequest && !showingAllGeneratedRequests ? 'the selected request report' : 'the complete report'}.
           </p>
         </div>
 
@@ -59,10 +66,21 @@ export function ReportHistoryViewModal({
                   : 'Report section'}
             </span>
             <select
-              value={selectedSheetIndex}
-              onChange={(event) => setSheetIndex(Number(event.target.value))}
+              value={showingAllGeneratedRequests ? 'all' : String(selectedSheetIndex)}
+              onChange={(event) => {
+                setSelectionReportId(preview.entry.id)
+                if (event.target.value === 'all') {
+                  setAllGeneratedRequests(true)
+                  return
+                }
+                setAllGeneratedRequests(false)
+                setSheetIndex(Number(event.target.value))
+              }}
               className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2.5 text-sm font-medium text-gray-800 shadow-sm outline-none focus:border-primary focus:ring-2 focus:ring-primary/20"
             >
+              {selectsGeneratedRequest ? (
+                <option value="all">All Generated Requests ({totalRecords})</option>
+              ) : null}
               {preview.sheets.map((item, index) => (
                 <option key={item.name} value={index}>
                   {item.name} ({item.rows.length})
@@ -76,13 +94,29 @@ export function ReportHistoryViewModal({
           </h3>
         ) : null}
 
-        {sheet && sheet.rows.length === 0 ? (
+        {showingAllGeneratedRequests ? (
+          <div className="overflow-hidden rounded-lg border border-gray-200">
+            <div className="border-b border-gray-200 bg-gray-50 px-4 py-3">
+              <h3 className="text-sm font-semibold text-gray-900">Complete report contents</h3>
+            </div>
+            <ul className="divide-y divide-gray-100">
+              {preview.sheets.map((item) => (
+                <li key={item.id ?? item.name} className="flex items-start justify-between gap-4 px-4 py-3 text-sm">
+                  <span className="min-w-0 break-words text-gray-700">{item.name}</span>
+                  <span className="shrink-0 font-semibold text-gray-900">{item.rows.length}</span>
+                </li>
+              ))}
+            </ul>
+          </div>
+        ) : null}
+
+        {!showingAllGeneratedRequests && sheet && sheet.rows.length === 0 ? (
           <p className="rounded-lg border border-dashed border-gray-200 px-4 py-8 text-center text-sm text-gray-500">
             No records yet.
           </p>
         ) : null}
 
-        {sheet && shown.length > 0 ? (
+        {!showingAllGeneratedRequests && sheet && shown.length > 0 ? (
           <>
             <div className="hidden overflow-x-auto rounded-lg border border-gray-200 md:block">
               <table className="min-w-full text-left text-sm">
