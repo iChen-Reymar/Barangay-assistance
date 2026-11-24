@@ -1913,8 +1913,16 @@ app.all('/api/store/:key', async (req, res) => {
 // safely and never finalizes a request from a local heuristic fallback.
 
 const mlPort = Number(process.env.ML_PORT || 5050)
-const mlUrl = process.env.ML_URL || `http://127.0.0.1:${mlPort}`
+const configuredMlUrl = String(process.env.ML_URL || '').trim().replace(/\/+$/, '')
+const mlUrl = configuredMlUrl || `http://127.0.0.1:${mlPort}`
 const ML_TIMEOUT_MS = Number(process.env.ML_TIMEOUT_MS || 20000)
+
+function mlConfigurationError() {
+  if (process.env.VERCEL && !configuredMlUrl) {
+    return 'ML_URL is not configured for this Vercel deployment.'
+  }
+  return null
+}
 
 async function callMl(path, body) {
   const mlHeaders = {}
@@ -1937,10 +1945,21 @@ async function callMl(path, body) {
 }
 
 app.get('/api/ml-health', async (_req, res) => {
+  const configurationError = mlConfigurationError()
+  if (configurationError) {
+    res.status(503).json({ ok: false, service: 'barangay-vulnerability-ml', error: configurationError })
+    return
+  }
   try {
     const { status, payload } = await callMl('/api/health')
     if (status < 200 || status >= 300) {
-      res.status(503).json({ ok: false, service: 'barangay-vulnerability-ml' })
+      res.status(503).json({
+        ok: false,
+        service: 'barangay-vulnerability-ml',
+        error: status === 401
+          ? 'The ML service rejected the internal token.'
+          : 'The ML service health check failed.',
+      })
       return
     }
     res.json({
@@ -1962,6 +1981,11 @@ app.use('/api/ml', async (req, res) => {
   const trainRequest = /\/api\/train(?:\?|$)/.test(req.originalUrl)
   const actor = await requireRole(req, res, trainRequest ? ['admin'] : ['admin', 'staff', 'association'])
   if (!actor) return
+  const configurationError = mlConfigurationError()
+  if (configurationError) {
+    res.status(503).json({ ok: false, error: configurationError })
+    return
+  }
   const suffix = req.originalUrl.slice('/api/ml'.length) || '/'
   const isBodyless = req.method === 'GET' || req.method === 'HEAD'
   try {

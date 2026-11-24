@@ -181,7 +181,6 @@ def score():
     if len(records) < MIN_RECORDS_FOR_SCORE:
         return jsonify({"ok": False, "error": "No records supplied."}), 400
 
-    scorer: VulnerabilityScorer = _state["scorer"]
     incomplete = []
     for record in records:
         missing = _missing_assessment_fields(record)
@@ -195,6 +194,7 @@ def score():
         }), 400
 
     _ensure_trained()
+    scorer: VulnerabilityScorer = _state["scorer"]
     prepared = records
     matrix = _records_to_matrix(prepared)
     results = scorer.score(matrix)

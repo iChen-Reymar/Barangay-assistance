@@ -1,7 +1,9 @@
 """Regression tests for privacy-sensitive ML feature encoding."""
 
 import unittest
+from unittest.mock import patch
 
+import app as ml_app
 from app import _missing_assessment_fields, app
 
 from features import (
@@ -79,6 +81,56 @@ class FeatureEncodingTests(unittest.TestCase):
             }]})
         self.assertEqual(response.status_code, 400)
         self.assertFalse(response.get_json()["ok"])
+
+    def test_score_endpoint_uses_model_loaded_during_cold_start(self):
+        complete = {
+            "id": "member-1",
+            "name": "Complete Household",
+            "association": "Association A",
+            "familySize": 4,
+            "monthlyIncome": 8000,
+            "workingHouseholdMembers": 1,
+            "age": 42,
+            "employmentStatus": "Seasonal Worker",
+            "housingCondition": "Light Materials",
+            "vulnerabilityIndicators": [],
+        }
+
+        class ColdStartScorer:
+            def score(self, matrix):
+                self.matrix = matrix
+                return [{
+                    "score": 72.0,
+                    "classification": "HIGH",
+                    "probabilities": {"HIGH": 0.72, "MEDIUM": 0.2, "LOW": 0.08},
+                    "decisionTreePrediction": "HIGH",
+                    "logisticRegressionPrediction": "HIGH",
+                    "decisionTreePath": [],
+                    "logisticContributions": [],
+                }]
+
+        scorer = ColdStartScorer()
+
+        def load_model():
+            ml_app._state.update(
+                scorer=scorer,
+                metrics={"blended": {"accuracy": 0.85}},
+                trainedAt="2026-11-24T00:00:00+00:00",
+            )
+
+        previous = ml_app._state.copy()
+        ml_app._state["scorer"] = None
+        try:
+            with patch.object(ml_app, "_ensure_trained", side_effect=load_model):
+                with app.test_client() as client:
+                    response = client.post("/api/score", json={"records": [complete]})
+        finally:
+            ml_app._state.clear()
+            ml_app._state.update(previous)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertTrue(response.get_json()["ok"])
+        self.assertEqual(response.get_json()["results"][0]["classification"], "HIGH")
 
 
 if __name__ == "__main__":
